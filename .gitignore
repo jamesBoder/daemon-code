@@ -1,0 +1,24 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Go
+backend/bin/
+*.exe
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store

@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+
+:root {
+  /* Base layers */
+  --background:       #070809;
+  --surface:          #0d1018;
+  --surface-elevated: #141925;
+  --surface-overlay:  rgba(13, 16, 24, 0.92);
+
+  /* Borders */
+  --border:           rgba(255, 255, 255, 0.06);
+  --border-subtle:    rgba(255, 255, 255, 0.03);
+  --border-active:    rgba(255, 255, 255, 0.12);
+
+  /* Text */
+  --text-primary:     #e2e8f0;
+  --text-secondary:   #64748b;
+  --text-muted:       #334155;
+  --text-daemon:      #c4c9d4;
+
+  /* Accent — shifts by archetype, default indigo */
+  --accent:           #6366f1;
+  --accent-glow:      rgba(99, 102, 241, 0.15);
+
+  /* Archetype accents (applied dynamically via JS) */
+  --archetype-abandoned: #818cf8;
+  --archetype-unworthy:  #d97706;
+  --archetype-rage:      #dc2626;
+  --archetype-grief:     #0891b2;
+
+  /* Semantic */
+  --compile-green:      #22c55e;
+  --warning:            #f59e0b;
+  --process-running:    #22c55e;
+  --process-sleeping:   #475569;
+  --process-weakening:  #f59e0b;
+  --process-new:        #6366f1;
+
+  /* Spacing */
+  --space-1:  4px;  --space-2:  8px;  --space-3:  12px;
+  --space-4:  16px; --space-5:  20px; --space-6:  24px;
+  --space-8:  32px; --space-10: 40px; --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radii */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;
+
+  /* Type sizes */
+  --text-xs:   11px; --text-sm:   13px; --text-base: 15px;
+  --text-lg:   18px; --text-xl:   22px; --text-2xl:  28px;
+  --text-3xl:  36px; --text-mono: 13px;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Noise overlay — do not remove ──────────────────────────────────────────── */
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/noise.png');
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Glass card ─────────────────────────────────────────────────────────────── */
+
+.glass-card {
+  background: rgba(13, 16, 24, 0.72);
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card-elevated {
+  background: rgba(20, 25, 37, 0.88);
+  border: 0.5px solid rgba(255, 255, 255, 0.10);
+}

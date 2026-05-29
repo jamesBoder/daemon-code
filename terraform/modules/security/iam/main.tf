@@ -1,5 +1,6 @@
 variable "github_repo" {}   # "jamesboder/daemon-code"
 variable "environment"  {}
+variable "aws_region"   { default = "us-east-1" }
 variable "tags"         { type = map(string) }
 
 data "aws_caller_identity" "current" {}
@@ -61,6 +62,30 @@ resource "aws_iam_role_policy" "github_actions_phase0" {
         Effect   = "Allow"
         Action   = ["cloudfront:CreateInvalidation"]
         Resource = ["*"]
+      }
+    ]
+  })
+}
+
+# Phase 2: Lambda deploy permissions — allows cd-backend.yml to push new code
+resource "aws_iam_role_policy" "github_actions_phase2" {
+  name = "daemon-code-github-actions-phase2"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "LambdaDeploy"
+        Effect = "Allow"
+        Action = [
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration"
+        ]
+        Resource = [
+          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:daemon-code-*"
+        ]
       }
     ]
   })

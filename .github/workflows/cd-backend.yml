@@ -1,0 +1,55 @@
+name: cd-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  deploy:
+    name: Deploy Lambdas
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run tests
+        working-directory: backend
+        run: go test ./internal/...
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Run DB migrations
+        working-directory: backend
+        run: go run ./cmd/migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Build and deploy Lambdas
+        working-directory: backend
+        run: |
+          for cmd in api orchestrator analyst narrator deckgen notifier; do
+            GOOS=linux GOARCH=arm64 go build -o bootstrap ./cmd/$cmd
+            zip ${cmd}.zip bootstrap
+            aws lambda update-function-code \
+              --function-name daemon-code-${cmd} \
+              --zip-file fileb://${cmd}.zip
+            rm bootstrap ${cmd}.zip
+          done

@@ -1,7 +1,5 @@
-variable "domain_name"              {}
-variable "cloudfront_domain_name"   {}
-variable "cloudfront_hosted_zone_id" {}
-variable "tags"                     { type = map(string) }
+variable "domain_name" {}
+variable "tags"        { type = map(string) }
 
 # ACM certificate — must be in us-east-1 for CloudFront
 resource "aws_acm_certificate" "frontend" {
@@ -42,28 +40,9 @@ resource "aws_acm_certificate_validation" "frontend" {
   validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
 
-# A + AAAA alias records pointing to CloudFront
-resource "aws_route53_record" "apex" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = var.domain_name
-  type    = "A"
-  alias {
-    name                   = var.cloudfront_domain_name
-    zone_id                = var.cloudfront_hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-resource "aws_route53_record" "www" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "www.${var.domain_name}"
-  type    = "A"
-  alias {
-    name                   = var.cloudfront_domain_name
-    zone_id                = var.cloudfront_hosted_zone_id
-    evaluate_target_health = false
-  }
-}
+# A alias records (apex + www) → CloudFront live in modules/edge/cloudfront to avoid a
+# module-level cycle: cloudfront needs the validated cert ARN from route53; if route53
+# also needed the CloudFront domain name, the two modules would depend on each other.
 
 output "acm_certificate_arn"   { value = aws_acm_certificate_validation.frontend.certificate_arn }
 output "route53_zone_id"       { value = aws_route53_zone.main.zone_id }

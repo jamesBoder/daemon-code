@@ -1,0 +1,104 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jamesboder/daemon-code/internal/db"
+	"github.com/jamesboder/daemon-code/internal/middleware"
+)
+
+func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+
+	deck, err := h.ddb.GetDailyDeck(r.Context(), userID.String())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not load session")
+		return
+	}
+
+	if deck == nil {
+		respondWithJSON(w, http.StatusOK, map[string]interface{}{
+			"fragments": []interface{}{},
+			"ready":     false,
+		})
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"fragments": deck.Fragments,
+		"ready":     true,
+	})
+}
+
+type cardResponseRequest struct {
+	FragmentID   string          `json:"fragment_id"`
+	FragmentType string          `json:"fragment_type"`
+	ResponseData json.RawMessage `json:"response_data"`
+}
+
+func (h *handler) PostSessionResponse(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+
+	var req cardResponseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.FragmentID == "" || req.FragmentType == "" {
+		respondWithError(w, http.StatusBadRequest, "fragment_id and fragment_type required")
+		return
+	}
+
+	today := pgtype.Date{Time: time.Now().UTC().Truncate(24 * time.Hour), Valid: true}
+	if err := h.q.InsertCardResponse(r.Context(), db.InsertCardResponseParams{
+		UserID:       userID,
+		FragmentID:   req.FragmentID,
+		FragmentType: req.FragmentType,
+		ResponseData: req.ResponseData,
+		SessionDate:  today,
+	}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not save response")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type moodRequest struct {
+	Score int    `json:"score"`
+	Note  string `json:"note"`
+}
+
+func (h *handler) PostMood(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+
+	var req moodRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Score < 1 || req.Score > 5 {
+		respondWithError(w, http.StatusBadRequest, "score must be between 1 and 5")
+		return
+	}
+
+	today := pgtype.Date{Time: time.Now().UTC().Truncate(24 * time.Hour), Valid: true}
+	note := pgtype.Text{Valid: req.Note != ""}
+	if req.Note != "" {
+		note.String = req.Note
+	}
+	if err := h.q.InsertMoodLog(r.Context(), db.InsertMoodLogParams{
+		UserID:    userID,
+		MoodScore: int32(req.Score),
+		Note:      note,
+		LogDate:   today,
+	}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not save mood")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

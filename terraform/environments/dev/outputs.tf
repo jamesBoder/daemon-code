@@ -1,23 +1,47 @@
-output "cloudfront_distribution_id" {
-  value = module.cloudfront.distribution_id
+output "api_gateway_url" {
+  value = module.compute.api_gateway_url
 }
 
-output "cloudfront_domain" {
-  value = module.cloudfront.domain_name
+output "db_endpoint" {
+  value = module.data.db_endpoint
 }
 
-output "frontend_bucket_name" {
-  value = module.s3.frontend_bucket_name
+output "db_secret_arn" {
+  value = module.data.db_secret_arn
+}
+
+output "jwt_secret_arn" {
+  value = module.data.jwt_secret_arn
+}
+
+output "anthropic_secret_arn" {
+  value = module.data.anthropic_secret_arn
+}
+
+output "vapid_secret_arn" {
+  value = module.data.vapid_secret_arn
+}
+
+output "sqs_analyst_queue_url" {
+  value = module.compute.sqs_analyst_queue_url
+}
+
+output "event_bus_name" {
+  value = module.compute.event_bus_name
+}
+
+output "audio_bucket_name" {
+  value = module.data.audio_bucket_name
 }
 
 output "github_actions_role_arn" {
   value = module.iam.github_actions_role_arn
 }
 
-output "route53_name_servers" {
-  value = module.route53.route53_name_servers
+output "api_regional_domain" {
+  value = module.compute.api_regional_domain
 }
 
-output "route53_zone_id" {
-  value = module.route53.route53_zone_id
+output "acm_validation_records" {
+  value = module.compute.acm_validation_records
 }

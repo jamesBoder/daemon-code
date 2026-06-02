@@ -1,7 +1,11 @@
 variable "frontend_bucket_name"   {}
+variable "frontend_bucket_arn"    {}
 variable "frontend_bucket_domain" {}
+variable "audio_bucket_name"      {}
+variable "audio_bucket_arn"       {}
 variable "domain_name"            {}
 variable "acm_certificate_arn"    {}
+variable "route53_zone_id"        {}   # alias records live here to avoid cloudfront ↔ route53 cycle
 variable "backend_url"            { default = "" }
 variable "tags"                   { type = map(string) }
 
@@ -100,6 +104,78 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   tags = var.tags
+}
+
+# ── S3 bucket policies ────────────────────────────────────────────────────────
+# Policies live here (not in modules/edge/s3) because they need the distribution ARN,
+# which is only available after this resource is created. Putting policies in the s3
+# module would create a circular dependency: s3 → cloudfront → s3.
+
+resource "aws_s3_bucket_policy" "frontend" {
+  bucket = var.frontend_bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudFrontOAC"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${var.frontend_bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_s3_bucket_policy" "audio" {
+  bucket = var.audio_bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudFrontOAC"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${var.audio_bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+        }
+      }
+    }]
+  })
+}
+
+# ── Route53 alias records ─────────────────────────────────────────────────────
+# Alias records live here (not in modules/edge/route53) because they need the
+# CloudFront domain name, which is only available after the distribution is created.
+# Moving them here breaks the module-level cycle: route53 → cloudfront → route53.
+
+resource "aws_route53_record" "apex" {
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+  alias {
+    name                   = aws_cloudfront_distribution.frontend.domain_name
+    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = var.route53_zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+  alias {
+    name                   = aws_cloudfront_distribution.frontend.domain_name
+    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
 }
 
 output "distribution_id"   { value = aws_cloudfront_distribution.frontend.id }

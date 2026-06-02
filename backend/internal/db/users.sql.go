@@ -18,9 +18,9 @@ RETURNING id, email, password_hash, timezone, onboarding_complete, push_endpoint
 `
 
 type CreateUserParams struct {
-	Email        string
-	PasswordHash string
-	Timezone     string
+	Email        string `json:"email"`
+	PasswordHash string `json:"password_hash"`
+	Timezone     string `json:"timezone"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -44,8 +44,8 @@ SELECT id, timezone FROM users WHERE onboarding_complete = TRUE
 `
 
 type GetAllActiveUsersRow struct {
-	ID       uuid.UUID
-	Timezone string
+	ID       uuid.UUID `json:"id"`
+	Timezone string    `json:"timezone"`
 }
 
 func (q *Queries) GetAllActiveUsers(ctx context.Context) ([]GetAllActiveUsersRow, error) {

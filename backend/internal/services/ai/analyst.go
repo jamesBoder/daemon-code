@@ -298,8 +298,9 @@ func (a *Analyst) callAnthropic(ctx context.Context, responses []db.CardResponse
 		return nil, fmt.Errorf("parse anthropic response: %w", err)
 	}
 
+	text := stripMarkdownFence(apiResp.Content[0].Text)
 	var output analystOutput
-	if err := json.Unmarshal([]byte(apiResp.Content[0].Text), &output); err != nil {
+	if err := json.Unmarshal([]byte(text), &output); err != nil {
 		return nil, fmt.Errorf("parse analyst output JSON: %w", err)
 	}
 	return &output, nil

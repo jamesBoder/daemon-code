@@ -30,8 +30,7 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  app_name             = "daemon-code"
-  frontend_bucket_name = "daemon-code-frontend-${data.aws_caller_identity.current.account_id}"
+  app_name = "daemon-code"
 
   common_tags = {
     app = "daemon-code"
@@ -40,9 +39,6 @@ locals {
 }
 
 # ── Module calls ──────────────────────────────────────────────────────────────
-
-# ── Phase 2 — data + compute (deployable without CloudFront) ─────────────────
-# Apply independently: terraform apply -target=module.data -target=module.compute -target=module.iam
 
 module "data" {
   source      = "../../modules/data"
@@ -63,40 +59,11 @@ module "compute" {
   audio_bucket_name     = module.data.audio_bucket_name
   audio_bucket_arn      = module.data.audio_bucket_arn
   static_domain         = var.domain_name
-  cloudfront_id         = ""   # set to module.cloudfront.distribution_id once CF verified
   dynamo_table_decks    = module.data.dynamo_table_decks_name
   dynamo_table_state    = module.data.dynamo_table_state_name
   dynamo_table_decks_arn = module.data.dynamo_table_decks_arn
   dynamo_table_state_arn = module.data.dynamo_table_state_arn
   tags                  = local.common_tags
-}
-
-# ── Phase 0 — edge (blocked until CloudFront account verification resolves) ───
-
-module "s3" {
-  source               = "../../modules/edge/s3"
-  frontend_bucket_name = local.frontend_bucket_name
-  tags                 = local.common_tags
-}
-
-module "route53" {
-  source      = "../../modules/edge/route53"
-  domain_name = var.domain_name
-  tags        = local.common_tags
-}
-
-module "cloudfront" {
-  source                 = "../../modules/edge/cloudfront"
-  frontend_bucket_name   = local.frontend_bucket_name
-  frontend_bucket_arn    = module.s3.frontend_bucket_arn
-  frontend_bucket_domain = module.s3.frontend_bucket_regional_domain
-  audio_bucket_name      = module.data.audio_bucket_name
-  audio_bucket_arn       = module.data.audio_bucket_arn
-  domain_name            = var.domain_name
-  acm_certificate_arn    = module.route53.acm_certificate_arn
-  route53_zone_id        = module.route53.route53_zone_id
-  backend_url            = var.backend_url
-  tags                   = local.common_tags
 }
 
 module "iam" {

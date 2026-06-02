@@ -1,27 +1,54 @@
-import './App.css'
-import { CompileScreen } from './components/daemon/CompileScreen'
-import type { CompileData } from './types'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { ProtectedRoute } from './components/ui/ProtectedRoute'
+import { useAuthStore } from './stores/authStore'
+import { Welcome } from './screens/Welcome'
+import { Register } from './screens/auth/Register'
+import { Login } from './screens/auth/Login'
 
-const testData: CompileData = {
-  day: 1,
-  processingSignals: 12,
-  analystTime: '0.41s',
-  stats: [
-    { label: 'fragments decoded',    value: 4,  delta: 4 },
-    { label: 'processes identified', text: '1 new' },
-    { label: 'kernel access',        value: 4,  delta: 4, suffix: '%' },
-  ],
-  daemonProse: 'Something moved quickly when approached. I am not yet sure what it is. But I have been watching.',
-  dailySignalQuote: 'The most common form of despair is not being who you are.',
-  dailySignalAuthor: 'Kierkegaard',
-  orbState: 'cold',
+// Screens — stubbed until their steps are implemented
+const ComingSoon = ({ name }: { name: string }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+    {name} — coming soon
+  </div>
+)
+
+function RootRedirect() {
+  const { token, onboardingComplete } = useAuthStore()
+  if (!token) return <Navigate to="/welcome" replace />
+  // If stored flag is absent (legacy user), default to true → go to home
+  if (onboardingComplete === false) return <Navigate to="/onboarding" replace />
+  return <Navigate to="/home" replace />
 }
 
 function App() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
-      <CompileScreen data={testData} />
-    </div>
+    <Routes>
+      <Route path="/welcome" element={<Welcome />} />
+      <Route path="/auth/register" element={<Register />} />
+      <Route path="/auth/login" element={<Login />} />
+
+      <Route path="/onboarding" element={
+        <ProtectedRoute><ComingSoon name="Onboarding" /></ProtectedRoute>
+      } />
+      <Route path="/home" element={
+        <ProtectedRoute><ComingSoon name="Home" /></ProtectedRoute>
+      } />
+      <Route path="/session" element={
+        <ProtectedRoute><ComingSoon name="Session" /></ProtectedRoute>
+      } />
+      <Route path="/session/complete" element={
+        <ProtectedRoute><ComingSoon name="Session Complete" /></ProtectedRoute>
+      } />
+      <Route path="/processes" element={
+        <ProtectedRoute><ComingSoon name="Process Log" /></ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute><ComingSoon name="Settings" /></ProtectedRoute>
+      } />
+
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

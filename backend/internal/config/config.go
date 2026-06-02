@@ -21,8 +21,6 @@ type Config struct {
 	JWTSecret        string
 	AnthropicAPIKey  string
 	AudioBucket      string
-	StaticDomain     string // e.g. "static.daemoncode.app" — used for audio URLs
-	CloudFrontID     string // distribution ID for cache invalidation
 	SQSQueueURL      string // orchestrator → per-user Analyst fan-out
 	DynamoTableDecks string
 	DynamoTableState string
@@ -53,10 +51,8 @@ func Load() *Config {
 
 	cfg := &Config{
 		AWSRegion:        region,
-		AudioBucket:      os.Getenv("AUDIO_BUCKET"),
-		StaticDomain:     os.Getenv("STATIC_DOMAIN"),
-		CloudFrontID:     os.Getenv("CLOUDFRONT_DISTRIBUTION_ID"),
-		SQSQueueURL:      os.Getenv("SQS_ANALYST_QUEUE_URL"),
+		AudioBucket: os.Getenv("AUDIO_BUCKET"),
+		SQSQueueURL: os.Getenv("SQS_ANALYST_QUEUE_URL"),
 		DynamoTableDecks: os.Getenv("DYNAMO_TABLE_DECKS"),
 		DynamoTableState: os.Getenv("DYNAMO_TABLE_STATE"),
 		EventBusName:     os.Getenv("EVENT_BUS_NAME"),
@@ -135,6 +131,29 @@ func Load() *Config {
 				cfg.VAPIDPrivateKey = v.PrivateKey
 			}
 		}
+	}
+
+	// Local dev fallbacks: when secret ARNs are not set, read secrets directly
+	// from plain env vars. In Lambda the ARNs are always present; locally they are not.
+	if cfg.DBHost == "" {
+		cfg.DBHost = os.Getenv("DB_HOST")
+		cfg.DBPort = os.Getenv("DB_PORT")
+		if cfg.DBPort == "" {
+			cfg.DBPort = "5432"
+		}
+		cfg.DBName = os.Getenv("DB_NAME")
+		cfg.DBUser = os.Getenv("DB_USER")
+		cfg.DBPassword = os.Getenv("DB_PASSWORD")
+	}
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = os.Getenv("JWT_SECRET")
+	}
+	if cfg.AnthropicAPIKey == "" {
+		cfg.AnthropicAPIKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+	if cfg.VAPIDPublicKey == "" {
+		cfg.VAPIDPublicKey = os.Getenv("VAPID_PUBLIC_KEY")
+		cfg.VAPIDPrivateKey = os.Getenv("VAPID_PRIVATE_KEY")
 	}
 
 	return cfg

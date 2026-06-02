@@ -88,11 +88,11 @@ type DailyDeck struct {
 
 // Fragment is a single card in a DailyDeck.
 type Fragment struct {
-	ID         string `dynamodbav:"id"`
-	Type       string `dynamodbav:"type"`
-	Payload    string `dynamodbav:"payload"` // JSON, type-specific
-	DaemonNote string `dynamodbav:"daemon_note"`
-	Order      int    `dynamodbav:"order"`
+	ID         string `dynamodbav:"id"          json:"id"`
+	Type       string `dynamodbav:"type"         json:"type"`
+	Payload    string `dynamodbav:"payload"      json:"payload"`
+	DaemonNote string `dynamodbav:"daemon_note"  json:"daemon_note"`
+	Order      int    `dynamodbav:"order"        json:"order"`
 }
 
 func (c *Client) GetDailyDeck(ctx context.Context, userID string) (*DailyDeck, error) {

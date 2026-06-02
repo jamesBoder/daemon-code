@@ -155,16 +155,15 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 		return "", fmt.Errorf("parse anthropic response: %w", err)
 	}
 
-	return strings.TrimSpace(apiResp.Content[0].Text), nil
+	return stripMarkdownFence(apiResp.Content[0].Text), nil
 }
 
-// synthesizeVoice calls Polly, uploads MP3 to S3, returns the CloudFront URL.
+// synthesizeVoice calls Polly, uploads MP3 to S3, returns the S3 object key.
 func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage, userID, date string) (string, error) {
 	rates  := map[string]string{"cold": "72%", "warming": "80%", "running": "85%", "deep": "88%"}
-	pitches := map[string]string{"cold": "-3%", "warming": "0%", "running": "+2%", "deep": "+3%"}
-	pauses  := map[string]string{"cold": "600ms", "warming": "400ms", "running": "300ms", "deep": "200ms"}
+	pauses := map[string]string{"cold": "600ms", "warming": "400ms", "running": "300ms", "deep": "200ms"}
 
-	ssml := buildSSML(prose, rates[stage], pitches[stage], pauses[stage])
+	ssml := buildSSML(prose, rates[stage], pauses[stage])
 
 	out, err := n.polly.SynthesizeSpeech(ctx, &polly.SynthesizeSpeechInput{
 		Engine:       pollytypes.EngineNeural,
@@ -177,24 +176,32 @@ func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage, userID, da
 		return "", fmt.Errorf("polly: %w", err)
 	}
 	defer out.AudioStream.Close()
+	audio, err := io.ReadAll(out.AudioStream)
+	if err != nil {
+		return "", fmt.Errorf("read polly stream: %w", err)
+	}
 
 	key := fmt.Sprintf("daemon-audio/%s/%s.mp3", userID, date)
+	sz := int64(len(audio))
 	_, err = n.s3.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:       aws.String(n.cfg.AudioBucket),
-		Key:          aws.String(key),
-		Body:         out.AudioStream,
-		ContentType:  aws.String("audio/mpeg"),
-		CacheControl: aws.String("max-age=86400, immutable"),
+		Bucket:        aws.String(n.cfg.AudioBucket),
+		Key:           aws.String(key),
+		Body:          bytes.NewReader(audio),
+		ContentLength: &sz,
+		ContentType:   aws.String("audio/mpeg"),
+		CacheControl:  aws.String("max-age=86400, immutable"),
 	})
 	if err != nil {
 		return "", fmt.Errorf("s3 put: %w", err)
 	}
 
-	return fmt.Sprintf("https://%s/daemon-audio/%s/%s.mp3", n.cfg.StaticDomain, userID, date), nil
+	return key, nil
 }
 
 // buildSSML wraps daemon prose in stage-aware SSML for Polly Neural.
-func buildSSML(prose, rate, pitch, pause string) string {
+// Neural engine does not support <amazon:auto-breaths/> or prosody pitch —
+// only rate, volume, and <break> are supported.
+func buildSSML(prose, rate, pause string) string {
 	sentences := strings.Split(prose, ". ")
 	var parts []string
 	for i, s := range sentences {
@@ -204,8 +211,5 @@ func buildSSML(prose, rate, pitch, pause string) string {
 		}
 	}
 	inner := strings.Join(parts, " ")
-	return fmt.Sprintf(
-		`<speak><amazon:auto-breaths/><prosody rate="%s" pitch="%s">%s</prosody></speak>`,
-		rate, pitch, inner,
-	)
+	return fmt.Sprintf(`<speak><prosody rate="%s">%s</prosody></speak>`, rate, inner)
 }

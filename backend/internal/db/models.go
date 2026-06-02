@@ -10,61 +10,61 @@ import (
 )
 
 type CardResponse struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	FragmentID   string
-	FragmentType string
-	ResponseData []byte
-	SessionDate  pgtype.Date
-	RespondedAt  pgtype.Timestamptz
+	ID           uuid.UUID          `json:"id"`
+	UserID       uuid.UUID          `json:"user_id"`
+	FragmentID   string             `json:"fragment_id"`
+	FragmentType string             `json:"fragment_type"`
+	ResponseData []byte             `json:"response_data"`
+	SessionDate  pgtype.Date        `json:"session_date"`
+	RespondedAt  pgtype.Timestamptz `json:"responded_at"`
 }
 
 type MoodLog struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	MoodScore int32
-	Note      pgtype.Text
-	LoggedAt  pgtype.Timestamptz
-	LogDate   pgtype.Date
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	MoodScore int32              `json:"mood_score"`
+	Note      pgtype.Text        `json:"note"`
+	LoggedAt  pgtype.Timestamptz `json:"logged_at"`
+	LogDate   pgtype.Date        `json:"log_date"`
 }
 
 type PatternLibrary struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	Name          pgtype.Text
-	State         string
-	Strength      int32
-	Unnamed       bool
-	FirstDetected pgtype.Date
-	LastSeen      pgtype.Date
-	DaemonNote    pgtype.Text
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID            uuid.UUID          `json:"id"`
+	UserID        uuid.UUID          `json:"user_id"`
+	Name          pgtype.Text        `json:"name"`
+	State         string             `json:"state"`
+	Strength      int32              `json:"strength"`
+	Unnamed       bool               `json:"unnamed"`
+	FirstDetected pgtype.Date        `json:"first_detected"`
+	LastSeen      pgtype.Date        `json:"last_seen"`
+	DaemonNote    pgtype.Text        `json:"daemon_note"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ShadowProfile struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	PrimaryArchetype string
-	SignalConfidence pgtype.Numeric
-	KernelAccess     int32
-	Stage            string
-	Posture          pgtype.Numeric
-	Environment      string
-	Texture          string
-	FragmentsDecoded int32
-	CompileCount     int32
-	AnalystNotes     pgtype.Text
-	UpdatedAt        pgtype.Timestamptz
+	ID               uuid.UUID          `json:"id"`
+	UserID           uuid.UUID          `json:"user_id"`
+	PrimaryArchetype string             `json:"primary_archetype"`
+	SignalConfidence pgtype.Numeric     `json:"signal_confidence"`
+	KernelAccess     int32              `json:"kernel_access"`
+	Stage            string             `json:"stage"`
+	Posture          pgtype.Numeric     `json:"posture"`
+	Environment      string             `json:"environment"`
+	Texture          string             `json:"texture"`
+	FragmentsDecoded int32              `json:"fragments_decoded"`
+	CompileCount     int32              `json:"compile_count"`
+	AnalystNotes     pgtype.Text        `json:"analyst_notes"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {
-	ID                 uuid.UUID
-	Email              string
-	PasswordHash       string
-	Timezone           string
-	OnboardingComplete bool
-	PushEndpointID     pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
+	ID                 uuid.UUID          `json:"id"`
+	Email              string             `json:"email"`
+	PasswordHash       string             `json:"password_hash"`
+	Timezone           string             `json:"timezone"`
+	OnboardingComplete bool               `json:"onboarding_complete"`
+	PushEndpointID     pgtype.Text        `json:"push_endpoint_id"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }

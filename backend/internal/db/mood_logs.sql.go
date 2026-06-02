@@ -19,8 +19,8 @@ ORDER BY logged_at ASC
 `
 
 type GetMoodLogsForDateParams struct {
-	UserID  uuid.UUID
-	LogDate pgtype.Date
+	UserID  uuid.UUID   `json:"user_id"`
+	LogDate pgtype.Date `json:"log_date"`
 }
 
 func (q *Queries) GetMoodLogsForDate(ctx context.Context, arg GetMoodLogsForDateParams) ([]MoodLog, error) {
@@ -56,10 +56,10 @@ VALUES ($1, $2, $3, $4)
 `
 
 type InsertMoodLogParams struct {
-	UserID    uuid.UUID
-	MoodScore int32
-	Note      pgtype.Text
-	LogDate   pgtype.Date
+	UserID    uuid.UUID   `json:"user_id"`
+	MoodScore int32       `json:"mood_score"`
+	Note      pgtype.Text `json:"note"`
+	LogDate   pgtype.Date `json:"log_date"`
 }
 
 func (q *Queries) InsertMoodLog(ctx context.Context, arg InsertMoodLogParams) error {

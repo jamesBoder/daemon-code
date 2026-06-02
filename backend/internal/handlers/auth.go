@@ -21,7 +21,9 @@ type loginRequest struct {
 }
 
 type authResponse struct {
-	Token string `json:"token"`
+	Token              string `json:"token"`
+	OnboardingComplete bool   `json:"onboarding_complete"`
+	Timezone           string `json:"timezone"`
 }
 
 func (h *handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +73,11 @@ func (h *handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, authResponse{Token: token})
+	respondWithJSON(w, http.StatusCreated, authResponse{
+		Token:              token,
+		OnboardingComplete: user.OnboardingComplete,
+		Timezone:           user.Timezone,
+	})
 }
 
 func (h *handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +99,11 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, authResponse{Token: token})
+	respondWithJSON(w, http.StatusOK, authResponse{
+		Token:              token,
+		OnboardingComplete: user.OnboardingComplete,
+		Timezone:           user.Timezone,
+	})
 }
 
 func (h *handler) Refresh(w http.ResponseWriter, r *http.Request) {

@@ -19,8 +19,8 @@ ORDER BY responded_at ASC
 `
 
 type GetResponsesForDateParams struct {
-	UserID      uuid.UUID
-	SessionDate pgtype.Date
+	UserID      uuid.UUID   `json:"user_id"`
+	SessionDate pgtype.Date `json:"session_date"`
 }
 
 func (q *Queries) GetResponsesForDate(ctx context.Context, arg GetResponsesForDateParams) ([]CardResponse, error) {
@@ -57,11 +57,11 @@ VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertCardResponseParams struct {
-	UserID       uuid.UUID
-	FragmentID   string
-	FragmentType string
-	ResponseData []byte
-	SessionDate  pgtype.Date
+	UserID       uuid.UUID   `json:"user_id"`
+	FragmentID   string      `json:"fragment_id"`
+	FragmentType string      `json:"fragment_type"`
+	ResponseData []byte      `json:"response_data"`
+	SessionDate  pgtype.Date `json:"session_date"`
 }
 
 func (q *Queries) InsertCardResponse(ctx context.Context, arg InsertCardResponseParams) error {

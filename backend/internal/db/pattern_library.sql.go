@@ -57,13 +57,13 @@ RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen
 `
 
 type InsertPatternParams struct {
-	UserID        uuid.UUID
-	Name          pgtype.Text
-	State         string
-	Strength      int32
-	Unnamed       bool
-	FirstDetected pgtype.Date
-	DaemonNote    pgtype.Text
+	UserID        uuid.UUID   `json:"user_id"`
+	Name          pgtype.Text `json:"name"`
+	State         string      `json:"state"`
+	Strength      int32       `json:"strength"`
+	Unnamed       bool        `json:"unnamed"`
+	FirstDetected pgtype.Date `json:"first_detected"`
+	DaemonNote    pgtype.Text `json:"daemon_note"`
 }
 
 func (q *Queries) InsertPattern(ctx context.Context, arg InsertPatternParams) (PatternLibrary, error) {
@@ -107,13 +107,13 @@ RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen
 `
 
 type UpdatePatternParams struct {
-	ID         uuid.UUID
-	Name       pgtype.Text
-	State      string
-	Strength   int32
-	Unnamed    bool
-	LastSeen   pgtype.Date
-	DaemonNote pgtype.Text
+	ID         uuid.UUID   `json:"id"`
+	Name       pgtype.Text `json:"name"`
+	State      string      `json:"state"`
+	Strength   int32       `json:"strength"`
+	Unnamed    bool        `json:"unnamed"`
+	LastSeen   pgtype.Date `json:"last_seen"`
+	DaemonNote pgtype.Text `json:"daemon_note"`
 }
 
 func (q *Queries) UpdatePattern(ctx context.Context, arg UpdatePatternParams) (PatternLibrary, error) {

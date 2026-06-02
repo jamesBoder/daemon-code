@@ -45,3 +45,73 @@ export interface ProcessEntryData {
   lastSeen?: string
   daemonNote?: string
 }
+
+// Auth — matches authResponse JSON from /auth/register and /auth/login
+export interface AuthResponse {
+  token: string
+  onboarding_complete: boolean
+  timezone: string
+}
+
+// Shadow profile — matches db.ShadowProfile with emit_json_tags (snake_case keys)
+export interface ShadowProfile {
+  id: string
+  user_id: string
+  primary_archetype: Archetype
+  signal_confidence: number
+  kernel_access: number
+  stage: OrbState
+  posture: number
+  environment: string
+  texture: string
+  fragments_decoded: number
+  compile_count: number
+  analyst_notes: string | null
+}
+
+// Home — homeResponse DTO has explicit json tags (already correct)
+export interface HomeData {
+  day: number
+  processingSignals: number
+  analystTime: string
+  stats: { label: string; value: string }[]
+  daemonProse: string
+  dailySignalQuote: string
+  dailySignalAuthor: string
+  orbState: OrbState
+  daemonAudioUrl?: string
+}
+
+// Session fragments — Fragment is from DynamoDB with explicit json tags
+export interface Fragment {
+  id: string
+  type: 'reaction_test' | 'weighted_scale' | 'prediction_duel'
+  payload: string
+  daemon_note: string
+  order: number
+}
+
+export interface SessionTodayResponse {
+  fragments: Fragment[]
+  ready: boolean
+}
+
+// Process — matches db.PatternLibrary with emit_json_tags (snake_case keys)
+export interface Process {
+  id: string
+  user_id: string
+  name: string | null
+  state: ProcessState
+  strength: number
+  unnamed: boolean
+  first_detected: string
+  last_seen: string | null
+  daemon_note: string | null
+}
+
+// Used in SessionContainer to accumulate posted responses
+export interface SubmittedResponse {
+  fragment_id: string
+  fragment_type: string
+  response_data: unknown
+}

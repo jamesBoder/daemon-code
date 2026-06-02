@@ -7,10 +7,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
-	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/google/uuid"
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
@@ -20,21 +16,11 @@ import (
 type Generator struct {
 	cfg *appconfig.Config
 	ddb *dynamo.Client
-	cf  *cloudfront.Client
 	q   *db.Queries
 }
 
 func NewGenerator(cfg *appconfig.Config, ddb *dynamo.Client, q *db.Queries) *Generator {
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWSRegion))
-	if err != nil {
-		panic("deckgen: failed to load AWS config: " + err.Error())
-	}
-	return &Generator{
-		cfg: cfg,
-		ddb: ddb,
-		cf:  cloudfront.NewFromConfig(awsCfg),
-		q:   q,
-	}
+	return &Generator{cfg: cfg, ddb: ddb, q: q}
 }
 
 func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) error {
@@ -72,7 +58,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		return fmt.Errorf("put daily deck: %w", err)
 	}
 
-	return g.invalidateCache(ctx, userID.String())
+	return nil
 }
 
 // buildDeck produces the next day's fragment queue.
@@ -174,19 +160,3 @@ func (g *Generator) buildPredictionDuel(profile db.ShadowProfile, patterns []db.
 	}
 }
 
-func (g *Generator) invalidateCache(ctx context.Context, userID string) error {
-	if g.cfg.CloudFrontID == "" {
-		return nil
-	}
-	_, err := g.cf.CreateInvalidation(ctx, &cloudfront.CreateInvalidationInput{
-		DistributionId: aws.String(g.cfg.CloudFrontID),
-		InvalidationBatch: &cftypes.InvalidationBatch{
-			CallerReference: aws.String(fmt.Sprintf("%s-%d", userID, time.Now().Unix())),
-			Paths: &cftypes.Paths{
-				Quantity: aws.Int32(2),
-				Items:    []string{"/home", "/session/today"},
-			},
-		},
-	})
-	return err
-}

@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
@@ -13,8 +16,19 @@ import (
 func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handler {
 	mux := http.NewServeMux()
 
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWSRegion))
+	if err != nil {
+		panic("handlers: failed to load AWS config: " + err.Error())
+	}
+
 	tokens := services.NewTokenService(cfg)
-	h := &handler{cfg: cfg, q: q, ddb: ddb, tokens: tokens}
+	h := &handler{
+		cfg:      cfg,
+		q:        q,
+		ddb:      ddb,
+		tokens:   tokens,
+		s3presign: s3.NewPresignClient(s3.NewFromConfig(awsCfg)),
+	}
 
 	// Public auth routes
 	mux.HandleFunc("POST /auth/register", h.Register)
@@ -38,8 +52,9 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 }
 
 type handler struct {
-	cfg    *config.Config
-	q      *db.Queries
-	ddb    *dynamo.Client
-	tokens *services.TokenService
+	cfg       *config.Config
+	q         *db.Queries
+	ddb       *dynamo.Client
+	tokens    *services.TokenService
+	s3presign *s3.PresignClient
 }

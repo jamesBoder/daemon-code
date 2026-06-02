@@ -82,17 +82,17 @@ RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stag
 `
 
 type UpdateShadowProfileParams struct {
-	UserID           uuid.UUID
-	PrimaryArchetype string
-	SignalConfidence pgtype.Numeric
-	KernelAccess     int32
-	Stage            string
-	Posture          pgtype.Numeric
-	Environment      string
-	Texture          string
-	FragmentsDecoded int32
-	CompileCount     int32
-	AnalystNotes     pgtype.Text
+	UserID           uuid.UUID      `json:"user_id"`
+	PrimaryArchetype string         `json:"primary_archetype"`
+	SignalConfidence pgtype.Numeric `json:"signal_confidence"`
+	KernelAccess     int32          `json:"kernel_access"`
+	Stage            string         `json:"stage"`
+	Posture          pgtype.Numeric `json:"posture"`
+	Environment      string         `json:"environment"`
+	Texture          string         `json:"texture"`
+	FragmentsDecoded int32          `json:"fragments_decoded"`
+	CompileCount     int32          `json:"compile_count"`
+	AnalystNotes     pgtype.Text    `json:"analyst_notes"`
 }
 
 func (q *Queries) UpdateShadowProfile(ctx context.Context, arg UpdateShadowProfileParams) (ShadowProfile, error) {

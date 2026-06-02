@@ -3,10 +3,25 @@ package ai
 import (
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// stripMarkdownFence removes ```json ... ``` or ``` ... ``` wrappers that
+// Claude sometimes adds despite being asked for raw JSON/text output.
+func stripMarkdownFence(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		s = s[3:]
+		if idx := strings.IndexByte(s, '\n'); idx != -1 {
+			s = s[idx+1:] // drop the optional language tag line (e.g. "json\n")
+		}
+		s = strings.TrimSuffix(strings.TrimSpace(s), "```")
+	}
+	return strings.TrimSpace(s)
+}
 
 func pgDate(dateStr string) pgtype.Date {
 	t, _ := time.Parse("2006-01-02", dateStr)

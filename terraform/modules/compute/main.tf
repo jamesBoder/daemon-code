@@ -8,7 +8,6 @@ variable "vapid_secret_arn"      {}
 variable "audio_bucket_name"     {}
 variable "audio_bucket_arn"      {}
 variable "static_domain"         {}
-variable "cloudfront_id"         { default = "" }   # empty until CF account verified
 variable "dynamo_table_decks"    {}
 variable "dynamo_table_state"    {}
 variable "dynamo_table_decks_arn"{}
@@ -106,12 +105,6 @@ resource "aws_iam_role_policy" "lambda_exec" {
           var.vapid_secret_arn
         ]
       },
-      {
-        Sid      = "CloudFrontInvalidation"
-        Effect   = "Allow"
-        Action   = ["cloudfront:CreateInvalidation"]
-        Resource = ["*"]
-      }
     ]
   })
 }
@@ -235,7 +228,6 @@ locals {
     VAPID_SECRET_ARN           = var.vapid_secret_arn
     AUDIO_BUCKET               = var.audio_bucket_name
     STATIC_DOMAIN              = var.static_domain
-    CLOUDFRONT_DISTRIBUTION_ID = var.cloudfront_id   # empty until CF verified; DeckGen skips invalidation gracefully
     SQS_ANALYST_QUEUE_URL      = aws_sqs_queue.analyst.url
     DYNAMO_TABLE_DECKS         = var.dynamo_table_decks
     DYNAMO_TABLE_STATE         = var.dynamo_table_state
@@ -268,16 +260,45 @@ resource "aws_lambda_function" "api" {
   tags = var.tags
 }
 
-resource "aws_lambda_function_url" "api" {
-  function_name      = aws_lambda_function.api.function_name
-  authorization_type = "NONE"
+resource "aws_apigatewayv2_api" "api" {
+  name          = "${var.app_name}-api-${var.environment}"
+  protocol_type = "HTTP"
+  tags          = var.tags
 
-  cors {
-    allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "OPTIONS"]
+  cors_configuration {
+    allow_origins = ["https://${var.static_domain}"]
+    allow_methods = ["GET", "POST", "DELETE", "PUT", "PATCH"]
     allow_headers = ["Content-Type", "Authorization"]
     max_age       = 86400
   }
+}
+
+resource "aws_apigatewayv2_stage" "api" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "$default"
+  auto_deploy = true
+  tags        = var.tags
+}
+
+resource "aws_apigatewayv2_integration" "api" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.api.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "api_default" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
 resource "aws_lambda_function" "orchestrator" {
@@ -383,7 +404,7 @@ resource "aws_lambda_function" "notifier" {
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
-output "api_function_url"        { value = aws_lambda_function_url.api.function_url }
+output "api_gateway_url"         { value = aws_apigatewayv2_stage.api.invoke_url }
 output "api_lambda_arn"          { value = aws_lambda_function.api.arn }
 output "orchestrator_lambda_arn" { value = aws_lambda_function.orchestrator.arn }
 output "analyst_lambda_arn"      { value = aws_lambda_function.analyst.arn }

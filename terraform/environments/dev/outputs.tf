@@ -37,3 +37,11 @@ output "audio_bucket_name" {
 output "github_actions_role_arn" {
   value = module.iam.github_actions_role_arn
 }
+
+output "api_regional_domain" {
+  value = module.compute.api_regional_domain
+}
+
+output "acm_validation_records" {
+  value = module.compute.acm_validation_records
+}

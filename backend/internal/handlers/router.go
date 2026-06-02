@@ -23,10 +23,10 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 
 	tokens := services.NewTokenService(cfg)
 	h := &handler{
-		cfg:      cfg,
-		q:        q,
-		ddb:      ddb,
-		tokens:   tokens,
+		cfg:       cfg,
+		q:         q,
+		ddb:       ddb,
+		tokens:    tokens,
 		s3presign: s3.NewPresignClient(s3.NewFromConfig(awsCfg)),
 	}
 

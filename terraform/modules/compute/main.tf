@@ -402,6 +402,38 @@ resource "aws_lambda_function" "notifier" {
   tags = var.tags
 }
 
+# ── API custom domain (api.daemoncode.app) ────────────────────────────────────
+# Step 1: apply -target=aws_acm_certificate.api → get validation records → add to Cloudflare
+# Step 2: after cert issues, apply -target=module.compute to create domain + mapping
+
+resource "aws_acm_certificate" "api" {
+  domain_name       = "api.${var.static_domain}"
+  validation_method = "DNS"
+  tags              = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_apigatewayv2_domain_name" "api" {
+  domain_name = "api.${var.static_domain}"
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate.api.arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+
+  tags = var.tags
+}
+
+resource "aws_apigatewayv2_api_mapping" "api" {
+  api_id      = aws_apigatewayv2_api.api.id
+  domain_name = aws_apigatewayv2_domain_name.api.id
+  stage       = aws_apigatewayv2_stage.api.id
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "api_gateway_url"         { value = aws_apigatewayv2_stage.api.invoke_url }
@@ -413,3 +445,13 @@ output "deckgen_lambda_arn"      { value = aws_lambda_function.deckgen.arn }
 output "notifier_lambda_arn"     { value = aws_lambda_function.notifier.arn }
 output "sqs_analyst_queue_url"   { value = aws_sqs_queue.analyst.url }
 output "event_bus_name"          { value = aws_cloudwatch_event_bus.main.name }
+output "api_regional_domain"     { value = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name }
+output "acm_validation_records"  {
+  value = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name  = dvo.resource_record_name
+      type  = dvo.resource_record_type
+      value = dvo.resource_record_value
+    }
+  }
+}

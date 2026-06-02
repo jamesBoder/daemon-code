@@ -106,7 +106,7 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 	// Deterministic signal selection: hash(user_id + date) % len(quotes)
 	key := profile.UserID.String() + today
 	h := sha256.Sum256([]byte(key))
-	idx := int(binary.BigEndian.Uint64(h[:8])) % len(dailySignals)
+	idx := int(binary.BigEndian.Uint64(h[:8]) % uint64(len(dailySignals))) // #nosec G115 — safe: result bounded by len
 	if idx < 0 {
 		idx = -idx
 	}

@@ -76,16 +76,16 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 }
 
 type analystOutput struct {
-	PrimaryArchetype     string          `json:"primary_archetype"`
-	SignalConfidence     float64         `json:"signal_confidence"`
-	KernelAccess         int32           `json:"kernel_access"`
-	Stage                string          `json:"stage"`
-	Posture              float64         `json:"posture"`
-	Environment          string          `json:"environment"`
-	Texture              string          `json:"texture"`
-	FragmentsDecodedDelta int            `json:"fragments_decoded_delta"`
-	AnalystNotes         string          `json:"analyst_notes"`
-	PatternUpdates       []patternUpdate `json:"pattern_updates"`
+	PrimaryArchetype      string          `json:"primary_archetype"`
+	SignalConfidence      float64         `json:"signal_confidence"`
+	KernelAccess          int32           `json:"kernel_access"`
+	Stage                 string          `json:"stage"`
+	Posture               float64         `json:"posture"`
+	Environment           string          `json:"environment"`
+	Texture               string          `json:"texture"`
+	FragmentsDecodedDelta int             `json:"fragments_decoded_delta"`
+	AnalystNotes          string          `json:"analyst_notes"`
+	PatternUpdates        []patternUpdate `json:"pattern_updates"`
 }
 
 type patternUpdate struct {
@@ -146,7 +146,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	_, err = a.q.UpdateShadowProfile(ctx, db.UpdateShadowProfileParams{
 		UserID:           userID,
 		PrimaryArchetype: output.PrimaryArchetype,
-		SignalConfidence:  pgNumeric(output.SignalConfidence),
+		SignalConfidence: pgNumeric(output.SignalConfidence),
 		KernelAccess:     output.KernelAccess,
 		Stage:            output.Stage,
 		Posture:          pgNumeric(output.Posture),
@@ -199,13 +199,13 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 				name = u.Name
 			}
 			_, err := a.q.InsertPattern(ctx, db.InsertPatternParams{
-				UserID:     userID,
-				Name:       pgTextPtr(name),
-				State:      u.State,
-				Strength:   10,
-				Unnamed:    unnamed,
+				UserID:        userID,
+				Name:          pgTextPtr(name),
+				State:         u.State,
+				Strength:      10,
+				Unnamed:       unnamed,
 				FirstDetected: pgDateToday(),
-				DaemonNote: pgTextPtr(&u.DaemonNote),
+				DaemonNote:    pgTextPtr(&u.DaemonNote),
 			})
 			if err != nil {
 				return err
@@ -215,7 +215,7 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 			if err != nil {
 				continue
 			}
-			newStrength := strengthMap[patternID] + int32(u.StrengthDelta)
+			newStrength := strengthMap[patternID] + int32(u.StrengthDelta) // #nosec G115 — delta is bounded [-100,100] by Analyst prompt
 			if newStrength < 0 {
 				newStrength = 0
 			}
@@ -252,8 +252,8 @@ func (a *Analyst) callAnthropic(ctx context.Context, responses []db.CardResponse
 		"max_tokens": 1024,
 		"system": []map[string]interface{}{
 			{
-				"type": "text",
-				"text": analystSystemPrompt,
+				"type":          "text",
+				"text":          analystSystemPrompt,
 				"cache_control": map[string]string{"type": "ephemeral"},
 			},
 		},

@@ -51,8 +51,8 @@ func Load() *Config {
 
 	cfg := &Config{
 		AWSRegion:        region,
-		AudioBucket: os.Getenv("AUDIO_BUCKET"),
-		SQSQueueURL: os.Getenv("SQS_ANALYST_QUEUE_URL"),
+		AudioBucket:      os.Getenv("AUDIO_BUCKET"),
+		SQSQueueURL:      os.Getenv("SQS_ANALYST_QUEUE_URL"),
 		DynamoTableDecks: os.Getenv("DYNAMO_TABLE_DECKS"),
 		DynamoTableState: os.Getenv("DYNAMO_TABLE_STATE"),
 		EventBusName:     os.Getenv("EVENT_BUS_NAME"),

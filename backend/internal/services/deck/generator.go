@@ -91,8 +91,8 @@ func (g *Generator) buildReactionTest(profile db.ShadowProfile) dynamo.Fragment 
 	}
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"words":         words,
-		"duration_ms":   200,
+		"words":          words,
+		"duration_ms":    200,
 		"archetype_hint": archetype,
 	})
 
@@ -107,9 +107,9 @@ func (g *Generator) buildReactionTest(profile db.ShadowProfile) dynamo.Fragment 
 
 func (g *Generator) buildWeightedScale(profile db.ShadowProfile) dynamo.Fragment {
 	pairs := map[string][2]string{
-		"neutral":  {"certainty", "uncertainty"},
-		"water":    {"stillness", "movement"},
-		"fire":     {"intensity", "calm"},
+		"neutral": {"certainty", "uncertainty"},
+		"water":   {"stillness", "movement"},
+		"fire":    {"intensity", "calm"},
 	}
 
 	env := profile.Environment
@@ -159,4 +159,3 @@ func (g *Generator) buildPredictionDuel(profile db.ShadowProfile, patterns []db.
 		Order:      2,
 	}
 }
-

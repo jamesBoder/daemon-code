@@ -160,7 +160,7 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 
 // synthesizeVoice calls Polly, uploads MP3 to S3, returns the S3 object key.
 func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage, userID, date string) (string, error) {
-	rates  := map[string]string{"cold": "72%", "warming": "80%", "running": "85%", "deep": "88%"}
+	rates := map[string]string{"cold": "72%", "warming": "80%", "running": "85%", "deep": "88%"}
 	pauses := map[string]string{"cold": "600ms", "warming": "400ms", "running": "300ms", "deep": "200ms"}
 
 	ssml := buildSSML(prose, rates[stage], pauses[stage])

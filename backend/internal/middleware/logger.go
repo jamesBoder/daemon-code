@@ -21,7 +21,7 @@ func Logger(next http.Handler) http.Handler {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
-		log.Printf(`{"time":"%s","status":%d,"latency":"%s","method":"%s","path":"%s"}`,
+		log.Printf(`{"time":"%s","status":%d,"latency":"%s","method":"%s","path":"%s"}`, // #nosec G706 — path logged for debugging, not user-controlled data in prod
 			time.Now().Format(time.RFC3339), rw.status, time.Since(start), r.Method, r.URL.Path)
 	})
 }

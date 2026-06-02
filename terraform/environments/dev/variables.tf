@@ -19,5 +19,5 @@ variable "backend_url" {
 
 variable "github_repo" {
   description = "GitHub repo in owner/name format"
-  default     = "jamesboder/daemon-code"
+  default     = "jamesBoder/daemon-code"
 }

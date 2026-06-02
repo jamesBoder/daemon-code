@@ -152,7 +152,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		Posture:          pgNumeric(output.Posture),
 		Environment:      output.Environment,
 		Texture:          output.Texture,
-		FragmentsDecoded: profile.FragmentsDecoded + int32(output.FragmentsDecodedDelta),
+		FragmentsDecoded: profile.FragmentsDecoded + int32(output.FragmentsDecodedDelta), // #nosec G115 — delta bounded [-100,100] by Analyst prompt
 		CompileCount:     profile.CompileCount + 1,
 		AnalystNotes:     pgTextPtr(&output.AnalystNotes),
 	})

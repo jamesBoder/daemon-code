@@ -69,5 +69,5 @@ func validateJWT(tokenStr, secret string) (uuid.UUID, error) {
 func writeUnauthorized(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	json.NewEncoder(w).Encode(map[string]string{"error": msg}) // #nosec G104 — encoding a static map to ResponseWriter cannot fail
 }

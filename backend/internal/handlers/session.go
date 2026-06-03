@@ -13,7 +13,7 @@ import (
 type processDiff struct {
 	ID       string  `json:"id"`
 	Name     string  `json:"name"`
-	Change   string  `json:"change"`             // "named" | "strength_up" | "strength_down" | "new"
+	Change   string  `json:"change"`              // "named" | "strength_up" | "strength_down" | "new"
 	FromName *string `json:"from_name,omitempty"` // previous name for "named" changes
 	Delta    *int    `json:"delta,omitempty"`     // strength delta for strength changes
 }

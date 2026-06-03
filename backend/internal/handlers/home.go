@@ -113,10 +113,10 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 	sig := dailySignals[idx]
 
 	// Prefer archetype-matched signal written by SignalSelector Lambda; fall back to hash selection.
-	sigQuote  := sig.Quote
+	sigQuote := sig.Quote
 	sigAuthor := sig.Author
 	if state != nil && state.SignalQuote != "" {
-		sigQuote  = state.SignalQuote
+		sigQuote = state.SignalQuote
 		sigAuthor = state.SignalAuthor
 	}
 

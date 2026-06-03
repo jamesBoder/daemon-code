@@ -8,20 +8,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      manifest: {
-        name: 'The Daemon Code',
-        short_name: 'Daemon Code',
-        description: 'A daily game where your AI-constructed daemon runs endlessly beneath the surface.',
-        theme_color: '#070809',
-        background_color: '#070809',
-        display: 'standalone',
-        icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-        ],
-      },
-      workbox: {
+      strategies:      'injectManifest',
+      srcDir:          'src',
+      filename:        'sw.ts',
+      manifest:        false,       // managed in public/manifest.json
+      injectRegister:  'auto',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
     }),

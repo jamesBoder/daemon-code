@@ -4,6 +4,7 @@ import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
+import { ORB_LAYOUT_ID } from '../lib/constants'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
@@ -24,7 +25,7 @@ export function Session() {
   if (isLoading) {
     return (
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <DaemonOrb state="cold" />
+        <DaemonOrb state="cold" layoutId={ORB_LAYOUT_ID} />
       </div>
     )
   }

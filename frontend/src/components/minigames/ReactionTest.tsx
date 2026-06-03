@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { haptic } from '../../lib/haptics'
 import { MG } from '../../lib/minigame'
 
 export interface ReactionTestResult {
@@ -78,6 +79,7 @@ export function ReactionTest({ words, durationMs = 200, onComplete }: Props) {
     if (doneRef.current || tappedRef.current || phase === 'out') return
     tappedRef.current = true
     clearTimeout(timerRef.current)
+    haptic('tap')
 
     const reactionMs = Date.now() - wordStartRef.current
     resultsRef.current = [...resultsRef.current, { word: words[idx], reactionTimeMs: reactionMs }]

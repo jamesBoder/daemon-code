@@ -23,7 +23,7 @@ func main() {
 	queries := db.New(pool)
 
 	mux := handlers.NewRouter(cfg, queries, ddb)
-	mux = middleware.CORS(mux)
+	mux = middleware.CORS(cfg.AllowedOrigin)(mux)
 	mux = middleware.Logger(mux)
 
 	addr := ":8080"

@@ -19,3 +19,28 @@ export const COMPILE_SIGNAL_DURATION      = 0.40   // daily signal fade-in
 // Layout
 export const MAX_CONTENT_WIDTH = 480   // px — max page width (mobile-first)
 export const PROSE_MAX_WIDTH   = 320   // px — max width for daemon prose text
+
+// Token refresh
+export const TOKEN_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000  // refresh if expiry < 24h away
+
+// Push notifications
+export const PUSH_PROMPT_DAY_THRESHOLD = 3          // show prompt after this many compiles
+export const PUSH_PROMPT_DELAY_MS      = 8000       // delay past compile animation
+export const PUSH_PROMPT_KEY           = 'push_prompt_shown'
+
+// Page transitions
+export const ROUTE_TRANSITION_MS = 200  // ms — major context changes only
+
+// Shared element
+export const ORB_LAYOUT_ID = 'daemon-orb'
+
+// UI
+export const TOAST_DISMISS_MS  = 3000  // ms — inline error auto-dismiss
+export const MODAL_Z_INDEX     = 100   // above all position:fixed session content
+export const MODAL_MAX_WIDTH   = 320   // px — confirm modal max width
+
+// Session
+export const SESSION_RETRY_DELAY_MS = 2000  // ms — POST retry on first network failure
+
+// Haptics
+export const HAPTICS_KEY = 'haptics_enabled'  // localStorage boolean; default true (opt-out)

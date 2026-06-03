@@ -39,7 +39,10 @@ type ShadowState struct {
 	Date         string `dynamodbav:"date"`
 	DaemonProse  string `dynamodbav:"daemon_prose"`
 	AudioURL     string `dynamodbav:"audio_url"`
-	CompileStats string `dynamodbav:"compile_stats"` // JSON
+	CompileStats string `dynamodbav:"compile_stats"` // JSON []CompileStat
+	RecentDiff   string `dynamodbav:"recent_diff"`   // JSON []ProcessDiff; written by Analyst
+	SignalQuote  string `dynamodbav:"signal_quote"`  // written by SignalSelector (Step 7)
+	SignalAuthor string `dynamodbav:"signal_author"` // written by SignalSelector (Step 7)
 	TTL          int64  `dynamodbav:"ttl"`
 }
 
@@ -73,6 +76,26 @@ func (c *Client) PutShadowState(ctx context.Context, s ShadowState) error {
 	_, err = c.ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(c.tableState),
 		Item:      item,
+	})
+	return err
+}
+
+// PutSignalFields writes signal_quote and signal_author onto an existing ShadowState
+// item without overwriting other fields. Returns ConditionalCheckFailedException
+// (from types package) if the item does not exist yet.
+func (c *Client) PutSignalFields(ctx context.Context, userID, date, quote, author string) error {
+	_, err := c.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(c.tableState),
+		Key: map[string]types.AttributeValue{
+			"user_id": &types.AttributeValueMemberS{Value: userID},
+			"date":    &types.AttributeValueMemberS{Value: date},
+		},
+		UpdateExpression: aws.String("SET signal_quote = :q, signal_author = :a"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":q": &types.AttributeValueMemberS{Value: quote},
+			":a": &types.AttributeValueMemberS{Value: author},
+		},
+		ConditionExpression: aws.String("attribute_exists(user_id)"),
 	})
 	return err
 }

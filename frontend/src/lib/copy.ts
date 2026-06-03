@@ -1,4 +1,14 @@
 export const copy = {
+  session: {
+    exitPrompt:   "Leave session? Your progress won't be saved.",
+    exitConfirm:  'Leave',
+    exitCancel:   'Stay',
+  },
+  push: {
+    prompt:       `The daemon compiled overnight. Want to be notified when it's ready?`,
+    enableLabel:  'Enable notifications',
+    dismissLabel: 'Not now',
+  },
   compile: {
     lines: (signals: number, analystTime: string): string[] => [
       '> compiling daemon_profile...',

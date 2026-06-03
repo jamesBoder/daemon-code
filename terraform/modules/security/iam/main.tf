@@ -91,4 +91,31 @@ resource "aws_iam_role_policy" "github_actions_phase2" {
   })
 }
 
+# Terraform state — allows tf-plan.yml and tf-apply.yml to read/write state
+resource "aws_iam_role_policy" "github_actions_tfstate" {
+  name = "daemon-code-github-actions-tfstate"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "TFStateBucket"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:DeleteObject"]
+        Resource = [
+          "arn:aws:s3:::daemon-code-tfstate-${data.aws_caller_identity.current.account_id}",
+          "arn:aws:s3:::daemon-code-tfstate-${data.aws_caller_identity.current.account_id}/*"
+        ]
+      },
+      {
+        Sid    = "TFStateLock"
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
+        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/daemon-code-tfstate-lock"
+      }
+    ]
+  })
+}
+
 output "github_actions_role_arn" { value = aws_iam_role.github_actions.arn }

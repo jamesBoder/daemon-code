@@ -4,13 +4,13 @@ import { useAuthStore } from './stores/authStore'
 import { Welcome } from './screens/Welcome'
 import { Register } from './screens/auth/Register'
 import { Login } from './screens/auth/Login'
+import { Onboarding } from './screens/Onboarding'
+import { Home } from './screens/Home'
+import { Session } from './screens/Session'
+import { SessionComplete } from './screens/SessionComplete'
+import { ProcessLog } from './screens/ProcessLog'
+import { Settings } from './screens/Settings'
 
-// Screens — stubbed until their steps are implemented
-const ComingSoon = ({ name }: { name: string }) => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-    {name} — coming soon
-  </div>
-)
 
 function RootRedirect() {
   const { token, onboardingComplete } = useAuthStore()
@@ -28,22 +28,22 @@ function App() {
       <Route path="/auth/login" element={<Login />} />
 
       <Route path="/onboarding" element={
-        <ProtectedRoute><ComingSoon name="Onboarding" /></ProtectedRoute>
+        <ProtectedRoute><Onboarding /></ProtectedRoute>
       } />
       <Route path="/home" element={
-        <ProtectedRoute><ComingSoon name="Home" /></ProtectedRoute>
+        <ProtectedRoute><Home /></ProtectedRoute>
       } />
       <Route path="/session" element={
-        <ProtectedRoute><ComingSoon name="Session" /></ProtectedRoute>
+        <ProtectedRoute><Session /></ProtectedRoute>
       } />
       <Route path="/session/complete" element={
-        <ProtectedRoute><ComingSoon name="Session Complete" /></ProtectedRoute>
+        <ProtectedRoute><SessionComplete /></ProtectedRoute>
       } />
       <Route path="/processes" element={
-        <ProtectedRoute><ComingSoon name="Process Log" /></ProtectedRoute>
+        <ProtectedRoute><ProcessLog /></ProtectedRoute>
       } />
       <Route path="/settings" element={
-        <ProtectedRoute><ComingSoon name="Settings" /></ProtectedRoute>
+        <ProtectedRoute><Settings /></ProtectedRoute>
       } />
 
       <Route path="/" element={<RootRedirect />} />

@@ -88,6 +88,29 @@ html, body, #root {
   font-size: var(--text-base);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  /* Prevent iOS rubber-band from exposing raw background behind noise overlay */
+  overscroll-behavior: none;
+}
+
+/* Screens — use 100dvh so the layout accounts for the mobile browser chrome */
+.screen {
+  min-height: 100dvh;
+}
+
+/* iOS keyboard zoom prevention — any input below 16px triggers auto-zoom */
+input, textarea, select {
+  font-size: 16px;
+}
+
+/* Bottom safe area — apply to any element that sits above the iOS home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Combined: screen + bottom safe padding, used by most full-screen layouts */
+.screen-safe {
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ── Noise overlay — do not remove ──────────────────────────────────────────── */

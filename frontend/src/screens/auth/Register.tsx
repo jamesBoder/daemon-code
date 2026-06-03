@@ -14,8 +14,8 @@ const inputStyle: CSSProperties = {
   border: '0.5px solid var(--border)',
   borderRadius: '8px',
   color: 'var(--text-primary)',
-  fontFamily: 'var(--font-body)',
-  fontSize: 'var(--text-base)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: '16px',
   outline: 'none',
   boxSizing: 'border-box',
 }
@@ -70,12 +70,13 @@ export function Register() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem',
+        padding: 'var(--space-8)',
+        paddingBottom: 'calc(var(--space-8) + env(safe-area-inset-bottom))',
       }}
     >
       <GlassCard style={{ width: '100%', maxWidth: '360px', padding: '2rem' }}>
@@ -113,7 +114,7 @@ export function Register() {
               style={inputStyle}
             />
             <span style={{
-              fontFamily: 'var(--font-body)',
+              fontFamily: 'var(--font-sans)',
               fontSize: 'var(--text-xs)',
               color: 'var(--text-muted)',
             }}>
@@ -123,7 +124,7 @@ export function Register() {
 
           {error && (
             <p style={{
-              fontFamily: 'var(--font-body)',
+              fontFamily: 'var(--font-sans)',
               fontSize: 'var(--text-sm)',
               color: 'var(--text-muted)',
               margin: 0,
@@ -142,7 +143,7 @@ export function Register() {
         to="/auth/login"
         style={{
           marginTop: '1.5rem',
-          fontFamily: 'var(--font-body)',
+          fontFamily: 'var(--font-sans)',
           fontSize: 'var(--text-sm)',
           color: 'var(--text-muted)',
           textDecoration: 'none',

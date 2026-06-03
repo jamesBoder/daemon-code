@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { springs } from '../../lib/springs'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
-import { REDUCED_MOTION_DURATION } from '../../lib/constants'
+import { REDUCED_MOTION_DURATION, ROUTE_TRANSITION_MS } from '../../lib/constants'
 import { copy } from '../../lib/copy'
 import type { OrbState } from '../../types'
 
@@ -13,6 +13,7 @@ interface DaemonOrbProps {
   signalConfidence?: number
   kernelAccess?: number
   compilePulse?: boolean
+  layoutId?: string
 }
 
 const ORB_INNER_RATIO = 0.5
@@ -34,14 +35,22 @@ export function DaemonOrb({
   state = 'cold',
   size = 200,
   compilePulse = false,
+  layoutId,
 }: DaemonOrbProps) {
   const reduced = useReducedMotion()
   const visual = orbVisuals[state]
 
   return (
-    <div
+    <motion.div
       role="img"
       aria-label={copy.daemonOrb.accessibilityLabel}
+      layout={!!layoutId}
+      layoutId={layoutId}
+      transition={{
+        layout: reduced
+          ? { duration: REDUCED_MOTION_DURATION }
+          : { duration: ROUTE_TRANSITION_MS / 1000, ease: 'easeOut' },
+      }}
       style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       <motion.div
@@ -84,6 +93,6 @@ export function DaemonOrb({
           border: '0.5px solid var(--border-subtle)',
         }}
       />
-    </div>
+    </motion.div>
   )
 }

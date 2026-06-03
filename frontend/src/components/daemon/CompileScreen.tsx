@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useCompileAnimation } from '../../hooks/useCompileAnimation'
 import { DaemonOrb } from './DaemonOrb'
+import { DaemonProse } from './DaemonProse'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { copy } from '../../lib/copy'
 import { COMPILE_AUTOPLAY_DELAY, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
 import type { CompileData } from '../../types'
 
 interface CompileScreenProps {
-  data: CompileData
-  autoPlay?: boolean
+  data:          CompileData
+  autoPlay?:     boolean
+  audioUrl?:     string
+  audioPlaying?: boolean
+  onMicClick?:   () => void
 }
 
-export function CompileScreen({ data, autoPlay = true }: CompileScreenProps) {
+export function CompileScreen({ data, autoPlay = true, audioUrl, onMicClick }: CompileScreenProps) {
   const { containerRef, play } = useCompileAnimation()
   const reduced = useReducedMotion()
   const [orbPulsing, setOrbPulsing] = useState(false)
@@ -123,23 +127,18 @@ export function CompileScreen({ data, autoPlay = true }: CompileScreenProps) {
       {/* Orb — compile pulse fires when terminal text fades at 1.8s mark */}
       <DaemonOrb state={data.orbState} size={180} compilePulse={orbPulsing} />
 
-      {/* Daemon prose (2.2s mark) */}
-      <p
+      {/* Daemon prose (2.2s mark) — wrapper is GSAP target; DaemonProse renders text + mic */}
+      <div
         data-compile-prose
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 'var(--text-xl)',
-          lineHeight: 'var(--leading-xl)',
-          fontWeight: 300,
-          color: 'var(--text-daemon)',
-          textAlign: 'center',
-          letterSpacing: '-0.01em',
-          maxWidth: PROSE_MAX_WIDTH,
-          opacity: 0,
-        }}
+        style={{ opacity: 0, textAlign: 'center', maxWidth: PROSE_MAX_WIDTH, width: '100%' }}
       >
-        {data.daemonProse}
-      </p>
+        <DaemonProse
+          text={data.daemonProse}
+          animate={false}
+          showMicIcon={!!audioUrl}
+          onMicClick={onMicClick}
+        />
+      </div>
 
       {/* Daily Signal (3.8s mark) */}
       <div

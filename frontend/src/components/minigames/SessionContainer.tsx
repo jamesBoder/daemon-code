@@ -6,7 +6,10 @@ import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { ReactionTest } from './ReactionTest'
 import { WeightedScale } from './WeightedScale'
 import { PredictionDuel } from './PredictionDuel'
+import { ConfirmModal } from '../ui/ConfirmModal'
 import { apiFetch } from '../../lib/api'
+import { copy } from '../../lib/copy'
+import { SESSION_RETRY_DELAY_MS } from '../../lib/constants'
 import { MG } from '../../lib/minigame'
 import type { Fragment } from '../../types'
 
@@ -17,16 +20,16 @@ interface Props {
 
 type Phase = 'game' | 'mood'
 
-const MOOD_SCORES   = [1, 2, 3, 4, 5]
-const RETRY_DELAY   = 2000  // ms — POST retry on first failure
-const transMs       = MG.transition.fragmentMs
+const MOOD_SCORES = [1, 2, 3, 4, 5]
+const transMs     = MG.transition.fragmentMs
 
 export function SessionContainer({ fragments, onComplete }: Props) {
   const navigate        = useNavigate()
   const reduced         = useReducedMotion()
   const [idx, setIdx]   = useState(0)
   const [phase, setPhase] = useState<Phase>('game')
-  const [visible, setVisible] = useState(true)
+  const [visible, setVisible]         = useState(true)
+  const [showExitModal, setShowExitModal] = useState(false)
 
   const fragment = fragments[idx]
   const progress = phase === 'mood' ? 1 : idx / fragments.length
@@ -34,7 +37,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
   function postResponse(frag: Fragment, responseData: unknown) {
     const body = JSON.stringify({ fragment_id: frag.id, fragment_type: frag.type, response_data: responseData })
     const post = () => apiFetch('/session/response', { method: 'POST', body })
-    post().catch(() => setTimeout(() => post().catch(() => {}), RETRY_DELAY))
+    post().catch(() => setTimeout(() => post().catch(() => {}), SESSION_RETRY_DELAY_MS))
   }
 
   function advance(currentIdx: number) {
@@ -61,9 +64,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     onComplete(fragments.length)
   }
 
-  function handleExit() {
-    if (window.confirm('Leave session? Your progress won\'t be saved.')) navigate('/home')
-  }
+  function handleExit() { setShowExitModal(true) }
 
   function renderFragment() {
     const raw = JSON.parse(fragment.payload) as Record<string, unknown>
@@ -136,6 +137,17 @@ export function SessionContainer({ fragments, onComplete }: Props) {
           </div>
         )}
       </motion.div>
+
+      {showExitModal && (
+        <ConfirmModal
+          message={copy.session.exitPrompt}
+          cancelLabel={copy.session.exitCancel}
+          confirmLabel={copy.session.exitConfirm}
+          dangerous
+          onCancel={() => setShowExitModal(false)}
+          onConfirm={() => navigate('/home')}
+        />
+      )}
     </>
   )
 }

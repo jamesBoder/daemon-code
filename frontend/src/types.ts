@@ -115,3 +115,12 @@ export interface SubmittedResponse {
   fragment_type: string
   response_data: unknown
 }
+
+// Process change recorded by the Analyst after a nightly run
+export interface ProcessDiff {
+  id:        string
+  name:      string
+  change:    'named' | 'strength_up' | 'strength_down' | 'new'
+  from_name?: string  // previous name for 'named' changes
+  delta?:    number   // strength delta for 'strength_up' / 'strength_down'
+}

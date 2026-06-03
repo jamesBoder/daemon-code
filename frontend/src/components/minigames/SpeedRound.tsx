@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { haptic } from '../../lib/haptics'
 import { MG, isDesktop } from '../../lib/minigame'
 
 export interface SpeedRoundResult {
@@ -34,6 +35,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
   const prompt = prompts[idx]
 
   function handleChoice(chosen: string) {
+    haptic('tap')
     const responseTimeMs = Date.now() - promptStartRef.current
     const next = [...resultsRef.current, { starter: prompt.starter, chosen, responseTimeMs }]
     resultsRef.current = next

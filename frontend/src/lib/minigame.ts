@@ -25,6 +25,7 @@ export const MG = {
     commitThreshold: 0.08,  // |value| must exceed this before "Next" appears
     dimmedAlpha:     0.35,  // label opacity when dragged to the opposite side
     hintOpacity:     0.55,  // opacity of "drag to balance" hint text
+    svgDesktopWidth: 480,   // px — decorative arm SVG width on desktop
   },
 
   // ── ReactionTest specific ──────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CompileScreen } from '../components/daemon/CompileScreen'
@@ -13,7 +13,6 @@ const PLAYED_KEY = 'compile_played_day'
 
 export function Home() {
   const navigate = useNavigate()
-  const [playing, setPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const { data: home, isLoading: homeLoading, isError: homeError, refetch } = useQuery({
@@ -101,7 +100,7 @@ export function Home() {
         <audio
           ref={audioRef}
           src={compileData.daemonAudioUrl}
-          onEnded={() => setPlaying(false)}
+          onEnded={() => {}}
           style={{ display: 'none' }}
         />
       )}

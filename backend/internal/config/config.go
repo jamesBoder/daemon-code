@@ -28,6 +28,7 @@ type Config struct {
 	VAPIDPrivateKey  string
 	EventBusName     string // custom EventBridge bus name for inter-Lambda events
 	Environment      string
+	AllowedOrigin    string // CORS allowed origin; empty = "*" (local dev)
 }
 
 type dbSecret struct {
@@ -57,6 +58,7 @@ func Load() *Config {
 		DynamoTableState: os.Getenv("DYNAMO_TABLE_STATE"),
 		EventBusName:     os.Getenv("EVENT_BUS_NAME"),
 		Environment:      os.Getenv("ENVIRONMENT"),
+		AllowedOrigin:    os.Getenv("ALLOWED_ORIGIN"),
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(region))

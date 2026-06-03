@@ -10,6 +10,32 @@ import (
 	"github.com/jamesboder/daemon-code/internal/middleware"
 )
 
+type processDiff struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Change   string  `json:"change"`             // "named" | "strength_up" | "strength_down" | "new"
+	FromName *string `json:"from_name,omitempty"` // previous name for "named" changes
+	Delta    *int    `json:"delta,omitempty"`     // strength delta for strength changes
+}
+
+func (h *handler) GetSessionRecentDiff(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+
+	state, err := h.ddb.GetShadowState(r.Context(), userID.String())
+	if err != nil || state == nil || state.RecentDiff == "" {
+		respondWithJSON(w, http.StatusOK, []processDiff{})
+		return
+	}
+
+	var diff []processDiff
+	if err := json.Unmarshal([]byte(state.RecentDiff), &diff); err != nil {
+		respondWithJSON(w, http.StatusOK, []processDiff{})
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, diff)
+}
+
 func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 

@@ -112,12 +112,20 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 	}
 	sig := dailySignals[idx]
 
+	// Prefer archetype-matched signal written by SignalSelector Lambda; fall back to hash selection.
+	sigQuote  := sig.Quote
+	sigAuthor := sig.Author
+	if state != nil && state.SignalQuote != "" {
+		sigQuote  = state.SignalQuote
+		sigAuthor = state.SignalAuthor
+	}
+
 	resp := homeResponse{
 		Day:               int(profile.CompileCount),
 		ProcessingSignals: len(patterns),
 		OrbState:          profile.Stage,
-		DailySignalQuote:  sig.Quote,
-		DailySignalAuthor: sig.Author,
+		DailySignalQuote:  sigQuote,
+		DailySignalAuthor: sigAuthor,
 		Stats: []compileStat{
 			{Label: "fragments decoded", Value: strconv.Itoa(int(profile.FragmentsDecoded))},
 			{Label: "kernel access", Value: strconv.Itoa(int(profile.KernelAccess)) + "%"},

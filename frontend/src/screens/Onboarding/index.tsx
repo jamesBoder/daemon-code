@@ -129,8 +129,8 @@ export function Onboarding() {
         return (
           <StepCard>
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 320 }}>
-              The daemon is watching how you respond.<br />
-              Tap when you feel something.
+              Words will pass quickly.<br />
+              Tap the ones that stay with you.
             </p>
             <button className="daemon-btn daemon-btn-primary" style={{ maxWidth: 240 }} onClick={() => setStep(1)}>
               Begin →

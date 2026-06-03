@@ -73,6 +73,35 @@ export function Home() {
 
   const compileData = homeToCompileData(home)
 
+  // ── Day 0 — Analyst hasn't run yet, no compile data ──────────────────────
+  // Show the orb as hero rather than the compile screen with all-zero stats.
+  if (home.processingSignals === 0) {
+    return (
+      <>
+        <div style={{
+          position: 'fixed', inset: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 'var(--space-8)',
+          padding: 'var(--space-8)',
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
+        }}>
+          <DaemonOrb state="cold" size={240} />
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+            Forming · Day {home.day}
+          </p>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 280 }}>
+            The daemon has a first impression.<br />It will know more tomorrow.
+          </p>
+          <DaemonButton onClick={() => navigate('/session')}>
+            Begin session →
+          </DaemonButton>
+        </div>
+        <BottomNav />
+      </>
+    )
+  }
+
   return (
     <>
       {/* Scrollable content — 80px bottom pad clears BottomNav */}

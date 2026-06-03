@@ -24,10 +24,10 @@ interface OrbVisual {
 }
 
 const orbVisuals: Record<OrbState, OrbVisual> = {
-  cold:    { outerOpacity: 0.15, innerScale: 0.40, glowOpacity: 0.05 },
-  warming: { outerOpacity: 0.30, innerScale: 0.55, glowOpacity: 0.10 },
-  running: { outerOpacity: 0.55, innerScale: 0.70, glowOpacity: 0.18 },
-  deep:    { outerOpacity: 0.80, innerScale: 0.85, glowOpacity: 0.28 },
+  cold:    { outerOpacity: 0.40, innerScale: 0.42, glowOpacity: 0.14 },
+  warming: { outerOpacity: 0.55, innerScale: 0.58, glowOpacity: 0.22 },
+  running: { outerOpacity: 0.72, innerScale: 0.72, glowOpacity: 0.32 },
+  deep:    { outerOpacity: 0.90, innerScale: 0.86, glowOpacity: 0.44 },
 }
 
 export function DaemonOrb({

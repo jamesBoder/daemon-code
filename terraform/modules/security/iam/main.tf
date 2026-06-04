@@ -134,6 +134,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetSecretValue",
           "secretsmanager:GetResourcePolicy",
+          "secretsmanager:PutSecretValue",
           "secretsmanager:CreateSecret",
           "secretsmanager:UpdateSecret",
           "secretsmanager:DeleteSecret",
@@ -316,6 +317,32 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
         Effect   = "Allow"
         Action   = ["ec2:Describe*"]
         Resource = "*"
+      },
+      {
+        Sid    = "EC2SecurityGroups"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "RDSManage"
+        Effect = "Allow"
+        Action = ["rds:*"]
+        Resource = [
+          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:db:daemon-code-*",
+          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:subgrp:daemon-code-*",
+          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:pg:daemon-code-*",
+          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secgrp:daemon-code-*"
+        ]
       },
     ]
   })

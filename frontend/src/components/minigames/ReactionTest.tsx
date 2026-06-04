@@ -11,7 +11,7 @@ export interface ReactionTestResult {
 
 interface Props {
   words: string[]
-  durationMs?: number   // display time per word; default 200ms; use 800ms for testing
+  durationMs?: number   // display time per word in ms; default 800ms
   onComplete: (result: ReactionTestResult) => void
 }
 
@@ -20,7 +20,7 @@ type Phase = 'in' | 'show' | 'out'
 
 const { fadeInMs, fadeOutMs, flashMs, ripple: rippleCfg } = MG.reaction
 
-export function ReactionTest({ words, durationMs = 200, onComplete }: Props) {
+export function ReactionTest({ words, durationMs = 800, onComplete }: Props) {
   const reduced = useReducedMotion()
 
   const [idx,     setIdx]     = useState(0)

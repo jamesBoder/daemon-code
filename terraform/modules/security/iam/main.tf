@@ -195,27 +195,9 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
         ]
       },
       {
-        Sid    = "LambdaManage"
-        Effect = "Allow"
-        Action = [
-          "lambda:GetFunction",
-          "lambda:CreateFunction",
-          "lambda:UpdateFunctionCode",
-          "lambda:UpdateFunctionConfiguration",
-          "lambda:DeleteFunction",
-          "lambda:TagResource",
-          "lambda:ListTags",
-          "lambda:GetFunctionConfiguration",
-          "lambda:AddPermission",
-          "lambda:RemovePermission",
-          "lambda:GetPolicy",
-          "lambda:CreateEventSourceMapping",
-          "lambda:GetEventSourceMapping",
-          "lambda:UpdateEventSourceMapping",
-          "lambda:DeleteEventSourceMapping",
-          "lambda:ListEventSourceMappings",
-          "lambda:PutFunctionConcurrency"
-        ]
+        Sid      = "LambdaManage"
+        Effect   = "Allow"
+        Action   = ["lambda:*"]
         Resource = [
           "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:daemon-code-*",
           "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:event-source-mapping:*"
@@ -332,7 +314,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       {
         Sid      = "EC2ReadOnly"
         Effect   = "Allow"
-        Action   = ["ec2:DescribeVpcs", "ec2:DescribeVpcAttribute"]
+        Action   = ["ec2:Describe*"]
         Resource = "*"
       },
     ]

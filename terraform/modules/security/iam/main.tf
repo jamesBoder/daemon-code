@@ -334,15 +334,10 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
         Resource = "*"
       },
       {
-        Sid    = "RDSManage"
-        Effect = "Allow"
-        Action = ["rds:*"]
-        Resource = [
-          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:db:daemon-code-*",
-          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:subgrp:daemon-code-*",
-          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:pg:daemon-code-*",
-          "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secgrp:daemon-code-*"
-        ]
+        Sid      = "RDSManage"
+        Effect   = "Allow"
+        Action   = ["rds:*"]
+        Resource = "*"
       },
     ]
   })

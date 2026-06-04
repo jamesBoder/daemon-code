@@ -77,5 +77,7 @@ module "iam" {
 module "cloudwatch" {
   source      = "../../modules/observability/cloudwatch"
   environment = var.environment
+  app_name    = local.app_name
+  aws_region  = var.aws_region
   tags        = local.common_tags
 }

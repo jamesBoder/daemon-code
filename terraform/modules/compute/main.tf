@@ -105,6 +105,17 @@ resource "aws_iam_role_policy" "lambda_exec" {
           var.vapid_secret_arn
         ]
       },
+      {
+        Sid    = "XRay"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets"
+        ]
+        Resource = ["*"]
+      },
     ]
   })
 }
@@ -254,6 +265,7 @@ resource "aws_lambda_function" "api" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 
@@ -314,6 +326,7 @@ resource "aws_lambda_function" "orchestrator" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 
@@ -333,6 +346,7 @@ resource "aws_lambda_function" "analyst" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 
@@ -358,6 +372,7 @@ resource "aws_lambda_function" "narrator" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 
@@ -377,6 +392,7 @@ resource "aws_lambda_function" "deckgen" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 
@@ -396,6 +412,7 @@ resource "aws_lambda_function" "notifier" {
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
 
   lifecycle { ignore_changes = [filename, source_code_hash] }
 

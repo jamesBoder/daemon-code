@@ -133,6 +133,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
         Action = [
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetSecretValue",
+          "secretsmanager:GetResourcePolicy",
           "secretsmanager:CreateSecret",
           "secretsmanager:UpdateSecret",
           "secretsmanager:DeleteSecret",
@@ -150,6 +151,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "logs:DeleteLogGroup",
           "logs:PutRetentionPolicy",
           "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
           "logs:TagLogGroup"
         ]
         Resource = "*"
@@ -244,6 +246,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "events:PutTargets",
           "events:RemoveTargets",
           "events:TagResource",
+          "events:ListTagsForResource",
           "events:DescribeEventBus",
           "events:CreateEventBus",
           "events:DeleteEventBus"
@@ -329,7 +332,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
       {
         Sid      = "EC2ReadOnly"
         Effect   = "Allow"
-        Action   = ["ec2:DescribeVpcs"]
+        Action   = ["ec2:DescribeVpcs", "ec2:DescribeVpcAttribute"]
         Resource = "*"
       },
     ]

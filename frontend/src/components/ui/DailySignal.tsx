@@ -1,4 +1,5 @@
 import { GlassCard } from './GlassCard'
+import { LETTER_SPACING_TIGHT } from '../../lib/constants'
 
 interface DailySignalProps {
   quote: string
@@ -16,7 +17,7 @@ export function DailySignal({ quote, author, animate = false }: DailySignalProps
           lineHeight: 'var(--leading-sm)',
           fontWeight: 300,
           color: 'var(--text-daemon)',
-          letterSpacing: '-0.01em',
+          letterSpacing: LETTER_SPACING_TIGHT,
           fontStyle: 'italic',
           marginBottom: 'var(--space-2)',
         }}>

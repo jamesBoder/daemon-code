@@ -6,12 +6,13 @@ import { DaemonButton } from '../../components/ui/DaemonButton'
 import { useAuthStore } from '../../stores/authStore'
 import { apiFetch } from '../../lib/api'
 import type { AuthResponse } from '../../types'
+import { HAIRLINE } from '../../lib/constants'
 
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: '0.75rem 1rem',
   background: 'rgba(255,255,255,0.04)',
-  border: '0.5px solid var(--border)',
+  border: `${HAIRLINE} solid var(--border)`,
   borderRadius: '8px',
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-sans)',

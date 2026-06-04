@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { springs } from '../../lib/springs'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
-import { REDUCED_MOTION_DURATION } from '../../lib/constants'
+import { LETTER_SPACING_TIGHT, REDUCED_MOTION_DURATION } from '../../lib/constants'
 
 interface DaemonProseProps {
   text: string
@@ -9,6 +9,7 @@ interface DaemonProseProps {
   animate?: boolean
   delay?: number
   showMicIcon?: boolean
+  audioPlaying?: boolean
   onMicClick?: () => void
 }
 
@@ -25,12 +26,15 @@ const lineHeightMap = {
   '3xl': 'var(--leading-3xl)',
 }
 
+const MIC = { iconSize: 14, pad: 15 }  // pad expands hit area to 14+30=44px
+
 export function DaemonProse({
   text,
   size = 'xl',
   animate = false,
   delay = 0,
   showMicIcon = false,
+  audioPlaying = false,
   onMicClick,
 }: DaemonProseProps) {
   const reduced = useReducedMotion()
@@ -43,7 +47,7 @@ export function DaemonProse({
         lineHeight: lineHeightMap[size],
         fontWeight: 300,
         color: 'var(--text-daemon)',
-        letterSpacing: '-0.01em',
+        letterSpacing: LETTER_SPACING_TIGHT,
         paddingRight: showMicIcon ? 'var(--space-6)' : 0,
       }}>
         {text}
@@ -52,21 +56,22 @@ export function DaemonProse({
         <button
           type="button"
           onClick={e => { e.stopPropagation(); onMicClick?.() }}
-          aria-label="Listen to daemon voice"
+          aria-label={audioPlaying ? 'Stop daemon voice' : 'Listen to daemon voice'}
           style={{
             position: 'absolute',
-            top: 2,
-            right: 0,
+            top: 2 - MIC.pad,
+            right: -MIC.pad,
+            padding: MIC.pad,
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: 'var(--text-muted)',
-            padding: 0,
+            color: audioPlaying ? 'var(--accent)' : 'var(--text-muted)',
             lineHeight: 1,
-            fontSize: 14,
+            fontSize: MIC.iconSize,
+            transition: 'color 0.2s',
           }}
         >
-          ⏵
+          {audioPlaying ? '⏸' : '⏵'}
         </button>
       )}
     </div>

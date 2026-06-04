@@ -44,3 +44,18 @@ export const SESSION_RETRY_DELAY_MS = 2000  // ms — POST retry on first networ
 
 // Haptics
 export const HAPTICS_KEY = 'haptics_enabled'  // localStorage boolean; default true (opt-out)
+
+// Touch targets
+export const MIN_TOUCH_TARGET = 44  // px — Apple HIG minimum tappable dimension
+
+// Layout geometry
+export const BOTTOM_NAV_HEIGHT    = 80        // px — BottomNav height; used in safe-area calc across all screens
+export const HAIRLINE             = '0.5px'   // hairline border thickness (retina only)
+
+// Typography
+export const LETTER_SPACING_WIDE  = '0.06em'   // mono metadata labels throughout the app
+export const LETTER_SPACING_TIGHT = '-0.01em'  // display prose text throughout the app
+
+// Button interaction
+export const BUTTON_TAP_SCALE   = 0.88  // whileTap scale for interactive buttons
+export const BUTTON_TAP_OPACITY = 0.7   // whileTap opacity for interactive buttons

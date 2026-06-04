@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { jwtDecode } from 'jwt-decode'
 import { ArrowLeft } from 'lucide-react'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
 import { useAuthStore } from '../stores/authStore'
-import { HAPTICS_KEY, MAX_CONTENT_WIDTH, ROUTE_TRANSITION_MS } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, HAPTICS_KEY, MAX_CONTENT_WIDTH, ROUTE_TRANSITION_MS } from '../lib/constants'
 
 const TOGGLE = {
   trackW:   40,
@@ -13,6 +14,8 @@ const TOGGLE = {
   radius:   12,
   dotSize:  18,
   dotPad:   3,
+  hitPadV:  10,  // (44 - trackH) / 2 — expands tap target to 44px without changing visual
+  hitPadH:  2,   // (44 - trackW) / 2
   get dotOn()  { return this.trackW - this.dotSize - this.dotPad },
   transS: `${ROUTE_TRANSITION_MS / 1000}s`,
 }
@@ -42,15 +45,16 @@ export function Settings() {
 
   return (
     <>
-      <div className="screen" style={{ overflowY: 'auto', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+      <div className="screen" style={{ overflowY: 'auto', paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
         <div style={{ padding: 'var(--space-10) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-8)' }}>
-            <button
+            <motion.button
               onClick={() => navigate('/home')}
+              whileTap={{ scale: 0.88, opacity: 0.7 }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 'var(--space-2)', minHeight: 44, minWidth: 44 }}
             >
               <ArrowLeft size={16} strokeWidth={1.5} />
-            </button>
+            </motion.button>
             <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-lg)', color: 'var(--text-primary)', margin: 0 }}>
               Settings
             </p>
@@ -85,20 +89,27 @@ export function Settings() {
                 aria-checked={hapticsEnabled}
                 onClick={handleHapticsToggle}
                 style={{
-                  width: TOGGLE.trackW, height: TOGGLE.trackH, borderRadius: TOGGLE.radius, flexShrink: 0,
-                  background: hapticsEnabled ? 'var(--accent)' : 'var(--border)',
-                  border: 'none', cursor: 'pointer', position: 'relative',
-                  transition: `background ${TOGGLE.transS}`,
+                  padding: `${TOGGLE.hitPadV}px ${TOGGLE.hitPadH}px`,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  flexShrink: 0, lineHeight: 0,
                 }}
               >
                 <span style={{
-                  position: 'absolute',
-                  top: TOGGLE.dotPad, left: hapticsEnabled ? TOGGLE.dotOn : TOGGLE.dotPad,
-                  width: TOGGLE.dotSize, height: TOGGLE.dotSize, borderRadius: '50%',
-                  background: 'var(--text-primary)',
                   display: 'block',
-                  transition: `left ${TOGGLE.transS}`,
-                }} />
+                  width: TOGGLE.trackW, height: TOGGLE.trackH, borderRadius: TOGGLE.radius,
+                  background: hapticsEnabled ? 'var(--accent)' : 'var(--border)',
+                  position: 'relative',
+                  transition: `background ${TOGGLE.transS}`,
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    top: TOGGLE.dotPad, left: hapticsEnabled ? TOGGLE.dotOn : TOGGLE.dotPad,
+                    width: TOGGLE.dotSize, height: TOGGLE.dotSize, borderRadius: '50%',
+                    background: 'var(--text-primary)',
+                    display: 'block',
+                    transition: `left ${TOGGLE.transS}`,
+                  }} />
+                </span>
               </button>
             </div>
           </div>

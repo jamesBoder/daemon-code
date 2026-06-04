@@ -32,12 +32,15 @@ func NewClient(cfg *appconfig.Config) *Client {
 	}
 }
 
-// ShadowState holds the nightly compile output for a user (prose + audio URL).
-// TTL is set to now+24h so stale records self-delete.
+// ShadowState holds the nightly compile output for a user (prose + audio URL + shadow prompt).
+// TTL is set to now+365d so entries persist in the Chronicle for one year.
 type ShadowState struct {
 	UserID       string `dynamodbav:"user_id"`
 	Date         string `dynamodbav:"date"`
+	DayNumber    int    `dynamodbav:"day_number"`    // compile count at time of write; used by Chronicle
+	OrbState     string `dynamodbav:"orb_state"`     // profile.Stage at time of compile; used by Chronicle
 	DaemonProse  string `dynamodbav:"daemon_prose"`
+	ShadowPrompt string `dynamodbav:"shadow_prompt"` // Mirror Method question; written by Narrator
 	AudioURL     string `dynamodbav:"audio_url"`
 	CompileStats string `dynamodbav:"compile_stats"` // JSON []CompileStat
 	RecentDiff   string `dynamodbav:"recent_diff"`   // JSON []ProcessDiff; written by Analyst
@@ -66,6 +69,30 @@ func (c *Client) GetShadowState(ctx context.Context, userID string) (*ShadowStat
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 	return &s, nil
+}
+
+// GetChronicle returns all nightly prose entries for a user, newest first.
+// Uses begins_with on the sort key to exclude non-date items (e.g. "push_subscription").
+func (c *Client) GetChronicle(ctx context.Context, userID string, limit int32) ([]ShadowState, error) {
+	out, err := c.ddb.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(c.tableState),
+		KeyConditionExpression: aws.String("user_id = :uid AND begins_with(#d, :prefix)"),
+		ExpressionAttributeNames:  map[string]string{"#d": "date"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid":    &types.AttributeValueMemberS{Value: userID},
+			":prefix": &types.AttributeValueMemberS{Value: "20"},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            &limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("chronicle query: %w", err)
+	}
+	var entries []ShadowState
+	if err := attributevalue.UnmarshalListOfMaps(out.Items, &entries); err != nil {
+		return nil, fmt.Errorf("unmarshal chronicle: %w", err)
+	}
+	return entries, nil
 }
 
 func (c *Client) PutShadowState(ctx context.Context, s ShadowState) error {

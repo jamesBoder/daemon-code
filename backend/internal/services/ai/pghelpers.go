@@ -23,6 +23,20 @@ func stripMarkdownFence(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// extractJSON finds the first {...} object in s. If s already starts with '{',
+// it's returned as-is. Handles the case where Claude prefixes JSON with prose.
+func extractJSON(s string) string {
+	if strings.HasPrefix(s, "{") {
+		return s
+	}
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start != -1 && end > start {
+		return s[start : end+1]
+	}
+	return s
+}
+
 func pgDate(dateStr string) pgtype.Date {
 	t, _ := time.Parse("2006-01-02", dateStr)
 	return pgtype.Date{Time: t, Valid: true}

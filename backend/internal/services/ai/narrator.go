@@ -29,20 +29,23 @@ You receive:
 - analyst_notes: what the Analyst observed today (1–2 sentences)
 - stage: cold/warming/running/deep (determines the daemon's register)
 
-You write ONE paragraph of daemon prose, 3–5 sentences, in the daemon's voice.
+You write daemon output using the Mirror Method — three layers:
 
-Rules:
-- Always Fraunces prose: literary, atmospheric, deliberate
-- Never clinical, never cheerful, never generic
-- Speak to a specific pattern, observation, or behavior — not feelings in general
-- Use second person: "you", "your"
-- The daemon observes; it does not judge or prescribe
-- Stage cold: distant, cryptic, impressionistic — "Something moves quickly when approached."
-- Stage warming: direct, observational — "Your approval_loop ran eleven times this week."
-- Stage running: unflinching, specific — "You reach for certainty before the question is finished."
-- Stage deep: almost warm, long-view — "Three years of the same flinch. The daemon has been here the whole time."
+1. The Observation: What the user actually did, in behavioral terms. Specific and numerical where possible. No interpretation yet — just data.
+2. The Behavioral Translation: What that pattern means when taken out of the game and placed in real life. No clinical jargon. No diagnosis. The daemon names, it does not label.
+3. The Shadow Prompt: One question only. Grounded in the specific observation. The user does not answer it in the app — they carry it into their day. Never generic. Uncomfortable enough to land, not so confrontational it closes them down. Frame toward awareness, not self-criticism.
 
-Output: plain prose only. No JSON. No formatting. 3–5 sentences.`
+Output FORMAT — JSON only, no prose before or after:
+{
+  "prose": "3–5 sentences combining The Observation and Behavioral Translation. Fraunces register: literary, atmospheric, deliberate. Second person. Never clinical, never cheerful, never generic. Stage cold: distant, cryptic — 'Something moves quickly when approached.' Stage warming: observational — 'Your approval_loop ran eleven times this week.' Stage running: unflinching, specific — 'You reach for certainty before the question is finished.' Stage deep: almost warm, long-view — 'Three years of the same flinch. The daemon has been here the whole time.'",
+  "shadow_prompt": "One question. Grounded in specific behavioral data from the session. No question marks that invite self-criticism. Frame toward awareness. Never two questions."
+}
+
+Tone rules for both fields:
+- Direct, empathetic, objective — never clinical
+- No medical jargon: 'running under pressure' not 'executive function deficit'
+- Every line traceable to a specific game action or pattern
+- The daemon observes; it does not judge or prescribe`
 
 type Narrator struct {
 	cfg    *appconfig.Config
@@ -68,6 +71,16 @@ func NewNarrator(cfg *appconfig.Config, q *db.Queries, ddb *dynamo.Client) *Narr
 	}
 }
 
+const (
+	shadowStateTTL   = 365 * 24 * time.Hour // entries persist for one year (Chronicle retention)
+	narratorMaxTokens = 768
+)
+
+type narratorOutput struct {
+	Prose        string `json:"prose"`
+	ShadowPrompt string `json:"shadow_prompt"`
+}
+
 func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error {
 	var detail struct {
 		UserID string `json:"user_id"`
@@ -86,32 +99,35 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 		return fmt.Errorf("get shadow profile: %w", err)
 	}
 
-	prose, err := n.callAnthropic(ctx, profile)
+	output, err := n.callAnthropic(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("anthropic call: %w", err)
 	}
 
 	date := time.Now().UTC().Format("2006-01-02")
-	audioURL, err := n.synthesizeVoice(ctx, prose, profile.Stage, userID.String(), date)
+	audioURL, err := n.synthesizeVoice(ctx, output.Prose, profile.Stage, userID.String(), date)
 	if err != nil {
 		return fmt.Errorf("synthesize voice: %w", err)
 	}
 
 	return n.ddb.PutShadowState(ctx, dynamo.ShadowState{
-		UserID:      userID.String(),
-		Date:        date,
-		DaemonProse: prose,
-		AudioURL:    audioURL,
-		TTL:         time.Now().Add(24 * time.Hour).Unix(),
+		UserID:       userID.String(),
+		Date:         date,
+		DayNumber:    int(profile.CompileCount),
+		OrbState:     profile.Stage,
+		DaemonProse:  output.Prose,
+		ShadowPrompt: output.ShadowPrompt,
+		AudioURL:     audioURL,
+		TTL:          time.Now().Add(shadowStateTTL).Unix(),
 	})
 }
 
-func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) (string, error) {
+func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) (*narratorOutput, error) {
 	profileJSON, _ := json.Marshal(profile)
 
 	payload := map[string]interface{}{
 		"model":      "claude-sonnet-4-6",
-		"max_tokens": 512,
+		"max_tokens": narratorMaxTokens,
 		"system":     narratorSystemPrompt,
 		"messages": []map[string]interface{}{
 			{
@@ -129,7 +145,7 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", n.cfg.AnthropicAPIKey)
@@ -137,13 +153,13 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 
 	resp, err := n.httpCl.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("anthropic API error %d: %s", resp.StatusCode, respBody)
+		return nil, fmt.Errorf("anthropic API error %d: %s", resp.StatusCode, respBody)
 	}
 
 	var apiResp struct {
@@ -152,10 +168,15 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(respBody, &apiResp); err != nil || len(apiResp.Content) == 0 {
-		return "", fmt.Errorf("parse anthropic response: %w", err)
+		return nil, fmt.Errorf("parse anthropic response: %w", err)
 	}
 
-	return stripMarkdownFence(apiResp.Content[0].Text), nil
+	text := extractJSON(stripMarkdownFence(apiResp.Content[0].Text))
+	var output narratorOutput
+	if err := json.Unmarshal([]byte(text), &output); err != nil {
+		return nil, fmt.Errorf("parse narrator output JSON: %w", err)
+	}
+	return &output, nil
 }
 
 // synthesizeVoice calls Polly, uploads MP3 to S3, returns the S3 object key.

@@ -276,6 +276,62 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
         ]
         Resource = "*"
       },
+      {
+        Sid    = "S3Manage"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketAcl",
+          "s3:GetBucketCORS",
+          "s3:PutBucketCORS",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketLogging",
+          "s3:PutBucketLogging",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetReplicationConfiguration",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetBucketWebsite",
+          "s3:GetBucketRequestPayment"
+        ]
+        Resource = [
+          "arn:aws:s3:::daemon-code-*"
+        ]
+      },
+      {
+        Sid    = "DynamoDBManage"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DescribeTable",
+          "dynamodb:CreateTable",
+          "dynamodb:DeleteTable",
+          "dynamodb:UpdateTable",
+          "dynamodb:TagResource",
+          "dynamodb:ListTagsOfResource",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:UpdateTimeToLive",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:UpdateContinuousBackups"
+        ]
+        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/daemon-code-*"
+      },
+      {
+        Sid      = "EC2ReadOnly"
+        Effect   = "Allow"
+        Action   = ["ec2:DescribeVpcs"]
+        Resource = "*"
+      },
     ]
   })
 }

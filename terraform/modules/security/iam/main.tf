@@ -153,7 +153,14 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "logs:PutRetentionPolicy",
           "logs:ListTagsLogGroup",
           "logs:ListTagsForResource",
-          "logs:TagLogGroup"
+          "logs:TagLogGroup",
+          "logs:CreateLogDelivery",
+          "logs:GetLogDelivery",
+          "logs:UpdateLogDelivery",
+          "logs:DeleteLogDelivery",
+          "logs:ListLogDeliveries",
+          "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies"
         ]
         Resource = "*"
       },

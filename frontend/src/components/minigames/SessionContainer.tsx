@@ -26,7 +26,7 @@ const transMs     = MG.transition.fragmentMs
 export function SessionContainer({ fragments, onComplete }: Props) {
   const navigate           = useNavigate()
   const reduced            = useReducedMotion()
-  const transTimer         = useRef<ReturnType<typeof setTimeout>>()
+  const transTimer         = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [idx, setIdx]      = useState(0)
   const [phase, setPhase]  = useState<Phase>('game')
 

@@ -28,6 +28,7 @@ export interface CompileData {
   analystTime: string
   stats: CompileStat[]
   daemonProse: string
+  shadowPrompt?: string
   dailySignalQuote: string
   dailySignalAuthor: string
   orbState: OrbState
@@ -76,6 +77,7 @@ export interface HomeData {
   analystTime: string
   stats: { label: string; value: string }[]
   daemonProse: string
+  shadowPrompt?: string
   dailySignalQuote: string
   dailySignalAuthor: string
   orbState: OrbState
@@ -114,6 +116,17 @@ export interface SubmittedResponse {
   fragment_id: string
   fragment_type: string
   response_data: unknown
+}
+
+// A single entry in the Chronicle — one nightly prose from the Narrator
+export interface ChronicleEntry {
+  date: string
+  day: number
+  orbState?: OrbState
+  prose: string
+  shadowPrompt?: string
+  signalQuote?: string
+  signalAuthor?: string
 }
 
 // Process change recorded by the Analyst after a nightly run

@@ -11,6 +11,7 @@ import { Session } from './screens/Session'
 import { SessionComplete } from './screens/SessionComplete'
 import { ProcessLog } from './screens/ProcessLog'
 import { Settings } from './screens/Settings'
+import { Chronicle } from './screens/Chronicle'
 import { ROUTE_TRANSITION_MS } from './lib/constants'
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them
@@ -64,6 +65,13 @@ function App() {
         } />
         <Route path="/settings" element={
           <ProtectedRoute><Settings /></ProtectedRoute>
+        } />
+
+        {/* Secondary screens — crossfade in/out */}
+        <Route path="/chronicle" element={
+          <TransitionPage>
+            <ProtectedRoute><Chronicle /></ProtectedRoute>
+          </TransitionPage>
         } />
 
         {/* Session flow — crossfades between states */}

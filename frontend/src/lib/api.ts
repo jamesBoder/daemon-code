@@ -36,6 +36,7 @@ export function homeToCompileData(home: HomeData): CompileData {
     analystTime: home.analystTime || '—',
     stats: home.stats.map(s => ({ label: s.label, text: s.value })),
     daemonProse: home.daemonProse || 'The daemon is forming a first impression.',
+    shadowPrompt: home.shadowPrompt,
     dailySignalQuote: home.dailySignalQuote,
     dailySignalAuthor: home.dailySignalAuthor,
     orbState: VALID_ORB_STATES.includes(home.orbState as OrbState)

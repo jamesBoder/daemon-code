@@ -7,10 +7,10 @@ import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
 import { apiFetchJson, homeToCompileData } from '../lib/api'
 import { applyArchetypeAccent } from '../lib/colors'
-import { TOAST_DISMISS_MS, ORB_LAYOUT_ID, MAX_CONTENT_WIDTH, MODAL_Z_INDEX } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, HAIRLINE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, TOAST_DISMISS_MS } from '../lib/constants'
 import { usePushPrompt } from '../hooks/usePushPrompt'
 import { copy } from '../lib/copy'
-import type { HomeData, ShadowProfile, Archetype } from '../types'
+import type { HomeData, ShadowProfile, Archetype, Process, ProcessState } from '../types'
 
 const PLAYED_KEY = 'compile_played_day'
 
@@ -30,6 +30,13 @@ export function Home() {
     queryKey: ['profile'],
     queryFn: () => apiFetchJson<ShadowProfile>('/profile'),
     staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: processes = [] } = useQuery({
+    queryKey: ['processes'],
+    queryFn: () => apiFetchJson<Process[]>('/processes'),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!(home && home.processingSignals > 0),
   })
 
   // Apply archetype accent color whenever profile loads or archetype changes
@@ -106,7 +113,7 @@ export function Home() {
           alignItems: 'center', justifyContent: 'center',
           gap: 'var(--space-8)',
           padding: 'var(--space-8)',
-          paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
+          paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
         }}>
           <DaemonOrb state="cold" size={240} layoutId={ORB_LAYOUT_ID} />
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
@@ -127,8 +134,8 @@ export function Home() {
 
   return (
     <>
-      {/* Scrollable content — 80px bottom pad clears BottomNav */}
-      <div className="screen" style={{ overflowY: 'auto', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+      {/* Scrollable content — BOTTOM_NAV_HEIGHT bottom pad clears BottomNav */}
+      <div className="screen" style={{ overflowY: 'auto', paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
         <div style={{ padding: 'var(--space-10) var(--space-5) var(--space-8)' }}>
           <CompileScreen
             data={compileData}
@@ -143,12 +150,28 @@ export function Home() {
             <DaemonButton onClick={() => navigate('/session')}>
               Begin session →
             </DaemonButton>
-            <button
-              onClick={() => navigate('/processes')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-2)' }}
-            >
-              View Process Log
-            </button>
+
+            {processes.length > 0 && (
+              <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
+            )}
+
+            {/* Secondary navigation row */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-8)' }}>
+              {processes.length === 0 && (
+                <button
+                  onClick={() => navigate('/processes')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 'var(--space-3)', minHeight: MIN_TOUCH_TARGET }}
+                >
+                  process log →
+                </button>
+              )}
+              <button
+                onClick={() => navigate('/chronicle')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 'var(--space-3)', minHeight: MIN_TOUCH_TARGET }}
+              >
+                the chronicle →
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -166,9 +189,9 @@ export function Home() {
       {/* Inline error — auto-dismisses after TOAST_DISMISS_MS */}
       {audioError && (
         <div style={{
-          position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom) + var(--space-4))',
+          position: 'fixed', bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom) + var(--space-4))`,
           left: '50%', transform: 'translateX(-50%)',
-          background: 'var(--surface)', border: '0.5px solid var(--border)',
+          background: 'var(--surface)', border: `${HAIRLINE} solid var(--border)`,
           borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-5)',
           fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)',
           whiteSpace: 'nowrap', zIndex: 20,
@@ -183,6 +206,62 @@ export function Home() {
   )
 }
 
+const STATE_COLORS: Record<ProcessState, string> = {
+  running:   'var(--compile-green)',
+  sleeping:  'var(--text-muted)',
+  weakening: 'var(--warning)',
+  new:       'var(--accent)',
+}
+
+const STRIP_MAX = 3  // process rows shown in the home strip
+
+function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAll: () => void }) {
+  const active = processes.filter(p => p.state === 'running' || p.state === 'new')
+  const rest   = processes.filter(p => p.state !== 'running' && p.state !== 'new')
+  const top    = [...active, ...rest].slice(0, STRIP_MAX)
+
+  return (
+    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+          active processes
+        </span>
+        <button
+          onClick={onViewAll}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 0, minHeight: MIN_TOUCH_TARGET, display: 'flex', alignItems: 'center' }}
+        >
+          view all →
+        </button>
+      </div>
+      {top.map((p, i) => {
+        const name = p.name
+          ? p.name
+          : `unnamed_process_${String(i + 1).padStart(3, '0')}`
+        const color = STATE_COLORS[p.state as ProcessState] ?? 'var(--text-muted)'
+        return (
+          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) 0' }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              color: p.unnamed ? 'var(--text-muted)' : 'var(--text-primary)',
+              letterSpacing: '0.04em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}>
+              {name}
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color, letterSpacing: '0.04em', flexShrink: 0 }}>
+              {p.state}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function PushPrompt({ onDismiss, onEnable }: { onDismiss: () => void; onEnable: () => void }) {
   return (
     <>
@@ -193,7 +272,7 @@ function PushPrompt({ onDismiss, onEnable }: { onDismiss: () => void; onEnable: 
       />
       <div style={{
         position: 'fixed',
-        bottom: 'calc(80px + env(safe-area-inset-bottom) + var(--space-4))',
+        bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom) + var(--space-4))`,
         left: '50%',
         transform: 'translateX(-50%)',
         width: `min(calc(100vw - var(--space-8)), ${MAX_CONTENT_WIDTH}px)`,
@@ -212,7 +291,7 @@ function PushPrompt({ onDismiss, onEnable }: { onDismiss: () => void; onEnable: 
           <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
             <button
               onClick={onDismiss}
-              style={{ flex: 1, background: 'none', border: '0.5px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}
+              style={{ flex: 1, background: 'none', border: `${HAIRLINE} solid var(--border)`, borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}
             >
               {copy.push.dismissLabel}
             </button>

@@ -23,14 +23,18 @@ export function usePushPrompt(day: number) {
   async function enable() {
     localStorage.setItem(PUSH_PROMPT_KEY, 'true')
     setShow(false)
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') return
-    const reg = await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly:      true,
-      applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
-    })
-    await apiFetch('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) })
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') return
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly:      true,
+        applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
+      })
+      await apiFetch('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) })
+    } catch {
+      // SW unavailable or subscribe rejected — prompt is already dismissed, nothing to do
+    }
   }
 
   return { show, dismiss, enable }

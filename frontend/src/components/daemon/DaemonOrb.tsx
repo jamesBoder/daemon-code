@@ -55,7 +55,7 @@ export function DaemonOrb({
     >
       <motion.div
         animate={{
-          opacity: compilePulse
+          opacity: compilePulse && !reduced
             ? [visual.glowOpacity, visual.glowOpacity * 3, visual.glowOpacity]
             : visual.glowOpacity,
           scale: compilePulse && !reduced ? [1, 1.15, 1] : 1,

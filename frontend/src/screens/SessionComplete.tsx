@@ -29,13 +29,13 @@ export function SessionComplete() {
     queryClient.invalidateQueries({ queryKey: ['profile'] })
   }, [])
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: () => apiFetchJson<ShadowProfile>('/profile'),
     staleTime: Infinity,
   })
 
-  const { data: rawDiff = [] } = useQuery({
+  const { data: rawDiff = [], isLoading: diffLoading } = useQuery({
     queryKey: ['session-diff'],
     queryFn:  () => apiFetchJson<ProcessDiff[]>('/session/recent-diff'),
     staleTime: Infinity,  // point-in-time — never refetch
@@ -50,6 +50,14 @@ export function SessionComplete() {
   }, [diff])
 
   const orbState = (profile?.stage || 'cold') as OrbState
+
+  if (profileLoading || diffLoading) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <DaemonOrb state="cold" />
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -94,14 +102,16 @@ export function SessionComplete() {
 }
 
 function DiffCard({ entry }: { entry: ProcessDiff }) {
+  const monoBase = { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', letterSpacing: '0.04em' }
+
   if (entry.change === 'named') {
     return (
-      <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+      <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <span style={{ ...monoBase, color: 'var(--text-muted)', wordBreak: 'break-word' }}>
           {entry.from_name ?? '—'}
         </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)' }}>→</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--accent)', letterSpacing: '0.04em' }}>
+        <span style={{ ...monoBase, color: 'var(--text-muted)', flexShrink: 0 }}>→</span>
+        <span style={{ ...monoBase, color: 'var(--accent)', wordBreak: 'break-word' }}>
           {entry.name}
         </span>
       </div>
@@ -110,11 +120,11 @@ function DiffCard({ entry }: { entry: ProcessDiff }) {
 
   if (entry.change === 'new') {
     return (
-      <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-primary)', letterSpacing: '0.04em' }}>
+      <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <span style={{ ...monoBase, color: 'var(--text-primary)', minWidth: 0, wordBreak: 'break-word' }}>
           {entry.name}
         </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+        <span style={{ ...monoBase, color: 'var(--text-muted)', letterSpacing: '0.06em', flexShrink: 0 }}>
           new
         </span>
       </div>
@@ -129,11 +139,11 @@ function DiffCard({ entry }: { entry: ProcessDiff }) {
     : ''
 
   return (
-    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-primary)', letterSpacing: '0.04em' }}>
+    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
+      <span style={{ ...monoBase, color: 'var(--text-primary)', minWidth: 0, wordBreak: 'break-word' }}>
         {entry.name}
       </span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color, letterSpacing: '0.06em' }}>
+      <span style={{ ...monoBase, color, letterSpacing: '0.06em', flexShrink: 0 }}>
         {arrow} strength{deltaStr}
       </span>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -24,10 +24,13 @@ const MOOD_SCORES = [1, 2, 3, 4, 5]
 const transMs     = MG.transition.fragmentMs
 
 export function SessionContainer({ fragments, onComplete }: Props) {
-  const navigate        = useNavigate()
-  const reduced         = useReducedMotion()
-  const [idx, setIdx]   = useState(0)
-  const [phase, setPhase] = useState<Phase>('game')
+  const navigate           = useNavigate()
+  const reduced            = useReducedMotion()
+  const transTimer         = useRef<ReturnType<typeof setTimeout>>()
+  const [idx, setIdx]      = useState(0)
+  const [phase, setPhase]  = useState<Phase>('game')
+
+  useEffect(() => () => clearTimeout(transTimer.current), [])
   const [visible, setVisible]         = useState(true)
   const [showExitModal, setShowExitModal] = useState(false)
 
@@ -56,7 +59,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
       return
     }
     setVisible(false)
-    setTimeout(() => advance(idx), transMs)
+    transTimer.current = setTimeout(() => advance(idx), transMs)
   }
 
   function handleMoodSelect(score: number) {
@@ -84,11 +87,12 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     <>
       {/* Progress bar + exit — always visible, never fades */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10 }}>
-        <div style={{ height: MG.reaction.progressHeight, background: 'var(--border)' }}>
+        <div style={{ height: MG.reaction.progressHeight, background: 'var(--border)', overflow: 'hidden' }}>
           <motion.div
-            animate={{ width: `${progress * 100}%` }}
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: progress }}
             transition={{ duration: MG.reaction.progressAnimS }}
-            style={{ height: '100%', background: 'var(--accent)' }}
+            style={{ height: '100%', width: '100%', background: 'var(--accent)', transformOrigin: 'left' }}
           />
         </div>
         <button

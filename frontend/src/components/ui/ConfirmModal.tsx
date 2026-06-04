@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { DaemonButton } from './DaemonButton'
 import { MODAL_Z_INDEX, MODAL_MAX_WIDTH } from '../../lib/constants'
@@ -12,6 +13,14 @@ interface ConfirmModalProps {
 }
 
 export function ConfirmModal({ message, confirmLabel, cancelLabel, dangerous, onConfirm, onCancel }: ConfirmModalProps) {
+  const confirmed = useRef(false)
+
+  function handleConfirm() {
+    if (confirmed.current) return
+    confirmed.current = true
+    onConfirm()
+  }
+
   return createPortal(
     <div
       onClick={onCancel}
@@ -51,7 +60,7 @@ export function ConfirmModal({ message, confirmLabel, cancelLabel, dangerous, on
             {cancelLabel}
           </DaemonButton>
           <DaemonButton
-            onClick={onConfirm}
+            onClick={handleConfirm}
             style={{
               flex: 1,
               ...(dangerous ? { background: 'var(--warning)', borderColor: 'var(--warning)' } : {}),

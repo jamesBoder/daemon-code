@@ -4,7 +4,7 @@ import { DaemonOrb } from './DaemonOrb'
 import { DaemonProse } from './DaemonProse'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { copy } from '../../lib/copy'
-import { COMPILE_AUTOPLAY_DELAY, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
+import { COMPILE_AUTOPLAY_DELAY, LETTER_SPACING_TIGHT, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
 import type { CompileData } from '../../types'
 
 interface CompileScreenProps {
@@ -15,7 +15,7 @@ interface CompileScreenProps {
   onMicClick?:   () => void
 }
 
-export function CompileScreen({ data, autoPlay = true, audioUrl, onMicClick }: CompileScreenProps) {
+export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, onMicClick }: CompileScreenProps) {
   const { containerRef, play } = useCompileAnimation()
   const reduced = useReducedMotion()
   const [orbPulsing, setOrbPulsing] = useState(false)
@@ -130,14 +130,29 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, onMicClick }: C
       {/* Daemon prose (2.2s mark) — wrapper is GSAP target; DaemonProse renders text + mic */}
       <div
         data-compile-prose
-        style={{ opacity: 0, textAlign: 'center', maxWidth: PROSE_MAX_WIDTH, width: '100%' }}
+        style={{ opacity: autoPlay ? 0 : 1, textAlign: 'center', maxWidth: PROSE_MAX_WIDTH, width: '100%' }}
       >
         <DaemonProse
           text={data.daemonProse}
           animate={false}
           showMicIcon={!!audioUrl}
+          audioPlaying={audioPlaying}
           onMicClick={onMicClick}
         />
+        {data.shadowPrompt && (
+          <p style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--text-sm)',
+            lineHeight: 'var(--leading-sm)',
+            fontWeight: 300,
+            color: 'var(--text-muted)',
+            fontStyle: 'italic',
+            letterSpacing: LETTER_SPACING_TIGHT,
+            marginTop: 'var(--space-5)',
+          }}>
+            {data.shadowPrompt}
+          </p>
+        )}
       </div>
 
       {/* Daily Signal (3.8s mark) */}
@@ -149,7 +164,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, onMicClick }: C
           border: '0.5px solid rgba(255, 255, 255, 0.07)',
           borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-5) var(--space-6)',
-          opacity: 0,
+          opacity: autoPlay ? 0 : 1,
         }}
       >
         <p style={{
@@ -159,7 +174,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, onMicClick }: C
           fontWeight: 300,
           color: 'var(--text-daemon)',
           fontStyle: 'italic',
-          letterSpacing: '-0.01em',
+          letterSpacing: LETTER_SPACING_TIGHT,
           marginBottom: 'var(--space-2)',
         }}>
           "{data.dailySignalQuote}"

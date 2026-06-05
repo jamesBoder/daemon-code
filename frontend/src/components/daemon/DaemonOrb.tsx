@@ -13,6 +13,7 @@ interface DaemonOrbProps {
   signalConfidence?: number
   kernelAccess?: number
   compilePulse?: boolean
+  namePulse?: boolean
   layoutId?: string
 }
 
@@ -35,6 +36,7 @@ export function DaemonOrb({
   state = 'cold',
   size = 200,
   compilePulse = false,
+  namePulse = false,
   layoutId,
 }: DaemonOrbProps) {
   const reduced = useReducedMotion()
@@ -55,14 +57,22 @@ export function DaemonOrb({
     >
       <motion.div
         animate={{
-          opacity: compilePulse && !reduced
-            ? [visual.glowOpacity, visual.glowOpacity * 3, visual.glowOpacity]
-            : visual.glowOpacity,
-          scale: compilePulse && !reduced ? [1, 1.15, 1] : 1,
+          opacity: namePulse && !reduced
+            ? [visual.glowOpacity, visual.glowOpacity * 5, visual.glowOpacity]
+            : compilePulse && !reduced
+              ? [visual.glowOpacity, visual.glowOpacity * 3, visual.glowOpacity]
+              : visual.glowOpacity,
+          scale: namePulse && !reduced
+            ? [1, 1.3, 1]
+            : compilePulse && !reduced ? [1, 1.15, 1] : 1,
         }}
         transition={reduced
           ? { duration: REDUCED_MOTION_DURATION }
-          : compilePulse ? { duration: 0.6, ease: 'easeOut' } : springs.smooth
+          : namePulse
+            ? { duration: 1.8, ease: 'easeInOut', repeat: Infinity, repeatDelay: 0.3 }
+            : compilePulse
+              ? { duration: 0.6, ease: 'easeOut' }
+              : springs.smooth
         }
         style={{
           position: 'absolute',

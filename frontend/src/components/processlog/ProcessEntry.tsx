@@ -4,7 +4,7 @@ import { ProcessStatus } from './ProcessStatus'
 import { springs } from '../../lib/springs'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { copy } from '../../lib/copy'
-import { REDUCED_MOTION_DURATION } from '../../lib/constants'
+import { HAIRLINE, REDUCED_MOTION_DURATION } from '../../lib/constants'
 import type { ProcessState } from '../../types'
 
 interface ProcessEntryProps {
@@ -126,7 +126,7 @@ export function ProcessEntry({
           >
             <div style={{
               padding: 'var(--space-3) var(--space-5) var(--space-4)',
-              borderTop: '0.5px solid var(--border-subtle)',
+              borderTop: `${HAIRLINE} solid var(--border-subtle)`,
               display: 'flex',
               flexDirection: 'column',
               gap: 'var(--space-2)',
@@ -148,6 +148,17 @@ export function ProcessEntry({
                   {lastSeen && (state === 'sleeping' || state === 'weakening') && (
                     <DetailRow label="last seen" value={lastSeen} />
                   )}
+                  {copy.processLog.stateDescriptions[state] && (
+                    <p style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'var(--text-xs)',
+                      lineHeight: 'var(--leading-xs)',
+                      fontStyle: 'italic',
+                      color: 'var(--text-muted)',
+                    }}>
+                      {copy.processLog.stateDescriptions[state]}
+                    </p>
+                  )}
                   {daemonNote && (
                     <p style={{
                       fontFamily: 'var(--font-display)',
@@ -155,7 +166,6 @@ export function ProcessEntry({
                       lineHeight: 'var(--leading-sm)',
                       fontStyle: 'italic',
                       color: 'var(--text-daemon)',
-                      marginTop: 'var(--space-1)',
                     }}>
                       {daemonNote}
                     </p>

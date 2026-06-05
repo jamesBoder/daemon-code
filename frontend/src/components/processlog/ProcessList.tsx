@@ -1,4 +1,6 @@
 import { ProcessEntry } from './ProcessEntry'
+import { copy } from '../../lib/copy'
+import { LETTER_SPACING_WIDE } from '../../lib/constants'
 import type { ProcessEntryData } from '../../types'
 
 interface ProcessListProps {
@@ -18,22 +20,22 @@ export function ProcessList({ entries }: ProcessListProps) {
 
   return (
     <div style={{ width: '100%' }}>
-      <div style={{ marginBottom: 'var(--space-4)' }}>
-        <h2 style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 'var(--text-lg)',
-          lineHeight: 'var(--leading-lg)',
-          fontWeight: 400,
-          color: 'var(--text-primary)',
-          marginBottom: 'var(--space-1)',
-        }}>
-          Process Log
-        </h2>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <p style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 'var(--text-sm)',
-          lineHeight: 'var(--leading-sm)',
+          fontFamily: 'var(--font-display)',
+          fontSize: 'var(--text-base)',
+          lineHeight: 'var(--leading-base)',
+          fontWeight: 300,
+          color: 'var(--text-secondary)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          {copy.processLog.description}
+        </p>
+        <p style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-xs)',
           color: 'var(--text-muted)',
+          letterSpacing: LETTER_SPACING_WIDE,
         }}>
           {summaryParts.join(' · ')}
         </p>

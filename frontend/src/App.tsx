@@ -15,7 +15,7 @@ import { Chronicle } from './screens/Chronicle'
 import { ROUTE_TRANSITION_MS } from './lib/constants'
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them
-const BOTTOM_NAV_PATHS = new Set(['/home', '/processes', '/settings'])
+const BOTTOM_NAV_PATHS = new Set(['/home', '/chronicle', '/processes', '/settings'])
 
 function TransitionPage({ children }: { children: React.ReactNode }) {
   return (
@@ -60,18 +60,14 @@ function App() {
         <Route path="/home" element={
           <ProtectedRoute><Home /></ProtectedRoute>
         } />
+        <Route path="/chronicle" element={
+          <ProtectedRoute><Chronicle /></ProtectedRoute>
+        } />
         <Route path="/processes" element={
           <ProtectedRoute><ProcessLog /></ProtectedRoute>
         } />
         <Route path="/settings" element={
           <ProtectedRoute><Settings /></ProtectedRoute>
-        } />
-
-        {/* Secondary screens — crossfade in/out */}
-        <Route path="/chronicle" element={
-          <TransitionPage>
-            <ProtectedRoute><Chronicle /></ProtectedRoute>
-          </TransitionPage>
         } />
 
         {/* Session flow — crossfades between states */}

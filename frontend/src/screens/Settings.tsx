@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { jwtDecode } from 'jwt-decode'
-import { ArrowLeft } from 'lucide-react'
+import { Play } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
+import { ScreenHeader } from '../components/ui/ScreenHeader'
+import { apiFetchJson, patchProfile, getVoiceSampleUrl } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { BOTTOM_NAV_HEIGHT, HAPTICS_KEY, MAX_CONTENT_WIDTH, ROUTE_TRANSITION_MS } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import type { ShadowProfile } from '../types'
 
 const TOGGLE = {
   trackW:   40,
@@ -14,14 +18,30 @@ const TOGGLE = {
   radius:   12,
   dotSize:  18,
   dotPad:   3,
-  hitPadV:  10,  // (44 - trackH) / 2 — expands tap target to 44px without changing visual
-  hitPadH:  2,   // (44 - trackW) / 2
+  hitPadV:  10,
+  hitPadH:  2,
   get dotOn()  { return this.trackW - this.dotSize - this.dotPad },
   transS: `${ROUTE_TRANSITION_MS / 1000}s`,
 }
 
+const VOICE_ANIM = {
+  radioDotSize:  16,
+  radioInnerSize: 6,
+} as const
+
+const VOICE_OPTIONS = [
+  { id: null,      description: 'Daemon default'          },
+  { id: 'Matthew', description: 'Measured, deliberate'    },
+  { id: 'Ruth',    description: 'Warm, searching'         },
+  { id: 'Stephen', description: 'Contained, harder edge'  },
+  { id: 'Kendra',  description: 'Quiet, subdued'          },
+  { id: 'Amy',     description: 'British, precise'        },
+  { id: 'Brian',   description: 'British, slower cadence' },
+]
+
 export function Settings() {
-  const navigate = useNavigate()
+  const navigate      = useNavigate()
+  const queryClient   = useQueryClient()
   const { token, logout } = useAuthStore()
 
   const email = token
@@ -31,6 +51,17 @@ export function Settings() {
   const [hapticsEnabled, setHapticsEnabled] = useState(
     () => localStorage.getItem(HAPTICS_KEY) !== 'false'
   )
+  const [previewPlaying, setPreviewPlaying] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => apiFetchJson<ShadowProfile>('/profile'),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const currentVoice = profile?.polly_voice ?? null
 
   function handleHapticsToggle() {
     const next = !hapticsEnabled
@@ -43,25 +74,48 @@ export function Settings() {
     navigate('/welcome', { replace: true })
   }
 
+  function handleVoiceSelect(voiceId: string | null) {
+    queryClient.setQueryData(['profile'], (old: ShadowProfile | undefined) =>
+      old ? { ...old, polly_voice: voiceId } : old
+    )
+    patchProfile(voiceId).catch(() => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+    })
+  }
+
+  async function handlePreview(voiceId: string) {
+    if (previewLoading) return
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    if (previewPlaying === voiceId) {
+      setPreviewPlaying(null)
+      return
+    }
+    setPreviewLoading(voiceId)
+    try {
+      const url = await getVoiceSampleUrl(voiceId)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => { setPreviewPlaying(null); audioRef.current = null }
+      await audio.play()
+      setPreviewPlaying(voiceId)
+    } catch {
+      // Silent fail
+    } finally {
+      setPreviewLoading(null)
+    }
+  }
+
   return (
     <>
-      <div className="screen" style={{ overflowY: 'auto', paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
-        <div style={{ padding: 'var(--space-10) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-8)' }}>
-            <motion.button
-              onClick={() => navigate('/home')}
-              whileTap={{ scale: 0.88, opacity: 0.7 }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 'var(--space-2)', minHeight: 44, minWidth: 44 }}
-            >
-              <ArrowLeft size={16} strokeWidth={1.5} />
-            </motion.button>
-            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-lg)', color: 'var(--text-primary)', margin: 0 }}>
-              Settings
-            </p>
-          </div>
+      <ScreenHeader title="settings" />
+      <div className="screen" style={{ overflowY: 'auto', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))`, paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
+        <div style={{ padding: 'var(--space-6) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
           <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, textTransform: 'uppercase' }}>
               Account
             </p>
             <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
@@ -76,8 +130,90 @@ export function Settings() {
             </DaemonButton>
           </div>
 
+          {/* Daemon Voice */}
           <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
+                Daemon Voice
+              </p>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>
+                The daemon selects by default. You can override here.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {VOICE_OPTIONS.map(({ id, description }) => {
+                const isSelected = id === null ? currentVoice === null : currentVoice === id
+                return (
+                  <div
+                    key={id ?? '__default'}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--space-4)',
+                      padding: 'var(--space-3) var(--space-1)',
+                      borderRadius: 'var(--radius-sm)',
+                    }}
+                  >
+                    {/* Radio + label */}
+                    <button
+                      onClick={() => handleVoiceSelect(id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                        flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+                        padding: 0, minHeight: MIN_TOUCH_TARGET, textAlign: 'left',
+                      }}
+                    >
+                      <span style={{
+                        width: VOICE_ANIM.radioDotSize, height: VOICE_ANIM.radioDotSize, borderRadius: '50%', flexShrink: 0,
+                        border: `${HAIRLINE} solid ${isSelected ? 'var(--accent)' : 'var(--border-active)'}`,
+                        background: isSelected ? 'var(--accent)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s, border-color 0.15s',
+                      }}>
+                        {isSelected && (
+                          <span style={{ width: VOICE_ANIM.radioInnerSize, height: VOICE_ANIM.radioInnerSize, borderRadius: '50%', background: 'var(--background)' }} />
+                        )}
+                      </span>
+                      <span style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: 'var(--text-sm)',
+                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        transition: 'color 0.15s',
+                      }}>
+                        {description}
+                      </span>
+                    </button>
+
+                    {id !== null ? (
+                      <motion.button
+                        onClick={() => handlePreview(id)}
+                        whileTap={previewLoading ? {} : { scale: BUTTON_TAP_SCALE, opacity: BUTTON_TAP_OPACITY }}
+                        style={{
+                          width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, borderRadius: '50%', flexShrink: 0,
+                          border: `${HAIRLINE} solid ${previewPlaying === id ? 'var(--accent)' : 'var(--border)'}`,
+                          background: previewPlaying === id ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'none',
+                          cursor: previewLoading === id ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: previewPlaying === id ? 'var(--accent)' : 'var(--text-muted)',
+                          opacity: previewLoading === id ? 0.4 : 1,
+                          transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                        }}
+                      >
+                        <Play size={14} strokeWidth={1.5} />
+                      </motion.button>
+                    ) : (
+                      <div style={{ width: MIN_TOUCH_TARGET, flexShrink: 0 }} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Preferences */}
+          <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, textTransform: 'uppercase' }}>
               Preferences
             </p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

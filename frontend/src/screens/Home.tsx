@@ -5,9 +5,10 @@ import { CompileScreen } from '../components/daemon/CompileScreen'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
+import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson, homeToCompileData } from '../lib/api'
 import { applyArchetypeAccent } from '../lib/colors'
-import { BOTTOM_NAV_HEIGHT, HAIRLINE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, TOAST_DISMISS_MS } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, HAIRLINE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS } from '../lib/constants'
 import { usePushPrompt } from '../hooks/usePushPrompt'
 import { copy } from '../lib/copy'
 import type { HomeData, ShadowProfile, Archetype, Process, ProcessState } from '../types'
@@ -107,12 +108,14 @@ export function Home() {
   if (home.processingSignals === 0) {
     return (
       <>
+        <ScreenHeader title="daemon" />
         <div style={{
           position: 'fixed', inset: 0,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           gap: 'var(--space-8)',
           padding: 'var(--space-8)',
+          paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top) + var(--space-4))`,
           paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
         }}>
           <DaemonOrb state="cold" size={240} layoutId={ORB_LAYOUT_ID} />
@@ -134,9 +137,10 @@ export function Home() {
 
   return (
     <>
+      <ScreenHeader title="daemon" />
       {/* Scrollable content — BOTTOM_NAV_HEIGHT bottom pad clears BottomNav */}
-      <div className="screen" style={{ overflowY: 'auto', paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
-        <div style={{ padding: 'var(--space-10) var(--space-5) var(--space-8)' }}>
+      <div className="screen" style={{ overflowY: 'auto', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))`, paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
+        <div style={{ padding: 'var(--space-5) var(--space-5) var(--space-8)' }}>
           <CompileScreen
             data={compileData}
             autoPlay={autoPlay}
@@ -146,7 +150,7 @@ export function Home() {
           />
 
           {/* Navigation — below CompileScreen, not inside it */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-8)', maxWidth: 480, margin: 'var(--space-8) auto 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: 'var(--space-8) auto 0' }}>
             <DaemonButton onClick={() => navigate('/session')}>
               Begin session →
             </DaemonButton>
@@ -154,24 +158,6 @@ export function Home() {
             {processes.length > 0 && (
               <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
             )}
-
-            {/* Secondary navigation row */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-8)' }}>
-              {processes.length === 0 && (
-                <button
-                  onClick={() => navigate('/processes')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 'var(--space-3)', minHeight: MIN_TOUCH_TARGET }}
-                >
-                  process log →
-                </button>
-              )}
-              <button
-                onClick={() => navigate('/chronicle')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 'var(--space-3)', minHeight: MIN_TOUCH_TARGET }}
-              >
-                the chronicle →
-              </button>
-            </div>
           </div>
         </div>
       </div>

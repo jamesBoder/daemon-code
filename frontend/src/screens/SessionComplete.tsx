@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
+import { NamingCeremony } from '../components/daemon/NamingCeremony'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
 import { haptic } from '../lib/haptics'
@@ -17,12 +18,14 @@ const DIFF_CHANGE_ORDER: Record<string, number> = {
 }
 
 export function SessionComplete() {
-  const navigate     = useNavigate()
-  const queryClient  = useQueryClient()
-  const location     = useLocation()
+  const navigate      = useNavigate()
+  const queryClient   = useQueryClient()
+  const location      = useLocation()
 
   const state         = location.state as { fragmentCount?: number } | null
   const fragmentCount = state?.fragmentCount ?? 0
+
+  const [ceremonyDone, setCeremonyDone] = useState(false)
 
   useEffect(() => {
     haptic('success')
@@ -56,6 +59,18 @@ export function SessionComplete() {
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <DaemonOrb state="cold" />
       </div>
+    )
+  }
+
+  const namedDiffs = diff.filter(d => d.change === 'named')
+
+  if (namedDiffs.length > 0 && !ceremonyDone) {
+    return (
+      <NamingCeremony
+        names={namedDiffs.map(d => d.name)}
+        orbState={orbState}
+        onComplete={() => setCeremonyDone(true)}
+      />
     )
   }
 

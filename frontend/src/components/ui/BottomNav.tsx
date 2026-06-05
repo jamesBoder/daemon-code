@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, Zap, GitBranch, Settings } from 'lucide-react'
+import { Home, Zap, Scroll, GitBranch, Settings } from 'lucide-react'
 
 const TABS = [
   { label: 'Home',      path: '/home',      Icon: Home      },
   { label: 'Session',   path: '/session',   Icon: Zap       },
+  { label: 'Chronicle', path: '/chronicle', Icon: Scroll    },
   { label: 'Processes', path: '/processes', Icon: GitBranch },
   { label: 'Settings',  path: '/settings',  Icon: Settings  },
 ]

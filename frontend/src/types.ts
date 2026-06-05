@@ -24,6 +24,7 @@ export interface CompileStat {
 // Data shape for the compile screen and home screen
 export interface CompileData {
   day: number
+  consecutiveDays: number
   processingSignals: number
   analystTime: string
   stats: CompileStat[]
@@ -68,11 +69,13 @@ export interface ShadowProfile {
   fragments_decoded: number
   compile_count: number
   analyst_notes: string | null
+  polly_voice:   string | null
 }
 
 // Home — homeResponse DTO has explicit json tags (already correct)
 export interface HomeData {
   day: number
+  consecutiveDays: number
   processingSignals: number
   analystTime: string
   stats: { label: string; value: string }[]

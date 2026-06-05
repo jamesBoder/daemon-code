@@ -15,7 +15,7 @@ import (
 const createShadowProfile = `-- name: CreateShadowProfile :one
 INSERT INTO shadow_profiles (user_id)
 VALUES ($1)
-RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, updated_at
+RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at
 `
 
 func (q *Queries) CreateShadowProfile(ctx context.Context, userID uuid.UUID) (ShadowProfile, error) {
@@ -34,13 +34,14 @@ func (q *Queries) CreateShadowProfile(ctx context.Context, userID uuid.UUID) (Sh
 		&i.FragmentsDecoded,
 		&i.CompileCount,
 		&i.AnalystNotes,
+		&i.PollyVoice,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getShadowProfile = `-- name: GetShadowProfile :one
-SELECT id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, updated_at FROM shadow_profiles WHERE user_id = $1
+SELECT id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at FROM shadow_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetShadowProfile(ctx context.Context, userID uuid.UUID) (ShadowProfile, error) {
@@ -59,6 +60,7 @@ func (q *Queries) GetShadowProfile(ctx context.Context, userID uuid.UUID) (Shado
 		&i.FragmentsDecoded,
 		&i.CompileCount,
 		&i.AnalystNotes,
+		&i.PollyVoice,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -78,7 +80,7 @@ SET primary_archetype  = $2,
     analyst_notes      = $11,
     updated_at         = NOW()
 WHERE user_id = $1
-RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, updated_at
+RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at
 `
 
 type UpdateShadowProfileParams struct {
@@ -123,6 +125,7 @@ func (q *Queries) UpdateShadowProfile(ctx context.Context, arg UpdateShadowProfi
 		&i.FragmentsDecoded,
 		&i.CompileCount,
 		&i.AnalystNotes,
+		&i.PollyVoice,
 		&i.UpdatedAt,
 	)
 	return i, err

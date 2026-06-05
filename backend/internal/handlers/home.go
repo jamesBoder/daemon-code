@@ -44,6 +44,7 @@ type compileStat struct {
 
 type homeResponse struct {
 	Day               int           `json:"day"`
+	ConsecutiveDays   int           `json:"consecutiveDays"`
 	ProcessingSignals int           `json:"processingSignals"`
 	AnalystTime       string        `json:"analystTime"`
 	Stats             []compileStat `json:"stats"`
@@ -59,9 +60,10 @@ func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
 	var (
-		profile  db.ShadowProfile
-		state    *dynamo.ShadowState
-		patterns []db.PatternLibrary
+		profile      db.ShadowProfile
+		state        *dynamo.ShadowState
+		patterns     []db.PatternLibrary
+		sessionDates []time.Time
 	)
 
 	g, ctx := errgroup.WithContext(r.Context())
@@ -81,6 +83,11 @@ func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
 		patterns, err = h.q.GetPatternLibrary(ctx, userID)
 		return err
 	})
+	g.Go(func() error {
+		var err error
+		sessionDates, err = h.q.GetSessionDates(ctx, userID)
+		return err
+	})
 
 	if err := g.Wait(); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not load home data")
@@ -98,11 +105,14 @@ func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondWithJSON(w, http.StatusOK, buildHomeResponse(profile, state, patterns, audioURL))
+	now := time.Now().UTC()
+	resp := buildHomeResponse(profile, state, patterns, audioURL, now)
+	resp.ConsecutiveDays = streakLen(sessionDates, now)
+	respondWithJSON(w, http.StatusOK, resp)
 }
 
-func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patterns []db.PatternLibrary, audioURL string) homeResponse {
-	today := time.Now().UTC().Format("2006-01-02")
+func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patterns []db.PatternLibrary, audioURL string, now time.Time) homeResponse {
+	today := now.Format("2006-01-02")
 
 	// Deterministic signal selection: hash(user_id + date) % len(quotes)
 	key := profile.UserID.String() + today
@@ -142,6 +152,30 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 	}
 
 	return resp
+}
+
+// streakLen returns how many consecutive days (ending today or yesterday) the user has played.
+// Returns 0 if the most recent session was 2+ days ago.
+func streakLen(dates []time.Time, now time.Time) int {
+	if len(dates) == 0 {
+		return 0
+	}
+	today := now.Truncate(24 * time.Hour)
+	mostRecent := dates[0].UTC().Truncate(24 * time.Hour)
+	if today.Sub(mostRecent) > 24*time.Hour {
+		return 0
+	}
+	count := 1
+	for i := 1; i < len(dates); i++ {
+		prev := dates[i-1].UTC().Truncate(24 * time.Hour)
+		curr := dates[i].UTC().Truncate(24 * time.Hour)
+		if prev.Sub(curr) == 24*time.Hour {
+			count++
+		} else {
+			break
+		}
+	}
+	return count
 }
 
 func relativeDate(date, today string) string {

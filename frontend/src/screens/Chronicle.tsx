@@ -1,11 +1,10 @@
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { BottomNav } from '../components/ui/BottomNav'
+import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH, SCREEN_HEADER_HEIGHT } from '../lib/constants'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { ChronicleEntry, OrbState } from '../types'
 
@@ -31,8 +30,6 @@ function formatDate(iso: string): string {
 }
 
 export function Chronicle() {
-  const navigate = useNavigate()
-
   const { data: entries = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['chronicle'],
     queryFn: () => apiFetchJson<ChronicleEntry[]>('/chronicle'),
@@ -41,24 +38,8 @@ export function Chronicle() {
 
   return (
     <>
-      <div className="screen" style={{ overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
-        {/* Header */}
-        <div style={{ padding: 'var(--space-5) var(--space-5) 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', width: '100%' }}>
-            <motion.button
-              onClick={() => navigate('/home')}
-              whileTap={{ scale: BUTTON_TAP_SCALE, opacity: BUTTON_TAP_OPACITY }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-2)', minHeight: MIN_TOUCH_TARGET, minWidth: MIN_TOUCH_TARGET }}
-            >
-              <ArrowLeft size={16} strokeWidth={1.5} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>home</span>
-            </motion.button>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, paddingRight: 'var(--space-2)' }}>
-              the chronicle
-            </span>
-          </div>
-        </div>
-
+      <ScreenHeader title="the chronicle" />
+      <div className="screen" style={{ overflowY: 'auto', overscrollBehavior: 'contain', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))`, paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
         <div style={{ padding: 'var(--space-6) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', width: '100%' }}>
           {isLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--space-16)', gap: 'var(--space-4)' }}>

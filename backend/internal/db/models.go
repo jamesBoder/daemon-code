@@ -55,6 +55,7 @@ type ShadowProfile struct {
 	FragmentsDecoded int32              `json:"fragments_decoded"`
 	CompileCount     int32              `json:"compile_count"`
 	AnalystNotes     pgtype.Text        `json:"analyst_notes"`
+	PollyVoice       pgtype.Text        `json:"polly_voice"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 

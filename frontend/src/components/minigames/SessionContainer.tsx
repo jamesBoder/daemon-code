@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useBlocker } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
@@ -24,15 +24,20 @@ const MOOD_SCORES = [1, 2, 3, 4, 5]
 const transMs     = MG.transition.fragmentMs
 
 export function SessionContainer({ fragments, onComplete }: Props) {
-  const navigate           = useNavigate()
-  const reduced            = useReducedMotion()
-  const transTimer         = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const [idx, setIdx]      = useState(0)
-  const [phase, setPhase]  = useState<Phase>('game')
+  const navigate  = useNavigate()
+  const reduced   = useReducedMotion()
+  const transTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [idx, setIdx]     = useState(0)
+  const [phase, setPhase] = useState<Phase>('game')
+  const [visible, setVisible] = useState(true)
 
   useEffect(() => () => clearTimeout(transTimer.current), [])
-  const [visible, setVisible]         = useState(true)
-  const [showExitModal, setShowExitModal] = useState(false)
+
+  // Block all navigation away from the session except the legitimate completion path.
+  // This catches both the X button and the device back gesture.
+  const blocker = useBlocker(({ nextLocation }) =>
+    nextLocation.pathname !== '/session/complete'
+  )
 
   const fragment = fragments[idx]
   const progress = phase === 'mood' ? 1 : idx / fragments.length
@@ -67,8 +72,6 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     onComplete(fragments.length)
   }
 
-  function handleExit() { setShowExitModal(true) }
-
   function renderFragment() {
     const raw = JSON.parse(fragment.payload) as Record<string, unknown>
     switch (fragment.type) {
@@ -86,7 +89,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
   return (
     <>
       {/* Progress bar + exit — always visible, never fades */}
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10 }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: 'env(safe-area-inset-top)' }}>
         <div style={{ height: MG.reaction.progressHeight, background: 'var(--border)', overflow: 'hidden' }}>
           <motion.div
             initial={{ scaleX: 0 }}
@@ -96,8 +99,8 @@ export function SessionContainer({ fragments, onComplete }: Props) {
           />
         </div>
         <button
-          onClick={handleExit}
-          style={{ position: 'absolute', top: 0, right: 0, width: 52, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => navigate('/home')}
+          style={{ position: 'absolute', top: 'env(safe-area-inset-top)', right: 0, width: 52, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <X size={18} strokeWidth={1.5} />
         </button>
@@ -142,14 +145,14 @@ export function SessionContainer({ fragments, onComplete }: Props) {
         )}
       </motion.div>
 
-      {showExitModal && (
+      {blocker.state === 'blocked' && (
         <ConfirmModal
           message={copy.session.exitPrompt}
           cancelLabel={copy.session.exitCancel}
           confirmLabel={copy.session.exitConfirm}
           dangerous
-          onCancel={() => setShowExitModal(false)}
-          onConfirm={() => navigate('/home')}
+          onCancel={() => blocker.reset()}
+          onConfirm={() => blocker.proceed()}
         />
       )}
     </>

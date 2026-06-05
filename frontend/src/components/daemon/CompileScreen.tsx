@@ -31,7 +31,9 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
     }
   }, [autoPlay, play, reduced])
 
-  const compileLines = copy.compile.lines(data.processingSignals, data.analystTime)
+  const baseLines    = copy.compile.lines(data.processingSignals, data.analystTime)
+  const streakLine   = copy.compile.streakLine(data.consecutiveDays, data.day)
+  const compileLines = streakLine ? [...baseLines, streakLine] : baseLines
 
   return (
     <div

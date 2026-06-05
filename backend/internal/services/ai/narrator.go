@@ -73,7 +73,7 @@ func NewNarrator(cfg *appconfig.Config, q *db.Queries, ddb *dynamo.Client) *Narr
 }
 
 const (
-	shadowStateTTL   = 365 * 24 * time.Hour // entries persist for one year (Chronicle retention)
+	shadowStateTTL    = 365 * 24 * time.Hour // entries persist for one year (Chronicle retention)
 	narratorMaxTokens = 768
 )
 

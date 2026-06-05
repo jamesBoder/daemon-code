@@ -37,8 +37,8 @@ func NewClient(cfg *appconfig.Config) *Client {
 type ShadowState struct {
 	UserID       string `dynamodbav:"user_id"`
 	Date         string `dynamodbav:"date"`
-	DayNumber    int    `dynamodbav:"day_number"`    // compile count at time of write; used by Chronicle
-	OrbState     string `dynamodbav:"orb_state"`     // profile.Stage at time of compile; used by Chronicle
+	DayNumber    int    `dynamodbav:"day_number"` // compile count at time of write; used by Chronicle
+	OrbState     string `dynamodbav:"orb_state"`  // profile.Stage at time of compile; used by Chronicle
 	DaemonProse  string `dynamodbav:"daemon_prose"`
 	ShadowPrompt string `dynamodbav:"shadow_prompt"` // Mirror Method question; written by Narrator
 	AudioURL     string `dynamodbav:"audio_url"`
@@ -75,9 +75,9 @@ func (c *Client) GetShadowState(ctx context.Context, userID string) (*ShadowStat
 // Uses begins_with on the sort key to exclude non-date items (e.g. "push_subscription").
 func (c *Client) GetChronicle(ctx context.Context, userID string, limit int32) ([]ShadowState, error) {
 	out, err := c.ddb.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(c.tableState),
-		KeyConditionExpression: aws.String("user_id = :uid AND begins_with(#d, :prefix)"),
-		ExpressionAttributeNames:  map[string]string{"#d": "date"},
+		TableName:                aws.String(c.tableState),
+		KeyConditionExpression:   aws.String("user_id = :uid AND begins_with(#d, :prefix)"),
+		ExpressionAttributeNames: map[string]string{"#d": "date"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":uid":    &types.AttributeValueMemberS{Value: userID},
 			":prefix": &types.AttributeValueMemberS{Value: "20"},

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ReactionTest, type ReactionTestResult } from '../../components/minigames/ReactionTest'
 import { WeightedScale, type WeightedScaleResult } from '../../components/minigames/WeightedScale'
 import { SpeedRound, type SpeedRoundResult, type SpeedRoundPrompt } from '../../components/minigames/SpeedRound'
+import { VoicePick } from './VoicePick'
 import { DaemonOrb } from '../../components/daemon/DaemonOrb'
 import { apiFetch } from '../../lib/api'
 import { useAuthStore } from '../../stores/authStore'
@@ -46,9 +47,9 @@ export function Onboarding() {
   const scaleRef    = useRef<WeightedScaleResult[] | null>(null)
   const speedRef    = useRef<SpeedRoundResult[] | null>(null)
 
-  // Step 6: run compile animation + POST in parallel
+  // Step 7: run compile animation + POST in parallel
   useEffect(() => {
-    if (step !== 6) return
+    if (step !== 7) return
 
     // Reset parallel-gate flags
     setPostDone(false)
@@ -61,7 +62,6 @@ export function Onboarding() {
       setTimeout(() => setCompileLines(i + 1), delay)
     )
     const minTimer = setTimeout(() => setTimerDone(true), MG.compile.minMs)
-
     // POST onboarding results
     const reaction = reactionRef.current?.tapped ?? []
     const scale    = scaleRef.current    ?? []
@@ -86,9 +86,9 @@ export function Onboarding() {
     return () => { timers.forEach(clearTimeout); clearTimeout(minTimer) }
   }, [step])
 
-  // Advance to step 7 when both the timer and POST have completed
+  // Advance to step 8 when both the timer and POST have completed
   useEffect(() => {
-    if (postDone && timerDone) setStep(7)
+    if (postDone && timerDone) setStep(8)
   }, [postDone, timerDone])
 
   function retry() {
@@ -192,8 +192,12 @@ export function Onboarding() {
           />
         )
 
-      // ── Step 6: compile loading ───────────────────────────────────────────
+      // ── Step 6: Voice pick ────────────────────────────────────────────────
       case 6:
+        return <VoicePick onComplete={() => setStep(7)} />
+
+      // ── Step 7: compile loading ───────────────────────────────────────────
+      case 7:
         if (postError) {
           return (
             <StepCard>
@@ -222,8 +226,8 @@ export function Onboarding() {
           </div>
         )
 
-      // ── Step 7: first look at daemon ─────────────────────────────────────
-      case 7:
+      // ── Step 8: first look at daemon ─────────────────────────────────────
+      case 8:
         return (
           <StepCard>
             <DaemonOrb state="cold" />

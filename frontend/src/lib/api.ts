@@ -27,11 +27,30 @@ export async function apiFetchJson<T>(path: string, init?: RequestInit): Promise
   return r.json() as Promise<T>
 }
 
+export async function patchProfile(polly_voice: string | null): Promise<void> {
+  const r = await apiFetch('/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ polly_voice }),
+  })
+  if (!r.ok) throw new Error(`PATCH /profile ${r.status}`)
+}
+
+export async function getVoiceSampleUrl(voice: string): Promise<string> {
+  const data = await apiFetchJson<{ url: string }>(`/audio/sample?voice=${encodeURIComponent(voice)}`)
+  return data.url
+}
+
+export async function getOnboardingVoiceSampleUrl(voice: string): Promise<string> {
+  const data = await apiFetchJson<{ url: string }>(`/audio/sample/onboarding?voice=${encodeURIComponent(voice)}`)
+  return data.url
+}
+
 const VALID_ORB_STATES: OrbState[] = ['cold', 'warming', 'running', 'deep']
 
 export function homeToCompileData(home: HomeData): CompileData {
   return {
     day: home.day,
+    consecutiveDays: home.consecutiveDays ?? 0,
     processingSignals: home.processingSignals,
     analystTime: home.analystTime || '—',
     stats: home.stats.map(s => ({ label: s.label, text: s.value })),

@@ -1,3 +1,5 @@
+import { STREAK_MIN_DAYS, STREAK_ABSENCE_MIN_DAY } from './constants'
+
 export const copy = {
   session: {
     exitPrompt:   "Leave session? Your progress won't be saved.",
@@ -15,11 +17,23 @@ export const copy = {
       `> processing ${signals} behavioral signals`,
       `> analyst complete [${analystTime}]`,
     ],
+    streakLine: (consecutive: number, day: number): string | null => {
+      if (consecutive >= STREAK_MIN_DAYS) return `> watching for ${consecutive} consecutive days`
+      if (consecutive === 0 && day >= STREAK_ABSENCE_MIN_DAY) return '> absence logged. daemon continued.'
+      return null
+    },
     complete: 'compile complete',
   },
   processLog: {
-    unnamedExpanded: 'The daemon is watching this. Come back tomorrow.',
-    stillForming:    'still forming',
+    unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
+    stillForming:     'still forming',
+    description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
+    stateDescriptions: {
+      running:   'active in recent sessions',
+      sleeping:  'detected before, quiet now',
+      weakening: 'losing signal',
+      new:       'first appeared this cycle',
+    } as Record<string, string>,
   },
   daemonOrb: {
     accessibilityLabel: 'Daemon orb visualization',

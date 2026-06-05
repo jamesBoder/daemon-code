@@ -50,6 +50,7 @@ export const MIN_TOUCH_TARGET = 44  // px — Apple HIG minimum tappable dimensi
 
 // Layout geometry
 export const BOTTOM_NAV_HEIGHT    = 80        // px — BottomNav height; used in safe-area calc across all screens
+export const SCREEN_HEADER_HEIGHT = 48        // px — fixed top header height; used in safe-area calc across all tabs
 export const HAIRLINE             = '0.5px'   // hairline border thickness (retina only)
 
 // Typography
@@ -59,3 +60,11 @@ export const LETTER_SPACING_TIGHT = '-0.01em'  // display prose text throughout 
 // Button interaction
 export const BUTTON_TAP_SCALE   = 0.88  // whileTap scale for interactive buttons
 export const BUTTON_TAP_OPACITY = 0.7   // whileTap opacity for interactive buttons
+
+// Naming Ceremony
+export const NAMING_CEREMONY_HOLD_MS = 3200   // ms each name stays on screen before auto-advance
+export const NAMING_CEREMONY_EXIT_MS = 350    // ms for full overlay fade-out after last name
+
+// Streak framing thresholds
+export const STREAK_MIN_DAYS        = 2  // min consecutive days before "watching for N days" appears
+export const STREAK_ABSENCE_MIN_DAY = 3  // min compile day before absence copy fires

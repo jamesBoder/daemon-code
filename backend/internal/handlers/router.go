@@ -40,6 +40,9 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 	// Protected routes — require valid JWT
 	protected := http.NewServeMux()
 	protected.HandleFunc("GET /profile", h.GetProfile)
+	protected.HandleFunc("PATCH /profile", h.PatchProfile)
+	protected.HandleFunc("GET /audio/sample", h.GetAudioSample)
+	protected.HandleFunc("GET /audio/sample/onboarding", h.GetOnboardingAudioSample)
 	protected.HandleFunc("GET /home", h.GetHome)
 	protected.HandleFunc("GET /session/today", h.GetSessionToday)
 	protected.HandleFunc("POST /session/response", h.PostSessionResponse)

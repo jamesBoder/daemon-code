@@ -17,6 +17,7 @@ import (
 	pollytypes "github.com/aws/aws-sdk-go-v2/service/polly/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
@@ -105,7 +106,8 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 	}
 
 	date := time.Now().UTC().Format("2006-01-02")
-	audioURL, err := n.synthesizeVoice(ctx, output.Prose, profile.Stage, userID.String(), date)
+	voice := resolveVoice(profile.PollyVoice, profile.PrimaryArchetype)
+	audioURL, err := n.synthesizeVoice(ctx, output.Prose, profile.Stage, voice, userID.String(), date)
 	if err != nil {
 		return fmt.Errorf("synthesize voice: %w", err)
 	}
@@ -179,8 +181,28 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 	return &output, nil
 }
 
+// archetypeVoice maps each archetype to its default Polly Neural voice.
+var archetypeVoice = map[string]pollytypes.VoiceId{
+	"grief_carrier":   pollytypes.VoiceIdMatthew,
+	"abandoned_child": pollytypes.VoiceIdRuth,
+	"caged_rage":      pollytypes.VoiceIdStephen,
+	"unworthy_self":   pollytypes.VoiceIdKendra,
+}
+
+// resolveVoice returns the user's preferred voice, falling back to the
+// archetype default and then to Matthew as the universal fallback.
+func resolveVoice(pollyVoice pgtype.Text, archetype string) pollytypes.VoiceId {
+	if pollyVoice.Valid && pollyVoice.String != "" {
+		return pollytypes.VoiceId(pollyVoice.String)
+	}
+	if v, ok := archetypeVoice[archetype]; ok {
+		return v
+	}
+	return pollytypes.VoiceIdMatthew
+}
+
 // synthesizeVoice calls Polly, uploads MP3 to S3, returns the S3 object key.
-func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage, userID, date string) (string, error) {
+func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage string, voiceID pollytypes.VoiceId, userID, date string) (string, error) {
 	rates := map[string]string{"cold": "72%", "warming": "80%", "running": "85%", "deep": "88%"}
 	pauses := map[string]string{"cold": "600ms", "warming": "400ms", "running": "300ms", "deep": "200ms"}
 
@@ -188,7 +210,7 @@ func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage, userID, da
 
 	out, err := n.polly.SynthesizeSpeech(ctx, &polly.SynthesizeSpeechInput{
 		Engine:       pollytypes.EngineNeural,
-		VoiceId:      pollytypes.VoiceIdMatthew,
+		VoiceId:      voiceID,
 		OutputFormat: pollytypes.OutputFormatMp3,
 		TextType:     pollytypes.TextTypeSsml,
 		Text:         aws.String(ssml),

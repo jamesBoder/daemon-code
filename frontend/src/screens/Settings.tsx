@@ -55,6 +55,8 @@ export function Settings() {
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null }, [])
+
   const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: () => apiFetchJson<ShadowProfile>('/profile'),

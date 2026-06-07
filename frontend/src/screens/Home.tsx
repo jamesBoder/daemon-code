@@ -8,7 +8,7 @@ import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson, homeToCompileData } from '../lib/api'
 import { applyArchetypeAccent } from '../lib/colors'
-import { BOTTOM_NAV_HEIGHT, HAIRLINE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS } from '../lib/constants'
 import { usePushPrompt } from '../hooks/usePushPrompt'
 import { copy } from '../lib/copy'
 import type { HomeData, ShadowProfile, Archetype, Process, ProcessState } from '../types'
@@ -119,7 +119,7 @@ export function Home() {
           paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
         }}>
           <DaemonOrb state="cold" size={240} layoutId={ORB_LAYOUT_ID} />
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
             Forming · Day {home.day}
           </p>
           <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 280 }}>
@@ -209,12 +209,12 @@ function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAl
   return (
     <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
           active processes
         </span>
         <button
           onClick={onViewAll}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em', padding: 0, minHeight: MIN_TOUCH_TARGET, display: 'flex', alignItems: 'center' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, padding: 0, minHeight: MIN_TOUCH_TARGET, display: 'flex', alignItems: 'center' }}
         >
           view all →
         </button>
@@ -230,7 +230,7 @@ function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAl
               fontFamily: 'var(--font-mono)',
               fontSize: 'var(--text-xs)',
               color: p.unnamed ? 'var(--text-muted)' : 'var(--text-primary)',
-              letterSpacing: '0.04em',
+              letterSpacing: LETTER_SPACING_PROCESS,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -238,7 +238,7 @@ function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAl
             }}>
               {name}
             </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color, letterSpacing: '0.04em', flexShrink: 0 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color, letterSpacing: LETTER_SPACING_PROCESS, flexShrink: 0 }}>
               {p.state}
             </span>
           </div>

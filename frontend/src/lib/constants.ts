@@ -54,8 +54,10 @@ export const SCREEN_HEADER_HEIGHT = 48        // px — fixed top header height;
 export const HAIRLINE             = '0.5px'   // hairline border thickness (retina only)
 
 // Typography
-export const LETTER_SPACING_WIDE  = '0.06em'   // mono metadata labels throughout the app
-export const LETTER_SPACING_TIGHT = '-0.01em'  // display prose text throughout the app
+export const LETTER_SPACING_WIDE    = '0.06em'   // mono metadata labels throughout the app
+export const LETTER_SPACING_TIGHT   = '-0.01em'  // display prose text throughout the app
+export const LETTER_SPACING_PROCESS = '0.04em'   // mono process/state rows in ProcessStrip and CompileScreen
+export const LETTER_SPACING_COMPILE = '0.05em'   // mono compile terminal lines and daily signal author
 
 // Button interaction
 export const BUTTON_TAP_SCALE   = 0.88  // whileTap scale for interactive buttons

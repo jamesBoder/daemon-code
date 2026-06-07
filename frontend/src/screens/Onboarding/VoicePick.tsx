@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Play } from 'lucide-react'
 import { getOnboardingVoiceSampleUrl, patchProfile } from '../../lib/api'
@@ -32,6 +32,8 @@ export function VoicePick({ onComplete }: VoicePickProps) {
   const [loading, setLoading] = useState<string | null>(null)
   const audioRef              = useRef<HTMLAudioElement | null>(null)
   const didSelect             = useRef(false)
+
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null }, [])
 
   async function handlePlay(voice: string) {
     if (loading) return

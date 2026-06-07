@@ -4,7 +4,7 @@ import { DaemonOrb } from './DaemonOrb'
 import { DaemonProse } from './DaemonProse'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { copy } from '../../lib/copy'
-import { COMPILE_AUTOPLAY_DELAY, LETTER_SPACING_TIGHT, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
+import { COMPILE_AUTOPLAY_DELAY, HAIRLINE, LETTER_SPACING_COMPILE, LETTER_SPACING_TIGHT, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
 import type { CompileData } from '../../types'
 
 interface CompileScreenProps {
@@ -60,7 +60,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
               fontSize: 'var(--text-mono)',
               lineHeight: 'var(--leading-mono)',
               color: 'var(--text-muted)',
-              letterSpacing: '0.05em',
+              letterSpacing: LETTER_SPACING_COMPILE,
               opacity: 0,
             }}
           >
@@ -75,12 +75,12 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
             fontSize: 'var(--text-mono)',
             lineHeight: 'var(--leading-mono)',
             color: 'var(--compile-green)',
-            letterSpacing: '0.05em',
+            letterSpacing: LETTER_SPACING_COMPILE,
             marginTop: 'var(--space-2)',
           }}>
             {copy.compile.complete}
           </p>
-          <div style={{ height: '0.5px', background: 'var(--border)', margin: 'var(--space-2) 0' }} />
+          <div style={{ height: HAIRLINE, background: 'var(--border)', margin: 'var(--space-2) 0' }} />
         </div>
 
         {/* Stats */}
@@ -163,7 +163,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
         style={{
           width: '100%',
           background: 'rgba(13, 16, 24, 0.72)',
-          border: '0.5px solid rgba(255, 255, 255, 0.07)',
+          border: `${HAIRLINE} solid rgba(255, 255, 255, 0.07)`,
           borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-5) var(--space-6)',
           opacity: autoPlay ? 0 : 1,
@@ -186,7 +186,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
           fontSize: 'var(--text-mono)',
           lineHeight: 'var(--leading-mono)',
           color: 'var(--text-muted)',
-          letterSpacing: '0.05em',
+          letterSpacing: LETTER_SPACING_COMPILE,
         }}>
           — {data.dailySignalAuthor}
         </p>

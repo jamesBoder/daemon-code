@@ -25,10 +25,15 @@ import (
 // inputs/outputs, and edge case guidance before relying on caching. Target 1200–1500 tokens.
 const analystSystemPrompt = `You are ShadowAnalyst, an AI that builds psychological profiles from behavioral patterns.
 
-You receive:
+You receive a JSON context object containing:
 - card_responses: today's reaction test taps, weighted scale choices, prediction duel answers
 - mood_log: today's mood score (1–5) and optional note
-- current_profile: the existing shadow profile (JSON), including daemon_accuracy (previous value)
+- current_profile: the existing shadow profile, including daemon_accuracy (previous value)
+- profile_dimensions: current behavioral dimension scores with confidence (omitted if first compile)
+- session_quality: pre-computed engagement signal — level (high/medium/low), avg_reaction_ms, variance_ms. At level "low" (uniform/rushed responses), reduce confidence gains by ~50%.
+- dimension_signals_today: pre-computed behavioral signals from today's session. Only dimensions with observed data are present. Each has "signal" (0.0–1.0) and supplementary fields (n_words, n_pairs, avg_deliberation_ms, reaction_variance_ms). Use these signals to inform archetype, pattern, and note decisions.
+- grim_trigger_signal: detected=true if daemon_accuracy dropped ≥5 points since last compile. When detected, consider elevated neuroticism and behavioral instability in your assessment.
+- k_level_signal: avg_deliberation_ratio (duel response time / reaction time) across recent sessions, n. Ratio ~1.0 = Level 1 (reactive), 2.0–3.5 = Level 2 (modeling), >3.5 = Level 3 or analysis paralysis — distinguish via accuracy pattern.
 
 You output a structured JSON update to the shadow profile. Never produce prose — only structured data.
 
@@ -152,13 +157,26 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		return fmt.Errorf("get shadow profile: %w", err)
 	}
 
-	// 4. Call Anthropic API
-	output, err := a.callAnthropic(ctx, responses, moods, profile)
+	// 4. Load recent responses (last 7 session dates) for cross-session signals
+	recentResponses, err := a.q.GetRecentResponses(ctx, userID, 7)
+	if err != nil {
+		return fmt.Errorf("get recent responses: %w", err)
+	}
+
+	// 5. Snapshot current daemon_accuracy before the Analyst overwrites it.
+	// This gives grim trigger detection an accurate pre-Analyst baseline next compile.
+	if err := a.q.SnapshotDaemonAccuracy(ctx, userID, profile.DaemonAccuracy); err != nil {
+		return fmt.Errorf("snapshot daemon accuracy: %w", err)
+	}
+
+	// 6. Assemble the full context object and call Anthropic
+	ac := assembleContext(responses, moods, profile, recentResponses)
+	output, err := a.callAnthropic(ctx, ac)
 	if err != nil {
 		return fmt.Errorf("anthropic call: %w", err)
 	}
 
-	// 5. Write updated profile to RDS
+	// 7. Write updated profile to RDS
 	newCompileCount := profile.CompileCount + 1
 	newFragmentsDecoded := profile.FragmentsDecoded + int32(output.FragmentsDecodedDelta) // #nosec G115 — delta bounded [-100,100] by Analyst prompt
 	_, err = a.q.UpdateShadowProfile(ctx, db.UpdateShadowProfileParams{
@@ -190,12 +208,12 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		})
 	}
 
-	// 6. Apply pattern updates
+	// 8. Apply pattern updates
 	if err := a.applyPatternUpdates(ctx, userID, output.PatternUpdates); err != nil {
 		return fmt.Errorf("pattern updates: %w", err)
 	}
 
-	// 7. Emit ShadowAnalystComplete to custom EventBridge bus
+	// 9. Emit ShadowAnalystComplete to custom EventBridge bus
 	detail, _ := json.Marshal(map[string]interface{}{
 		"user_id":       userID.String(),
 		"compile_lines": output.CompileLines,
@@ -275,10 +293,8 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 }
 
 // callAnthropic calls the Anthropic messages API with prompt caching on the system prompt.
-func (a *Analyst) callAnthropic(ctx context.Context, responses []db.CardResponse, moods []db.MoodLog, profile db.ShadowProfile) (*analystOutput, error) {
-	profileJSON, _ := json.Marshal(profile)
-	responsesJSON, _ := json.Marshal(responses)
-	moodsJSON, _ := json.Marshal(moods)
+func (a *Analyst) callAnthropic(ctx context.Context, ac analystContext) (*analystOutput, error) {
+	contextJSON, _ := json.Marshal(ac)
 
 	payload := map[string]interface{}{
 		"model":      "claude-sonnet-4-6",
@@ -292,11 +308,8 @@ func (a *Analyst) callAnthropic(ctx context.Context, responses []db.CardResponse
 		},
 		"messages": []map[string]interface{}{
 			{
-				"role": "user",
-				"content": fmt.Sprintf(
-					"card_responses: %s\nmood_log: %s\ncurrent_profile: %s",
-					string(responsesJSON), string(moodsJSON), string(profileJSON),
-				),
+				"role":    "user",
+				"content": string(contextJSON),
 			},
 		},
 	}

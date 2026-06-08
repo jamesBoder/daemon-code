@@ -6,7 +6,8 @@ import { MG, isDesktop } from '../../lib/minigame'
 export interface WeightedScaleResult {
   left: string
   right: string
-  value: number  // -1.0 = full left, 0 = center, 1.0 = full right
+  value: number            // -1.0 = full left, 0 = center, 1.0 = full right
+  deliberationTimeMs: number
 }
 
 interface Props {
@@ -25,6 +26,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
   const [pairVisible, setPairVisible] = useState(true)
   const [dragMax, setDragMax]       = useState(120)
   const resultsRef                  = useRef<WeightedScaleResult[]>([])
+  const pairStartTimeRef            = useRef(Date.now())
   const trackRef                    = useRef<HTMLDivElement>(null)
   const onCompleteRef               = useRef(onComplete)
   onCompleteRef.current             = onComplete
@@ -60,8 +62,9 @@ export function WeightedScale({ pairs, onComplete }: Props) {
   function handleNext() {
     if (committed) return
     setCommitted(true)
-    const v    = Math.max(-1, Math.min(1, value.get()))
-    const next = [...resultsRef.current, { left: pair.left, right: pair.right, value: v }]
+    const v                = Math.max(-1, Math.min(1, value.get()))
+    const deliberationTimeMs = Date.now() - pairStartTimeRef.current
+    const next = [...resultsRef.current, { left: pair.left, right: pair.right, value: v, deliberationTimeMs }]
     resultsRef.current = next
 
     if (idx + 1 >= pairs.length) {
@@ -69,7 +72,9 @@ export function WeightedScale({ pairs, onComplete }: Props) {
       return
     }
 
-    // Fade out → reset → advance → fade in
+    // Fade out → reset → advance → fade in → start timer
+    // pairStartTimeRef resets after fade-in completes so deliberationTimeMs
+    // measures time the user can actually see the pair, not the animation.
     setPairVisible(false)
     setTimeout(() => {
       dragX.set(0)
@@ -77,6 +82,9 @@ export function WeightedScale({ pairs, onComplete }: Props) {
       setIdx(idx + 1)
       setCommitted(false)
       setPairVisible(true)
+      setTimeout(() => {
+        pairStartTimeRef.current = Date.now()
+      }, reduced ? 0 : transMs)
     }, reduced ? 0 : transMs)
   }
 

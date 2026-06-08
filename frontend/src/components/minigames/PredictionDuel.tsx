@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MG } from '../../lib/minigame'
 
 export interface PredictionDuelResult {
   matched: boolean
+  duelResponseTimeMs: number
 }
 
 interface Props {
@@ -39,11 +40,16 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
   const [phase,   setPhase]   = useState<Phase>('idle')
   const [matched, setMatched] = useState<boolean | null>(null)
   const revealRef             = useRef<string>('')
+  // Reset after first paint so the clock starts when the question is visible,
+  // not during the route-transition fade-in. Mirrors ReactionTest's wordStartRef pattern.
+  const mountTimeRef          = useRef(0)
+  useEffect(() => { mountTimeRef.current = Date.now() }, [])
   const onCompleteRef         = useRef(onComplete)
   onCompleteRef.current       = onComplete
 
   function handleChoice(choice: boolean) {
     if (phase !== 'idle') return
+    const duelResponseTimeMs = Date.now() - mountTimeRef.current
     const pool = choice ? CORRECT_REVEALS : WRONG_REVEALS
     revealRef.current = pool[Math.floor(Math.random() * pool.length)]
     setMatched(choice)
@@ -52,7 +58,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
     setTimeout(() => {
       setPhase('reveal')
       setTimeout(() => {
-        onCompleteRef.current({ matched: choice })
+        onCompleteRef.current({ matched: choice, duelResponseTimeMs })
       }, reduced ? 0 : D.revealMs)
     }, reduced ? 0 : D.pauseMs)
   }

@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
+	"github.com/jamesboder/daemon-code/internal/signal"
 )
 
 const (
@@ -148,21 +149,15 @@ func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile, order int
 	}
 }
 
-// evergreen scale pairs — evergreen behavioral/abstract pairs where neither side signals "correct."
-// From the Jeopardy Principle: both sides must have genuine pull.
-var evergreenPairs = [][2]string{
-	{"arriving 10 minutes early", "arriving exactly on time"},
-	{"winning the argument", "ending it"},
-	{"what you built", "how you made people feel"},
-	{"the apology you gave", "the apology you're owed"},
-	{"a clean slate", "everything you've built"},
-	{"the city you're from", "the city you chose"},
-	{"the 5-year plan", "the feeling in your gut"},
-	{"ending a great book", "starting a new one"},
-	{"the advice you gave", "the advice you followed"},
-	{"speaking first", "listening first"},
-	{"being right", "being at peace"},
-	{"the version of you people remember", "the version you remember"},
+// evergreenPairs is derived from signal.Pairs — single source of truth for pair text and
+// dimension tags. Adding or editing a pair in signal/pairs.go automatically updates the deck.
+var evergreenPairs [][2]string
+
+func init() {
+	evergreenPairs = make([][2]string, len(signal.Pairs))
+	for i, p := range signal.Pairs {
+		evergreenPairs[i] = [2]string{p.Left, p.Right}
+	}
 }
 
 func pickScalePairs(n int) [][2]string {

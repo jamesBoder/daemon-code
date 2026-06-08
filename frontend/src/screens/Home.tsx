@@ -1,25 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CompileScreen } from '../components/daemon/CompileScreen'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
+import { SignalWhisper } from '../components/daemon/SignalWhisper'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
+import { ScoreTriad } from '../components/daemon/ScoreTriad'
 import { apiFetchJson, homeToCompileData } from '../lib/api'
 import { applyArchetypeAccent } from '../lib/colors'
-import { BOTTOM_NAV_HEIGHT, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS } from '../lib/constants'
-import { usePushPrompt } from '../hooks/usePushPrompt'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
+import { generateAndShareCard } from '../lib/shareCard'
+import { usePushPrompt } from '../hooks/usePushPrompt'
 import type { HomeData, ShadowProfile, Archetype, Process, ProcessState } from '../types'
 
-const PLAYED_KEY = 'compile_played_day'
 
 export function Home() {
   const navigate    = useNavigate()
   const audioRef    = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying]         = useState(false)
   const [audioError, setAudioError]   = useState(false)
+  const [shareError, setShareError]   = useState(false)
+  const [sharing, setSharing]         = useState(false)
 
   const { data: home, isLoading: homeLoading, isError: homeError, refetch } = useQuery({
     queryKey: ['home'],
@@ -54,12 +60,12 @@ export function Home() {
 
   // Only play the animation once per day — sessionStorage resets on a new day
   const autoPlay = home
-    ? sessionStorage.getItem(PLAYED_KEY) !== String(home.day)
+    ? sessionStorage.getItem(COMPILE_PLAYED_KEY) !== String(home.day)
     : false
 
   useEffect(() => {
     if (home && autoPlay) {
-      sessionStorage.setItem(PLAYED_KEY, String(home.day))
+      sessionStorage.setItem(COMPILE_PLAYED_KEY, String(home.day))
     }
   }, [home?.day, autoPlay])
 
@@ -78,6 +84,33 @@ export function Home() {
     }
   }
 
+  async function handleShare() {
+    if (sharing || !home) return
+    setSharing(true)
+    try {
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+      const namedProcesses = processes
+        .filter(p => !p.unnamed && p.name)
+        .slice(0, 3)
+        .map(p => p.name as string)
+      await generateAndShareCard({
+        prose:        home.daemonProse,
+        day:          home.day,
+        orbState:     home.orbState,
+        processNames: namedProcesses,
+        accent,
+      })
+    } catch (err) {
+      // AbortError means the user cancelled the share sheet — not an error
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setShareError(true)
+        setTimeout(() => setShareError(false), TOAST_DISMISS_MS)
+      }
+    } finally {
+      setSharing(false)
+    }
+  }
+
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -91,7 +124,7 @@ export function Home() {
   if (isError || !home) {
     return (
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-8)' }}>
-        <div className="glass-card" style={{ padding: 'var(--space-8)', maxWidth: 320, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+        <div className="glass-card" style={{ padding: 'var(--space-8)', maxWidth: MODAL_MAX_WIDTH, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
           <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)' }}>
             The daemon is unreachable. Try again later.
           </p>
@@ -122,7 +155,7 @@ export function Home() {
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
             Forming · Day {home.day}
           </p>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 280 }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: DAY0_TEXT_MAX_W }}>
             The daemon has a first impression.<br />It will know more tomorrow.
           </p>
           <DaemonButton onClick={() => navigate('/session')}>
@@ -149,8 +182,26 @@ export function Home() {
             onMicClick={handleMicClick}
           />
 
+          {/* Score triad — persistent three-number display */}
+          <div style={{ maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', width: '100%' }}>
+            <ScoreTriad
+              kernelAccess={compileData.kernelAccess}
+              daemonAccuracy={compileData.daemonAccuracy}
+              decodedLines={compileData.decodedLines}
+              kernelAccessDelta={compileData.kernelAccessDelta}
+              daemonAccuracyDelta={compileData.daemonAccuracyDelta}
+              decodedLinesDelta={compileData.decodedLinesDelta}
+            />
+            {/* Layer 1 — score whispers appear below the card on first non-zero load */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', marginTop: 'var(--space-3)', pointerEvents: 'none' }}>
+              <SignalWhisper hintKey="kernel_access"   text={copy.signalHints.kernel_access}   condition={compileData.kernelAccess > 0} />
+              <SignalWhisper hintKey="daemon_accuracy" text={copy.signalHints.daemon_accuracy} condition={compileData.daemonAccuracy > 0} />
+              <SignalWhisper hintKey="decoded_lines"   text={copy.signalHints.decoded_lines}   condition={compileData.decodedLines > 0} />
+            </div>
+          </div>
+
           {/* Navigation — below CompileScreen, not inside it */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: 'var(--space-8) auto 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: MAX_CONTENT_WIDTH, margin: 'var(--space-8) auto 0' }}>
             <DaemonButton onClick={() => navigate('/session')}>
               Begin session →
             </DaemonButton>
@@ -158,6 +209,20 @@ export function Home() {
             {processes.length > 0 && (
               <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
             )}
+
+            {/* Secondary actions — share + chronicle */}
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <SecondaryAction
+                onClick={handleShare}
+                disabled={sharing}
+                style={{ opacity: sharing ? 0.5 : 1 }}
+              >
+                {sharing ? 'generating…' : 'Share today.'}
+              </SecondaryAction>
+              <SecondaryAction onClick={() => navigate('/chronicle')}>
+                the chronicle →
+              </SecondaryAction>
+            </div>
           </div>
         </div>
       </div>
@@ -172,17 +237,17 @@ export function Home() {
         />
       )}
 
-      {/* Inline error — auto-dismisses after TOAST_DISMISS_MS */}
-      {audioError && (
+      {/* Inline toasts — auto-dismiss after TOAST_DISMISS_MS */}
+      {(audioError || shareError) && (
         <div style={{
           position: 'fixed', bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom) + var(--space-4))`,
           left: '50%', transform: 'translateX(-50%)',
           background: 'var(--surface)', border: `${HAIRLINE} solid var(--border)`,
           borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-5)',
           fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)',
-          whiteSpace: 'nowrap', zIndex: 20,
+          whiteSpace: 'nowrap', zIndex: TOAST_Z_INDEX,
         }}>
-          Audio unavailable
+          {audioError ? 'Audio unavailable' : 'Could not share'}
         </div>
       )}
 
@@ -245,6 +310,42 @@ function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAl
         )
       })}
     </div>
+  )
+}
+
+const SECONDARY_ACTION = {
+  flex:          1,
+  background:    'none',
+  border:        `${HAIRLINE} solid var(--border)`,
+  borderRadius:  'var(--radius-md)',
+  padding:       'var(--space-3) var(--space-4)',
+  fontFamily:    'var(--font-mono)',
+  fontSize:      'var(--text-xs)',
+  color:         'var(--text-muted)',
+  letterSpacing: LETTER_SPACING_WIDE,
+  minHeight:     MIN_TOUCH_TARGET,
+  cursor:        'pointer',
+  display:       'flex',
+  alignItems:    'center',
+  justifyContent:'center',
+  transition:    `opacity ${ROUTE_TRANSITION_MS / 1000}s`,
+} as const
+
+function SecondaryAction({ onClick, disabled, style, children }: {
+  onClick:   () => void
+  disabled?: boolean
+  style?:    CSSProperties
+  children:  ReactNode
+}) {
+  return (
+    <motion.button
+      onClick={onClick}
+      disabled={disabled}
+      whileTap={disabled ? undefined : { scale: BUTTON_TAP_SCALE, opacity: BUTTON_TAP_OPACITY }}
+      style={{ ...SECONDARY_ACTION, cursor: disabled ? 'default' : 'pointer', ...style }}
+    >
+      {children}
+    </motion.button>
   )
 }
 

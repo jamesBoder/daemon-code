@@ -1,11 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { ProcessList } from '../components/processlog/ProcessList'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
+import { SignalWhisper } from '../components/daemon/SignalWhisper'
 import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
 import { BOTTOM_NAV_HEIGHT, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import { copy } from '../lib/copy'
 import type { Process, ProcessEntryData, ProcessState } from '../types'
+
+const PROCESS_LOG = {
+  stateMaxW: 280,  // px — narrower than PROSE_MAX_WIDTH; fits two-line messages without excess line length
+} as const
 
 function toProcessEntryData(p: Process, index: number): ProcessEntryData {
   return {
@@ -40,20 +46,27 @@ export function ProcessLog() {
             </div>
           ) : isError ? (
             <div style={{ paddingTop: 'var(--space-16)', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-muted)', maxWidth: 280, margin: '0 auto' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-muted)', maxWidth: PROCESS_LOG.stateMaxW, margin: '0 auto' }}>
                 Could not load processes.<br />
                 Check your connection and try again.
               </p>
             </div>
           ) : entries.length === 0 ? (
             <div style={{ paddingTop: 'var(--space-16)', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', maxWidth: 280, margin: '0 auto' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', maxWidth: PROCESS_LOG.stateMaxW, margin: '0 auto' }}>
                 The daemon is building its first picture.<br />
                 Check back tomorrow.
               </p>
             </div>
           ) : (
-            <ProcessList entries={entries} />
+            <>
+              <SignalWhisper
+                hintKey="process_first"
+                text={copy.signalHints.process_first}
+                condition={entries.length > 0}
+              />
+              <ProcessList entries={entries} />
+            </>
           )}
         </div>
       </div>

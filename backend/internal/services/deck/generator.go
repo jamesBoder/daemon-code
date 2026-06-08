@@ -76,7 +76,7 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	fragments = append(fragments, g.buildReactionTest(profile, 0))
 	fragments = append(fragments, g.buildReactionTestExplore(profile, 1))
 
-	pairs := pickScalePairs(scalesPerSession)
+	pairs := pickScalePairs(scalesPerSession, profile.CompileCount)
 	for i, pair := range pairs {
 		fragments = append(fragments, buildWeightedScaleFragment(pair[0], pair[1], 2+i))
 	}
@@ -149,20 +149,17 @@ func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile, order int
 	}
 }
 
-// evergreenPairs is derived from signal.Pairs — single source of truth for pair text and
-// dimension tags. Adding or editing a pair in signal/pairs.go automatically updates the deck.
-var evergreenPairs [][2]string
-
-func init() {
-	evergreenPairs = make([][2]string, len(signal.Pairs))
-	for i, p := range signal.Pairs {
-		evergreenPairs[i] = [2]string{p.Left, p.Right}
+// pickScalePairs selects n random weighted-scale pairs eligible for this user's compile count.
+// Pairs with IntroducedAfterDay > compileCount are excluded — they require more session history
+// before the behavioral signal they probe is meaningful.
+// signal.Pairs is the single source of truth for pair text and dimension tags.
+func pickScalePairs(n int, compileCount int32) [][2]string {
+	var pool [][2]string
+	for _, p := range signal.Pairs {
+		if int32(p.IntroducedAfterDay) <= compileCount {
+			pool = append(pool, [2]string{p.Left, p.Right})
+		}
 	}
-}
-
-func pickScalePairs(n int) [][2]string {
-	pool := make([][2]string, len(evergreenPairs))
-	copy(pool, evergreenPairs)
 	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
 	if n > len(pool) {
 		n = len(pool)

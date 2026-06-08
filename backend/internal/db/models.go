@@ -61,7 +61,7 @@ type ShadowProfile struct {
 	DaemonAccuracyPrev          int32              `json:"daemon_accuracy_prev"`
 	DecodedLinesPrev            int32              `json:"decoded_lines_prev"`
 	ProfileDimensions           []byte             `json:"-"`
-	DaemonAccuracyLastCompile   int32              `json:"daemon_accuracy_last_compile"`
+	DaemonAccuracyLastCompile   int32              `json:"-"`
 	ProfileDimensionsPrev       []byte             `json:"-"`
 	UpdatedAt                   pgtype.Timestamptz `json:"updated_at"`
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,14 +19,16 @@ import (
 	"github.com/jamesboder/daemon-code/internal/db"
 )
 
-const analystSystemPrompt = `You are ShadowAnalyst, an AI that builds psychological profiles from behavioral patterns.
+// analystSystemPromptTmpl is the raw prompt template. SNAP_INTERVAL is replaced at init time
+// with the snapshotInterval constant so the prompt stays in sync with the Go value.
+const analystSystemPromptTmpl = `You are ShadowAnalyst, an AI that builds psychological profiles from behavioral patterns.
 
 You receive a JSON context object containing:
 - card_responses: today's reaction test taps, weighted scale choices, prediction duel answers
 - mood_log: today's mood score (1–5) and optional note
 - current_profile: the existing shadow profile, including daemon_accuracy (previous value)
 - profile_dimensions: current Bayesian dimension model (absent or null on Day 0 / first compile)
-- profile_dimensions_prev: snapshot from ~30 compiles ago (null until compile 30). Use in analyst_notes to note longitudinal movement.
+- profile_dimensions_prev: prior score snapshot (taken every SNAP_INTERVAL compiles; 1–SNAP_INTERVAL compiles old; null until compile SNAP_INTERVAL). Use in analyst_notes when dimensions show meaningful shift — small deltas right after a snapshot may be noise.
 - session_quality: pre-computed engagement signal — level (high/medium/low), avg_reaction_ms, variance_ms
 - dimension_signals_today: pre-computed behavioral signals from today's session. Only dimensions with observed data are present. Each has "signal" (0.0–1.0) and supplementary fields. Use these signals to inform archetype, pattern, note, and dimension update decisions.
 - grim_trigger_signal: detected=true if daemon_accuracy dropped ≥5 points since last compile. When detected, consider elevated neuroticism and behavioral instability.
@@ -177,7 +180,7 @@ low conscientiousness + low discount_factor (both < 0.35):
 
 profile_dimensions is this user's behavioral signature — a specific coordinate in ten-dimensional space. No two users occupy the same point, even within the same archetype. The signature deepens with every compile.
 
-profile_dimensions_prev: the snapshot from ~30 compiles ago (null until compile 30). When present, compare against profile_dimensions in analyst_notes to note longitudinal movement: which dimensions shifted, which held, whether the direction is consistent with today's session data. This is the arc the Narrator uses for Monthly Chapter narration.
+profile_dimensions_prev: the prior score snapshot (taken every SNAP_INTERVAL compiles; 1–SNAP_INTERVAL compiles old; null until compile SNAP_INTERVAL). When present, compare against profile_dimensions in analyst_notes to note longitudinal movement: which dimensions shifted, which held, whether direction is consistent with today. Small deltas right after a snapshot boundary may be noise — look for agreement between session data and the delta before calling it meaningful. This is the arc the Narrator uses for Monthly Chapter narration.
 
 Stage-aware language (let overall confidence calibrate certainty in analyst_notes and daemon_note):
   Most dimensions confidence < 0.30:     hedge — "Something is forming. The model is early."
@@ -245,6 +248,10 @@ daemon_accuracy rules:
 
 `
 
+// analystSystemPrompt is analystSystemPromptTmpl with SNAP_INTERVAL substituted from the
+// snapshotInterval constant, keeping the prompt text in sync with the Go value.
+var analystSystemPrompt = strings.ReplaceAll(analystSystemPromptTmpl, "SNAP_INTERVAL", fmt.Sprint(snapshotInterval))
+
 type Analyst struct {
 	cfg    *appconfig.Config
 	q      *db.Queries
@@ -266,6 +273,10 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 // At each multiple of this count, the Analyst persists current scores as *_prev
 // so the Home screen can show a month-over-month trend line.
 const snapshotInterval = 30
+
+// recentSessionWindow is the number of distinct session dates loaded for cross-session signals
+// (k_level deliberation ratio, grim trigger session count). Matches the GetRecentResponses call.
+const recentSessionWindow = 7
 
 type analystOutput struct {
 	PrimaryArchetype      string          `json:"primary_archetype"`
@@ -344,7 +355,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	}
 
 	// 4. Load recent responses (last 7 session dates) for cross-session signals
-	recentResponses, err := a.q.GetRecentResponses(ctx, userID, 7)
+	recentResponses, err := a.q.GetRecentResponses(ctx, userID, recentSessionWindow)
 	if err != nil {
 		return fmt.Errorf("get recent responses: %w", err)
 	}
@@ -360,6 +371,15 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	output, err := a.callAnthropic(ctx, ac)
 	if err != nil {
 		return fmt.Errorf("anthropic call: %w", err)
+	}
+
+	// 6b. Validate critical Analyst output fields before committing anything to the DB.
+	// daemon_accuracy=0 (zero-value from malformed JSON) written to the DB would cause a
+	// spurious high-magnitude grim_trigger on the next compile (drop = last_compile − 0).
+	// Returning an error here is safe: UpdateShadowProfile has not run yet, so an SQS retry
+	// re-snapshots the same pre-Analyst accuracy with no corruption.
+	if output.DaemonAccuracy < 1 || output.DaemonAccuracy > 100 {
+		return fmt.Errorf("analyst returned out-of-range daemon_accuracy: %d (expected 1–100)", output.DaemonAccuracy)
 	}
 
 	// 7. Write updated profile to RDS
@@ -406,12 +426,12 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		_ = a.q.UpdateProfileDimensions(ctx, userID, []byte(output.ProfileDimensions), shouldSnapshot)
 	}
 
-	// 8. Apply pattern updates
-	if err := a.applyPatternUpdates(ctx, userID, output.PatternUpdates); err != nil {
-		return fmt.Errorf("pattern updates: %w", err)
-	}
+	// 8. Apply pattern updates — non-fatal: returning an error here causes SQS to retry,
+	// which re-runs SnapshotDaemonAccuracy against the post-Analyst daemon_accuracy already
+	// committed by UpdateShadowProfile, corrupting the grim trigger baseline.
+	_ = a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
 
-	// 9. Emit ShadowAnalystComplete to custom EventBridge bus
+	// 9. Emit ShadowAnalystComplete to custom EventBridge bus — non-fatal for the same reason.
 	changeFlags := output.ChangeFlags
 	if changeFlags == nil {
 		changeFlags = []changeFlag{}
@@ -421,7 +441,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		"compile_lines": output.CompileLines,
 		"change_flags":  changeFlags,
 	})
-	_, err = a.eb.PutEvents(ctx, &eventbridge.PutEventsInput{
+	_, _ = a.eb.PutEvents(ctx, &eventbridge.PutEventsInput{
 		Entries: []ebtypes.PutEventsRequestEntry{
 			{
 				Source:       aws.String("daemon-code.analyst"),
@@ -431,7 +451,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 			},
 		},
 	})
-	return err
+	return nil
 }
 
 func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, updates []patternUpdate) error {

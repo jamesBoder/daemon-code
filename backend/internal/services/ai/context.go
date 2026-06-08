@@ -8,6 +8,17 @@ import (
 	"github.com/jamesboder/daemon-code/internal/signal"
 )
 
+const (
+	minReactionSamples     = 3     // minimum taps for a statistically meaningful session signal
+	sessionQualityLowSD    = 80.0  // ms SD below which session is "low" quality (disengaged, uniform taps)
+	sessionQualityMedSD    = 200.0 // ms SD below which session is "medium" quality
+	neuroVarNormCeiling    = 400.0 // ms SD that maps to neuroVarSig=1.0; taps above this are max-variance
+	grimTriggerMinCompiles = 6     // minimum compiles before grim trigger is evaluated (insufficient baseline before this)
+	grimTriggerMinDrop     = 5     // accuracy point drop required to detect grim trigger
+	grimTriggerMedDrop     = 10    // medium magnitude floor
+	grimTriggerHighDrop    = 20    // high magnitude floor
+)
+
 // analystContext is the complete pre-computed context object passed to the Analyst Lambda.
 // All cross-session aggregation, behavioral signal tagging, and quality assessment is done
 // in Go before the API call. The Lambda receives this and executes without querying history.
@@ -116,7 +127,7 @@ func collectReactionTimes(responses []db.CardResponse) []float64 {
 // computeSessionQuality assesses data quality from reaction time distribution.
 // Low standard deviation signals disengagement (uniform, rushed responses).
 func computeSessionQuality(reactionTimes []float64) sessionQualityCtx {
-	if len(reactionTimes) < 3 {
+	if len(reactionTimes) < minReactionSamples {
 		return sessionQualityCtx{Level: "low"}
 	}
 
@@ -125,9 +136,9 @@ func computeSessionQuality(reactionTimes []float64) sessionQualityCtx {
 
 	level := "high"
 	switch {
-	case sd < 80:
+	case sd < sessionQualityLowSD:
 		level = "low"
-	case sd < 200:
+	case sd < sessionQualityMedSD:
 		level = "medium"
 	}
 
@@ -189,10 +200,10 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 	// --- Neuroticism from reaction time variance ---
 	var neuroVarSig float64
 	var neuroSD float64
-	hasVarNeuro := len(reactionTimes) >= 3
+	hasVarNeuro := len(reactionTimes) >= minReactionSamples
 	if hasVarNeuro {
 		neuroSD = floatStdDev(reactionTimes)
-		neuroVarSig = math.Min(1.0, neuroSD/400.0)
+		neuroVarSig = math.Min(1.0, neuroSD/neuroVarNormCeiling)
 		out["neuroticism"] = map[string]interface{}{
 			"signal":               round2(neuroVarSig),
 			"reaction_variance_ms": roundTo1(neuroSD),
@@ -285,19 +296,19 @@ func scaleScore(value float64, leftHigh bool) float64 {
 // computeGrimTrigger detects whether the last compile produced a significant accuracy drop.
 // Only meaningful after ≥6 compiles (insufficient baseline before that).
 func computeGrimTrigger(profile db.ShadowProfile, recentResponses []db.CardResponse) grimTriggerCtx {
-	if profile.CompileCount < 6 {
+	if profile.CompileCount < grimTriggerMinCompiles {
 		return grimTriggerCtx{Detected: false}
 	}
 	drop := profile.DaemonAccuracyLastCompile - profile.DaemonAccuracy
-	if drop < 5 {
+	if drop < grimTriggerMinDrop {
 		return grimTriggerCtx{Detected: false}
 	}
 
 	magnitude := "low"
 	switch {
-	case drop >= 20:
+	case drop >= grimTriggerHighDrop:
 		magnitude = "high"
-	case drop >= 10:
+	case drop >= grimTriggerMedDrop:
 		magnitude = "medium"
 	}
 

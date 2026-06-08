@@ -8,7 +8,16 @@
 
 ## What it does
 
-Each day, daemon code runs a background pipeline that analyses your previous session responses, narrates a psychological profile in audio, and generates a fresh deck of cards tailored to your patterns. When you open the app you play a short session of adaptive mini-games, and the cycle repeats.
+daemon code is a daily self-awareness app built around a simple idea: your behaviour under pressure is measurable, and the patterns are more consistent than you think.
+
+Each day you play a short session of adaptive mini-games — reaction tests, instinct probes, decision-under-pressure tasks. The daemon watches how you respond: not what you say about yourself, but what you actually do.
+
+- **Daily sessions** — 5 mini-games per day, each designed to surface instinct rather than intention
+- **Nightly analysis** — an AI pipeline runs while you sleep, reading your session data and producing a behavioural observation narrated in audio
+- **Shadow prompt** — one question derived from your session, carried into your day unanswered
+- **Process Log** — a live map of your active behavioural patterns (approval loops, avoidance cycles, performance drift) with states that shift as you change
+- **The Chronicle** — every observation the daemon has ever written about you, in order
+- **Voice** — the daemon speaks, in a tone matched to your psychological archetype
 
 The daemon is always running. You just check in.
 
@@ -103,20 +112,20 @@ daemon-code/
 
 **Backend**
 ```bash
-cd backend
-cp ../.env.local.example .env.local   # fill in secrets
-go run ./cmd/localserver
+cp .env.local.example .env.local   # fill in secrets from AWS Secrets Manager
+source .env.local
+go run ./backend/cmd/localserver   # run from repo root, not from inside backend/
 ```
 
 **Frontend**
 ```bash
 cd frontend
-cp .env.local.example .env.local      # set VITE_API_URL
+cp .env.local.example .env.local   # defaults to http://localhost:8080
 npm install
 npm run dev
 ```
 
-Requires a local PostgreSQL instance and AWS credentials for DynamoDB/Secrets Manager. See `.env.local.example` for all variables.
+No Docker or local emulators needed. The local server connects directly to live dev AWS resources (RDS is publicly accessible in dev; DynamoDB/SQS/EventBridge are API-based). See `docs/local-dev.md` for the full setup guide including how to retrieve secrets from Secrets Manager.
 
 ---
 

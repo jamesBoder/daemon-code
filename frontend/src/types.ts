@@ -34,6 +34,7 @@ export interface CompileData {
   dailySignalAuthor: string
   orbState: OrbState
   daemonAudioUrl?: string
+  compileLogLines?: string[]  // Analyst-generated terminal lines; absent before first compile
   // Scoring system
   kernelAccess: number
   daemonAccuracy: number
@@ -92,6 +93,7 @@ export interface HomeData {
   dailySignalAuthor: string
   orbState: OrbState
   daemonAudioUrl?: string
+  compileLogLines?: string[]
   // Scoring system
   kernelAccess: number
   daemonAccuracy: number

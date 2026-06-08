@@ -54,7 +54,7 @@ export function homeToCompileData(home: HomeData): CompileData {
     processingSignals: home.processingSignals,
     analystTime: home.analystTime || '—',
     stats: home.stats.map(s => ({ label: s.label, text: s.value })),
-    daemonProse: home.daemonProse || 'The daemon is forming a first impression.',
+    daemonProse: home.daemonProse || 'Signal collected. The daemon compiles overnight.',
     shadowPrompt: home.shadowPrompt,
     dailySignalQuote: home.dailySignalQuote,
     dailySignalAuthor: home.dailySignalAuthor,
@@ -62,6 +62,7 @@ export function homeToCompileData(home: HomeData): CompileData {
       ? (home.orbState as OrbState)
       : 'cold',
     daemonAudioUrl: home.daemonAudioUrl,
+    compileLogLines: home.compileLogLines,
     kernelAccess:       home.kernelAccess       ?? 0,
     daemonAccuracy:     home.daemonAccuracy      ?? 0,
     decodedLines:       home.decodedLines        ?? 0,

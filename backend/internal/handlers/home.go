@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,6 +60,7 @@ type homeResponse struct {
 	DailySignalAuthor string        `json:"dailySignalAuthor"`
 	OrbState          string        `json:"orbState"`
 	DaemonAudioURL    string        `json:"daemonAudioUrl,omitempty"`
+	CompileLogLines   []string      `json:"compileLogLines,omitempty"`
 	// Scoring system — three persistent scores
 	KernelAccess   int32 `json:"kernelAccess"`
 	DaemonAccuracy int32 `json:"daemonAccuracy"`
@@ -174,6 +176,12 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 		resp.ShadowPrompt = state.ShadowPrompt
 		resp.DaemonAudioURL = audioURL
 		resp.AnalystTime = relativeDate(state.Date, today)
+		if state.CompileLogLines != "" {
+			var lines []string
+			if err := json.Unmarshal([]byte(state.CompileLogLines), &lines); err == nil && len(lines) > 0 {
+				resp.CompileLogLines = lines
+			}
+		}
 	}
 
 	return resp

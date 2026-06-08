@@ -35,6 +35,7 @@ const TERM = {
 } as const
 
 const GLITCH_CHARS = '!@#$%^*<>?|/[]{}▓▒'
+const MAX_COMPILE_LINE = 64
 
 interface CompileScreenProps {
   data:          CompileData
@@ -140,11 +141,14 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
   const reduced   = useReducedMotion()
   const [orbPulsing, setOrbPulsing] = useState(false)
 
-  const randomPicks = useRef<string[] | undefined>(undefined)
-  if (!randomPicks.current) {
-    randomPicks.current = pickRandomLines(copy.compile.logPool, 3)
+  // Use Analyst-generated lines when available; fall back to random pool.
+  const poolFills = useRef<string[] | undefined>(undefined)
+  if (!poolFills.current) {
+    poolFills.current = pickRandomLines(copy.compile.logPool, 3)
   }
-  const [r0, r1, r2] = randomPicks.current
+  const [r0, r1, r2] = (data.compileLogLines && data.compileLogLines.length >= 3)
+    ? data.compileLogLines.map(l => l.length > MAX_COMPILE_LINE ? l.slice(0, MAX_COMPILE_LINE - 1) + '…' : l)
+    : poolFills.current
   const streakLine = copy.compile.streakLine(data.consecutiveDays, data.day)
 
   const compileLines = [

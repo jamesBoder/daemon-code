@@ -156,7 +156,7 @@ export function Home() {
             Forming · Day {home.day}
           </p>
           <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: DAY0_TEXT_MAX_W }}>
-            The daemon has a first impression.<br />It will know more tomorrow.
+            I noted what you did during onboarding.<br />The analyst processes overnight.<br />The first model surfaces tomorrow.
           </p>
           <DaemonButton onClick={() => navigate('/session')}>
             Begin session →

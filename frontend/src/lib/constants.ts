@@ -36,14 +36,20 @@ export const ORB_LAYOUT_ID = 'daemon-orb'
 
 // UI
 export const TOAST_DISMISS_MS  = 3000  // ms — inline error auto-dismiss
-export const MODAL_Z_INDEX     = 100   // above all position:fixed session content
+export const SESSION_PROGRESS_Z_INDEX = 10   // session progress bar — above base content, below nav
+export const HEADER_Z_INDEX           = 50   // fixed screen header — above session, below modals
+export const TOAST_Z_INDEX            = 20   // above scrollable content, below modals (MODAL_Z_INDEX)
+export const MODAL_Z_INDEX            = 100  // above all position:fixed session content
 export const MODAL_MAX_WIDTH   = 320   // px — confirm modal max width
 
 // Session
 export const SESSION_RETRY_DELAY_MS = 2000  // ms — POST retry on first network failure
 
 // Haptics
-export const HAPTICS_KEY = 'haptics_enabled'  // localStorage boolean; default true (opt-out)
+export const HAPTICS_KEY   = 'haptics_enabled'    // localStorage boolean; default true (opt-out)
+
+// localStorage keys
+export const COMPILE_PLAYED_KEY = 'compile_played_day'  // sessionStorage — prevents re-playing compile animation same day
 
 // Touch targets
 export const MIN_TOUCH_TARGET = 44  // px — Apple HIG minimum tappable dimension
@@ -70,3 +76,20 @@ export const NAMING_CEREMONY_EXIT_MS = 350    // ms for full overlay fade-out af
 // Streak framing thresholds
 export const STREAK_MIN_DAYS        = 2  // min consecutive days before "watching for N days" appears
 export const STREAK_ABSENCE_MIN_DAY = 3  // min compile day before absence copy fires
+
+// Scoring system
+export const SCORE_HIGH_ACCURACY_THRESHOLD = 80  // daemon accuracy above this gets accent color treatment
+export const SCORE_SNAPSHOT_INTERVAL       = 30  // compiles between score baseline snapshots (mirrors analyst.go snapshotInterval)
+
+// Shareable card
+export const SHARE_CARD_SIZE = 1080  // canvas dimension (square, px) — Instagram-standard
+
+// Day-0 / onboarding text column
+export const DAY0_TEXT_MAX_W = 280  // narrower than PROSE_MAX_WIDTH for two-line centered headline
+
+// Guidance Layer (Section 1g) — Signal Whispers (Layer 1) + Fragment Context (Layer 4)
+export const SIGNAL_HINTS_KEY          = 'daemon_hints_seen'      // localStorage JSON string[] — tracks seen whispers
+export const SIGNAL_WHISPER_DISPLAY_MS = 6000                     // ms each whisper is visible
+export const SIGNAL_WHISPER_FADE_MS    = 400                      // ms fade in / fade out
+export const FRAGMENT_HINTS_KEY        = 'daemon_fragment_hints'  // localStorage JSON string[] — tracks seen fragment types
+export const FRAGMENT_CONTEXT_MS       = 2000                     // ms fragment context line shown before game starts

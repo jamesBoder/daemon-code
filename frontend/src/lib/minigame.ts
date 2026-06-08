@@ -65,6 +65,16 @@ export const MG = {
     revealS:    0.25, // generic reveal fade (confirm buttons, etc.)
   },
 
+  // ── Session chrome (progress bar + exit button + mood) ────────────────────
+  session: {
+    closeW:        52,   // px — wider than 44 to clear safe-area edge
+    closeH:        44,   // px — = MIN_TOUCH_TARGET
+    closeIconSize: 18,
+    closeStroke:   1.5,
+    moodSize:      56,   // px — mood tile width and height
+    moodTapScale:  0.92, // mild tap (larger target — softer than BUTTON_TAP_SCALE)
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

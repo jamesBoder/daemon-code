@@ -15,7 +15,7 @@ type analystContext struct {
 	CardResponses         []db.CardResponse      `json:"card_responses"`
 	MoodLog               []db.MoodLog           `json:"mood_log"`
 	CurrentProfile        db.ShadowProfile       `json:"current_profile"`
-	ProfileDimensions     json.RawMessage        `json:"profile_dimensions,omitempty"`
+	ProfileDimensions     json.RawMessage        `json:"profile_dimensions"`
 	SessionQuality        sessionQualityCtx      `json:"session_quality"`
 	DimensionSignalsToday map[string]interface{} `json:"dimension_signals_today"`
 	GrimTriggerSignal     grimTriggerCtx         `json:"grim_trigger_signal"`

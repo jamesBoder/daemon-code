@@ -61,7 +61,7 @@ function pickRandomLines(pool: readonly string[], count: number): string[] {
 
 function GlitchText({ text }: { text: string }) {
   const [display, setDisplay] = useState(text)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     function schedule() {
@@ -140,7 +140,7 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
   const reduced   = useReducedMotion()
   const [orbPulsing, setOrbPulsing] = useState(false)
 
-  const randomPicks = useRef<string[]>()
+  const randomPicks = useRef<string[] | undefined>(undefined)
   if (!randomPicks.current) {
     randomPicks.current = pickRandomLines(copy.compile.logPool, 3)
   }

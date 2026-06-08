@@ -13,7 +13,7 @@ function markSeen(key: string) {
 export function useSignalHint(key: string, condition = true) {
   const triggered = useRef(false)
   const [shouldShow, setShouldShow] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     if (!condition || triggered.current) return

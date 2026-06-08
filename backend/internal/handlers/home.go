@@ -60,13 +60,13 @@ type homeResponse struct {
 	OrbState          string        `json:"orbState"`
 	DaemonAudioURL    string        `json:"daemonAudioUrl,omitempty"`
 	// Scoring system — three persistent scores
-	KernelAccess       int32 `json:"kernelAccess"`
-	DaemonAccuracy     int32 `json:"daemonAccuracy"`
-	DecodedLines       int32 `json:"decodedLines"`
+	KernelAccess   int32 `json:"kernelAccess"`
+	DaemonAccuracy int32 `json:"daemonAccuracy"`
+	DecodedLines   int32 `json:"decodedLines"`
 	// Deltas vs. last monthly snapshot — zero until compile 30
-	KernelAccessDelta  int32 `json:"kernelAccessDelta"`
+	KernelAccessDelta   int32 `json:"kernelAccessDelta"`
 	DaemonAccuracyDelta int32 `json:"daemonAccuracyDelta"`
-	DecodedLinesDelta  int32 `json:"decodedLinesDelta"`
+	DecodedLinesDelta   int32 `json:"decodedLinesDelta"`
 }
 
 func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
@@ -164,9 +164,9 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 
 	// Deltas vs. last snapshot — only meaningful after the first snapshot at compile snapshotThreshold
 	if profile.CompileCount >= snapshotThreshold {
-		resp.KernelAccessDelta   = profile.KernelAccess - profile.KernelAccessPrev
+		resp.KernelAccessDelta = profile.KernelAccess - profile.KernelAccessPrev
 		resp.DaemonAccuracyDelta = profile.DaemonAccuracy - profile.DaemonAccuracyPrev
-		resp.DecodedLinesDelta   = profile.FragmentsDecoded - profile.DecodedLinesPrev
+		resp.DecodedLinesDelta = profile.FragmentsDecoded - profile.DecodedLinesPrev
 	}
 
 	if state != nil {

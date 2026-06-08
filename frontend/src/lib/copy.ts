@@ -35,7 +35,8 @@ export const copy = {
       return null
     },
     complete: 'compile complete',
-    // Random pool — 2-3 picked per render to surround the data lines
+    // Fallback pool — used when Analyst-generated lines are unavailable (pre-first compile).
+    // Analyst-generated lines replace these after the first nightly run.
     logPool: [
       '> binding behavioral model...',
       '> cross-referencing signal history...',
@@ -61,6 +62,26 @@ export const copy = {
       '> shadow pattern loaded',
       '> temporal coherence: ok',
       '> drift correction applied',
+      '> rebuilding behavioral baseline...',
+      '> cross-referencing prior sessions...',
+      '> isolating recurring response vectors...',
+      '> shadow weight recalculated',
+      '> archetype signal: active',
+      '> loading prior fragment history...',
+      '> signal-to-noise ratio: nominal',
+      '> behavioral drift: within bounds',
+      '> process thread integrity: ok',
+      '> reindexing behavioral graph...',
+      '> reading behavioral arc...',
+      '> daemon listening...',
+      '> scanning session anomalies...',
+      '> pattern boundary check...',
+      '> consistency factors weighted',
+      '> memory trace: complete',
+      '> kernel threads synchronizing...',
+      '> fragment history indexed',
+      '> response latency: within range',
+      '> shadow state reconciled',
     ] as readonly string[],
   },
   processLog: {

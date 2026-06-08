@@ -17,16 +17,35 @@ type Phase = 'idle' | 'waiting' | 'reveal'
 
 const { duel: D, type: TY } = MG
 
+const CORRECT_REVEALS = [
+  'Predicted correctly. The daemon notes the confirmation.',
+  'Expected. The model holds.',
+  'Consistent. Logged.',
+  'The daemon anticipated this. Pattern confirmed.',
+  'Alignment confirmed. Accuracy rising.',
+] as const
+
+const WRONG_REVEALS = [
+  'New data. The daemon revises.',
+  'Deviation logged. The model adjusts.',
+  'Unexpected. The daemon is taking note.',
+  'Contradiction detected. The daemon is updating.',
+  'The daemon was wrong. That is noted.',
+] as const
+
 export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Props) {
   const reduced = useReducedMotion()
 
   const [phase,   setPhase]   = useState<Phase>('idle')
   const [matched, setMatched] = useState<boolean | null>(null)
+  const revealRef             = useRef<string>('')
   const onCompleteRef         = useRef(onComplete)
   onCompleteRef.current       = onComplete
 
   function handleChoice(choice: boolean) {
     if (phase !== 'idle') return
+    const pool = choice ? CORRECT_REVEALS : WRONG_REVEALS
+    revealRef.current = pool[Math.floor(Math.random() * pool.length)]
     setMatched(choice)
     setPhase('waiting')
 
@@ -39,9 +58,6 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
   }
 
   const accentColor = matched === true ? 'var(--compile-green)' : 'var(--warning)'
-  const revealText  = matched === true
-    ? 'Predicted correctly. The daemon notes the confirmation.'
-    : 'New data. The daemon revises.'
 
   return (
     <div style={{
@@ -78,7 +94,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
             letterSpacing: '0.02em',
           }}
         >
-          {revealText}
+          {revealRef.current}
         </motion.p>
       )}
 

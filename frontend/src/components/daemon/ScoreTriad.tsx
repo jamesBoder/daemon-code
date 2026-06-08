@@ -184,6 +184,7 @@ function ScoreLabel({ label, onClick, center }: { label: string; onClick: () => 
   return (
     <button
       onClick={onClick}
+      aria-label={`View ${label} score sheet`}
       style={{
         background:    'none',
         border:        'none',

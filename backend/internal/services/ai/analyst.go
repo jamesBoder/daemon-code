@@ -44,6 +44,7 @@ Output format:
   "texture": "smooth|fractured",
   "fragments_decoded_delta": integer,
   "analyst_notes": "1-2 sentences on what you observed today — used by Narrator",
+  "compile_lines": ["exactly 3 terminal log lines shown verbatim on the compile screen. lowercase. each starts with >. draw directly from today's data — pick the 3 most signal-rich: archetype + confidence, named pattern + strength delta + state, prediction duel ratio, mood score, kernel access change. max 60 chars each. terse and specific. examples: '> archetype: abandoned_child [0.71]', '> the_approval_loop.process: +12 [running]', '> prediction duel: 4/5 confirmed'"],
   "pattern_updates": [
     {
       "pattern_id": "uuid or null for new",
@@ -99,6 +100,7 @@ type analystOutput struct {
 	Texture               string          `json:"texture"`
 	FragmentsDecodedDelta int             `json:"fragments_decoded_delta"`
 	AnalystNotes          string          `json:"analyst_notes"`
+	CompileLines          []string        `json:"compile_lines"`
 	PatternUpdates        []patternUpdate `json:"pattern_updates"`
 }
 
@@ -194,7 +196,10 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	}
 
 	// 7. Emit ShadowAnalystComplete to custom EventBridge bus
-	detail, _ := json.Marshal(map[string]string{"user_id": userID.String()})
+	detail, _ := json.Marshal(map[string]interface{}{
+		"user_id":       userID.String(),
+		"compile_lines": output.CompileLines,
+	})
 	_, err = a.eb.PutEvents(ctx, &eventbridge.PutEventsInput{
 		Entries: []ebtypes.PutEventsRequestEntry{
 			{

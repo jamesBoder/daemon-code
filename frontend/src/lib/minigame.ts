@@ -45,7 +45,8 @@ export const MG = {
 
   // ── SpeedRound specific ────────────────────────────────────────────────────
   speed: {
-    crossfadeMs: 80,  // opacity crossfade between prompts
+    crossfadeMs: 80,   // opacity crossfade between prompts
+    mobileMaxW:  380,  // px — container max-width on mobile viewport
   },
 
   // ── PredictionDuel specific ────────────────────────────────────────────────

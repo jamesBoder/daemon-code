@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
-import { GlassCard } from '../components/ui/GlassCard'
 import { useAuthStore } from '../stores/authStore'
+import { BUTTON_TAP_SCALE, DAY0_TEXT_MAX_W, MIN_TOUCH_TARGET } from '../lib/constants'
 
 export function Welcome() {
   const navigate = useNavigate()
@@ -27,7 +27,7 @@ export function Welcome() {
         textAlign: 'center',
       }}
     >
-      <div style={{ height: '40vh', display: 'flex', alignItems: 'center' }}>
+      <div style={{ minHeight: 'clamp(160px, 40vh, 260px)', display: 'flex', alignItems: 'center' }}>
         <DaemonOrb state="cold" />
       </div>
 
@@ -45,7 +45,7 @@ export function Welcome() {
         fontSize: 'var(--text-sm)',
         color: 'var(--text-secondary)',
         lineHeight: 1.6,
-        maxWidth: '280px',
+        maxWidth: DAY0_TEXT_MAX_W,
         margin: 0,
       }}>
         This isn&apos;t a wellness app.<br />
@@ -53,18 +53,22 @@ export function Welcome() {
         is who you&apos;ve been.
       </p>
 
-      <GlassCard
+      <motion.button
         onClick={() => navigate('/auth/register')}
-        style={{ cursor: 'pointer', padding: '1rem 2rem', width: '100%', maxWidth: '280px' }}
-      >
-        <span style={{
+        whileTap={{ scale: BUTTON_TAP_SCALE }}
+        className="glass-card"
+        style={{
+          cursor: 'pointer',
+          padding: 'var(--space-4) var(--space-8)',
+          width: '100%',
+          maxWidth: DAY0_TEXT_MAX_W,
           fontFamily: 'var(--font-sans)',
           fontSize: 'var(--text-base)',
           color: 'var(--text-primary)',
-        }}>
-          I&apos;m ready to begin →
-        </span>
-      </GlassCard>
+        }}
+      >
+        I&apos;m ready to begin →
+      </motion.button>
 
       <button
         onClick={() => navigate('/auth/login')}
@@ -76,7 +80,7 @@ export function Welcome() {
           color: 'var(--text-muted)',
           cursor: 'pointer',
           padding: 'var(--space-3) var(--space-4)',
-          minHeight: 44,
+          minHeight: MIN_TOUCH_TARGET,
         }}
       >
         I have an account

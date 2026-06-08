@@ -235,8 +235,9 @@ export function Onboarding() {
               Forming · Day 0
             </p>
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 320 }}>
-              The daemon has a first impression.<br />
-              It will know more tomorrow.
+              Signal collected.<br />
+              The analyst processes tonight.<br />
+              The model surfaces tomorrow.
             </p>
             <button className="daemon-btn daemon-btn-primary" style={{ maxWidth: 240 }} onClick={enterDaemon}>
               Enter the daemon →

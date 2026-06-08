@@ -84,7 +84,8 @@ type narratorOutput struct {
 
 func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error {
 	var detail struct {
-		UserID string `json:"user_id"`
+		UserID       string   `json:"user_id"`
+		CompileLines []string `json:"compile_lines"`
 	}
 	if err := json.Unmarshal([]byte(event.Detail), &detail); err != nil {
 		return fmt.Errorf("parse event detail: %w", err)
@@ -112,15 +113,21 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 		return fmt.Errorf("synthesize voice: %w", err)
 	}
 
+	var compileLinesStr string
+	if len(detail.CompileLines) > 0 {
+		compileLinesJSON, _ := json.Marshal(detail.CompileLines)
+		compileLinesStr = string(compileLinesJSON)
+	}
 	return n.ddb.PutShadowState(ctx, dynamo.ShadowState{
-		UserID:       userID.String(),
-		Date:         date,
-		DayNumber:    int(profile.CompileCount),
-		OrbState:     profile.Stage,
-		DaemonProse:  output.Prose,
-		ShadowPrompt: output.ShadowPrompt,
-		AudioURL:     audioURL,
-		TTL:          time.Now().Add(shadowStateTTL).Unix(),
+		UserID:          userID.String(),
+		Date:            date,
+		DayNumber:       int(profile.CompileCount),
+		OrbState:        profile.Stage,
+		DaemonProse:     output.Prose,
+		ShadowPrompt:    output.ShadowPrompt,
+		AudioURL:        audioURL,
+		CompileLogLines: compileLinesStr,
+		TTL:             time.Now().Add(shadowStateTTL).Unix(),
 	})
 }
 

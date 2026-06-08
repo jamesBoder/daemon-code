@@ -87,6 +87,13 @@ export const SHARE_CARD_SIZE = 1080  // canvas dimension (square, px) — Instag
 // Day-0 / onboarding text column
 export const DAY0_TEXT_MAX_W = 280  // narrower than PROSE_MAX_WIDTH for two-line centered headline
 
+// Auth forms
+export const AUTH_FORM_MAX_WIDTH = 360    // px — auth form card (wider than confirm modals)
+export const INPUT_FONT_SIZE     = '16px' // prevents iOS auto-zoom on input focus in Safari
+
+// BottomNav
+export const BOTTOM_NAV_BUTTON_HEIGHT = 56  // px — inner button area; total nav = this + env(safe-area-inset-bottom)
+
 // Guidance Layer (Section 1g) — Signal Whispers (Layer 1) + Fragment Context (Layer 4)
 export const SIGNAL_HINTS_KEY          = 'daemon_hints_seen'      // localStorage JSON string[] — tracks seen whispers
 export const SIGNAL_WHISPER_DISPLAY_MS = 6000                     // ms each whisper is visible

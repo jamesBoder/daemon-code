@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Home, Zap, Scroll, GitBranch, Settings } from 'lucide-react'
+import { BOTTOM_NAV_BUTTON_HEIGHT } from '../../lib/constants'
 
 const TABS = [
   { label: 'Home',      path: '/home',      Icon: Home      },
@@ -16,7 +17,7 @@ export function BottomNav() {
   return (
     <nav style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
-      height: 'calc(56px + env(safe-area-inset-bottom))',
+      height: `calc(${BOTTOM_NAV_BUTTON_HEIGHT}px + env(safe-area-inset-bottom))`,
       paddingBottom: 'env(safe-area-inset-bottom)',
       background: 'rgba(13, 16, 24, 0.92)',
       borderTop: '0.5px solid rgba(255, 255, 255, 0.07)',
@@ -32,7 +33,7 @@ export function BottomNav() {
             key={path}
             onClick={() => navigate(path)}
             style={{
-              flex: 1, height: 56,
+              flex: 1, height: BOTTOM_NAV_BUTTON_HEIGHT,
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
               gap: 3,

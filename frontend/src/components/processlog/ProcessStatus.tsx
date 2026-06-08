@@ -1,5 +1,10 @@
 import type { ProcessState } from '../../types'
 
+const STATUS = {
+  padV:    2,  // px — vertical padding on state badge
+  dotSize: 6,  // px — running state pulse indicator diameter
+} as const
+
 interface ProcessStatusProps {
   state: ProcessState
 }
@@ -26,17 +31,17 @@ export function ProcessStatus({ state }: ProcessStatusProps) {
       display: 'inline-flex',
       alignItems: 'center',
       gap: 'var(--space-1)',
-      padding: '2px var(--space-2)',
+      padding: `${STATUS.padV}px var(--space-2)`,
       borderRadius: 'var(--radius-full)',
       border: `0.5px solid ${color}`,
       background: `color-mix(in srgb, ${color} 10%, transparent)`,
       flexShrink: 0,
     }}>
       {state === 'running' && (
-        <div style={{ position: 'relative', width: 6, height: 6 }}>
+        <div style={{ position: 'relative', width: STATUS.dotSize, height: STATUS.dotSize }}>
           <div style={{
-            width: 6,
-            height: 6,
+            width: STATUS.dotSize,
+            height: STATUS.dotSize,
             borderRadius: '50%',
             background: color,
             position: 'relative',

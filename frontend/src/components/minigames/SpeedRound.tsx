@@ -72,7 +72,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           width: '100%',
-          maxWidth: isDesktop ? MG.scale.svgDesktopWidth ?? 480 : 380,
+          maxWidth: isDesktop ? MG.scale.svgDesktopWidth : MG.speed.mobileMaxW,
           gap: isDesktop ? MG.space.desktopGap : MG.space.mobileGap,
         }}
       >

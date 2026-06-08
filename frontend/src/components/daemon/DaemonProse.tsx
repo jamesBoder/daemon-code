@@ -59,8 +59,8 @@ export function DaemonProse({
           aria-label={audioPlaying ? 'Stop daemon voice' : 'Listen to daemon voice'}
           style={{
             position: 'absolute',
-            top: 2 - MIC.pad,
-            right: -MIC.pad,
+            top: 0,
+            right: 0,
             padding: MIC.pad,
             background: 'none',
             border: 'none',

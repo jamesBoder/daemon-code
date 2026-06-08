@@ -7,6 +7,10 @@ import { copy } from '../../lib/copy'
 import { HAIRLINE, REDUCED_MOTION_DURATION } from '../../lib/constants'
 import type { ProcessState } from '../../types'
 
+const ENTRY = {
+  strengthBarH: 2,  // px — process strength progress bar height
+} as const
+
 interface ProcessEntryProps {
   name: string
   state: ProcessState
@@ -80,7 +84,7 @@ export function ProcessEntry({
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <div style={{
                 flex: 1,
-                height: 2,
+                height: ENTRY.strengthBarH,
                 background: 'rgba(255,255,255,0.06)',
                 borderRadius: 'var(--radius-full)',
                 overflow: 'hidden',

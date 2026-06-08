@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { DaemonButton } from './DaemonButton'
 import { MODAL_Z_INDEX, MODAL_MAX_WIDTH } from '../../lib/constants'
@@ -14,6 +14,32 @@ interface ConfirmModalProps {
 
 export function ConfirmModal({ message, confirmLabel, cancelLabel, dangerous, onConfirm, onCancel }: ConfirmModalProps) {
   const confirmed = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  // Focus first button on open; restore focus to prior element on close.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    dialogRef.current?.querySelector<HTMLElement>('button')?.focus()
+    return () => { prev?.focus() }
+  }, [])
+
+  // Trap Tab/Shift+Tab within the modal buttons.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return
+      const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button') ?? [])
+      if (buttons.length === 0) return
+      const first = buttons[0]
+      const last  = buttons[buttons.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus() }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   function handleConfirm() {
     if (confirmed.current) return
@@ -35,6 +61,9 @@ export function ConfirmModal({ message, confirmLabel, cancelLabel, dangerous, on
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
         className="glass-card"
         onClick={e => e.stopPropagation()}
         style={{

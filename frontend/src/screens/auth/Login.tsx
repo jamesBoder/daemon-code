@@ -6,17 +6,17 @@ import { DaemonButton } from '../../components/ui/DaemonButton'
 import { useAuthStore } from '../../stores/authStore'
 import { apiFetch } from '../../lib/api'
 import type { AuthResponse } from '../../types'
-import { HAIRLINE } from '../../lib/constants'
+import { AUTH_FORM_MAX_WIDTH, HAIRLINE, INPUT_FONT_SIZE } from '../../lib/constants'
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '0.75rem 1rem',
+  padding: 'var(--space-3) var(--space-4)',
   background: 'rgba(255,255,255,0.04)',
   border: `${HAIRLINE} solid var(--border)`,
-  borderRadius: '8px',
+  borderRadius: 'var(--radius-md)',
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-sans)',
-  fontSize: '16px',
+  fontSize: INPUT_FONT_SIZE,
   outline: 'none',
   boxSizing: 'border-box',
 }
@@ -78,8 +78,8 @@ export function Login() {
         paddingBottom: 'calc(var(--space-8) + env(safe-area-inset-bottom))',
       }}
     >
-      <GlassCard style={{ width: '100%', maxWidth: '360px', padding: '2rem' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <GlassCard style={{ width: '100%', maxWidth: AUTH_FORM_MAX_WIDTH, padding: 'var(--space-8)' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <p style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'var(--text-xl)',
@@ -100,7 +100,7 @@ export function Login() {
             style={inputStyle}
           />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <input
               type="password"
               placeholder="Password"
@@ -131,7 +131,7 @@ export function Login() {
       <Link
         to="/auth/register"
         style={{
-          marginTop: '1.5rem',
+          marginTop: 'var(--space-6)',
           fontFamily: 'var(--font-sans)',
           fontSize: 'var(--text-sm)',
           color: 'var(--text-muted)',

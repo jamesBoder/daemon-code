@@ -18,6 +18,7 @@ SET primary_archetype  = $2,
     fragments_decoded  = $9,
     compile_count      = $10,
     analyst_notes      = $11,
+    daemon_accuracy    = $12,
     updated_at         = NOW()
 WHERE user_id = $1
 RETURNING *;

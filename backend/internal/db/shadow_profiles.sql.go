@@ -15,7 +15,7 @@ import (
 const createShadowProfile = `-- name: CreateShadowProfile :one
 INSERT INTO shadow_profiles (user_id)
 VALUES ($1)
-RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at
+RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, daemon_accuracy, kernel_access_prev, daemon_accuracy_prev, decoded_lines_prev, updated_at
 `
 
 func (q *Queries) CreateShadowProfile(ctx context.Context, userID uuid.UUID) (ShadowProfile, error) {
@@ -35,13 +35,17 @@ func (q *Queries) CreateShadowProfile(ctx context.Context, userID uuid.UUID) (Sh
 		&i.CompileCount,
 		&i.AnalystNotes,
 		&i.PollyVoice,
+		&i.DaemonAccuracy,
+		&i.KernelAccessPrev,
+		&i.DaemonAccuracyPrev,
+		&i.DecodedLinesPrev,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getShadowProfile = `-- name: GetShadowProfile :one
-SELECT id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at FROM shadow_profiles WHERE user_id = $1
+SELECT id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, daemon_accuracy, kernel_access_prev, daemon_accuracy_prev, decoded_lines_prev, updated_at FROM shadow_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetShadowProfile(ctx context.Context, userID uuid.UUID) (ShadowProfile, error) {
@@ -61,6 +65,10 @@ func (q *Queries) GetShadowProfile(ctx context.Context, userID uuid.UUID) (Shado
 		&i.CompileCount,
 		&i.AnalystNotes,
 		&i.PollyVoice,
+		&i.DaemonAccuracy,
+		&i.KernelAccessPrev,
+		&i.DaemonAccuracyPrev,
+		&i.DecodedLinesPrev,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -78,9 +86,10 @@ SET primary_archetype  = $2,
     fragments_decoded  = $9,
     compile_count      = $10,
     analyst_notes      = $11,
+    daemon_accuracy    = $12,
     updated_at         = NOW()
 WHERE user_id = $1
-RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, updated_at
+RETURNING id, user_id, primary_archetype, signal_confidence, kernel_access, stage, posture, environment, texture, fragments_decoded, compile_count, analyst_notes, polly_voice, daemon_accuracy, kernel_access_prev, daemon_accuracy_prev, decoded_lines_prev, updated_at
 `
 
 type UpdateShadowProfileParams struct {
@@ -95,6 +104,7 @@ type UpdateShadowProfileParams struct {
 	FragmentsDecoded int32          `json:"fragments_decoded"`
 	CompileCount     int32          `json:"compile_count"`
 	AnalystNotes     pgtype.Text    `json:"analyst_notes"`
+	DaemonAccuracy   int32          `json:"daemon_accuracy"`
 }
 
 func (q *Queries) UpdateShadowProfile(ctx context.Context, arg UpdateShadowProfileParams) (ShadowProfile, error) {
@@ -110,6 +120,7 @@ func (q *Queries) UpdateShadowProfile(ctx context.Context, arg UpdateShadowProfi
 		arg.FragmentsDecoded,
 		arg.CompileCount,
 		arg.AnalystNotes,
+		arg.DaemonAccuracy,
 	)
 	var i ShadowProfile
 	err := row.Scan(
@@ -126,6 +137,10 @@ func (q *Queries) UpdateShadowProfile(ctx context.Context, arg UpdateShadowProfi
 		&i.CompileCount,
 		&i.AnalystNotes,
 		&i.PollyVoice,
+		&i.DaemonAccuracy,
+		&i.KernelAccessPrev,
+		&i.DaemonAccuracyPrev,
+		&i.DecodedLinesPrev,
 		&i.UpdatedAt,
 	)
 	return i, err

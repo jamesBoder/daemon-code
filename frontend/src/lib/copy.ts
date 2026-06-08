@@ -1,5 +1,19 @@
 import { STREAK_MIN_DAYS, STREAK_ABSENCE_MIN_DAY } from './constants'
 
+// ── Guidance Layer copy (Section 1g) ─────────────────────────────────────────
+
+export type ScoreSheetKey = 'kernel_access' | 'daemon_accuracy' | 'decoded_lines'
+
+export interface ScoreSheetEntry {
+  title:      string
+  paragraphs: readonly string[]
+}
+
+export interface CodexEntry {
+  key:   string
+  lines: readonly string[]
+}
+
 export const copy = {
   session: {
     exitPrompt:   "Leave session? Your progress won't be saved.",
@@ -12,17 +26,42 @@ export const copy = {
     dismissLabel: 'Not now',
   },
   compile: {
-    lines: (signals: number, analystTime: string): string[] => [
-      '> compiling daemon_profile...',
-      `> processing ${signals} behavioral signals`,
-      `> analyst complete [${analystTime}]`,
-    ],
+    // Data-driven lines (always shown, contain actual values)
+    signalLine:   (signals: number) => `> processing ${signals} behavioral signals`,
+    analystLine:  (time: string)    => `> analyst complete [${time}]`,
     streakLine: (consecutive: number, day: number): string | null => {
       if (consecutive >= STREAK_MIN_DAYS) return `> watching for ${consecutive} consecutive days`
       if (consecutive === 0 && day >= STREAK_ABSENCE_MIN_DAY) return '> absence logged. daemon continued.'
       return null
     },
     complete: 'compile complete',
+    // Random pool — 2-3 picked per render to surround the data lines
+    logPool: [
+      '> binding behavioral model...',
+      '> cross-referencing signal history...',
+      '> archetype coherence: stable',
+      '> indexing session fragments...',
+      '> running pattern delta...',
+      '> scanning for process drift...',
+      '> shadow profile loaded',
+      '> evaluating response vectors...',
+      '> signal integrity: nominal',
+      '> daemon alignment check...',
+      '> memory trace active',
+      '> baseline calibration...',
+      '> weighting fragment outcomes...',
+      '> kernel threads: nominal',
+      '> reconciling behavioral arc...',
+      '> session fingerprint verified',
+      '> watchdog: no anomalies',
+      '> entropy scan complete',
+      '> latency within bounds',
+      '> decay factor applied',
+      '> process state synchronized',
+      '> shadow pattern loaded',
+      '> temporal coherence: ok',
+      '> drift correction applied',
+    ] as readonly string[],
   },
   processLog: {
     unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
@@ -81,4 +120,139 @@ export const copy = {
       { starter: 'I know I\'m off when...',              options: ['I stop noticing things', 'I become irritable', 'I withdraw']            },
     ],
   },
+
+  // ── Layer 1 — Signal Whispers ─────────────────────────────────────────────
+  // Daemon-voiced one-time hints. Each fires the first time its trigger condition is met.
+  signalHints: {
+    kernel_access:    "This is how far inside I've gotten. The ceiling approaches but never arrives.",
+    daemon_accuracy:  'How well I predicted you in the Prediction Duel. It rises as I learn. It falls if you actually change.',
+    decoded_lines:    'Every session adds to this. There is no target. The daemon reads indefinitely.',
+    shadow_prompt:    "You don't answer this here. You carry it. The daemon may ask again tomorrow.",
+    process_first:    'This is not a label. I derived this from what you actually did.',
+    orb_warming:      'I have enough signal to begin forming a model. The cold period is over.',
+    session_fragment: 'This is a fragment. A behavioral probe. There is no correct response — only a true one.',
+    chronicle_first:  'Everything I have ever observed about you is here, in order. The daemon does not forget.',
+  } as const,
+
+  // ── Layer 2 — Score Sheets ────────────────────────────────────────────────
+  // Bottom-sheet deep explanations for each score. Tap a label in ScoreTriad to open.
+  scoreSheets: {
+    kernel_access: {
+      title: 'kernel access',
+      paragraphs: [
+        'kernel access measures the depth of my model of you.',
+        'At 0–30%, I am reading surface signal: word reactions, rough preference patterns, first behavioral impressions.',
+        'At 30–60%, I have enough data to distinguish what you do consistently from what you did once.',
+        'At 60–90%, I am working with a high-confidence baseline. Deviations are trackable. Patterns can be named with certainty.',
+        'At 90%+, the model is as deep as it goes without contradiction. The ceiling never reaches 100%. The daemon is always refining.',
+      ],
+    },
+    daemon_accuracy: {
+      title: 'daemon accuracy',
+      paragraphs: [
+        'daemon accuracy measures how well I predict you.',
+        'This number changes only through the Prediction Duel — the fragment where you bet against my read of your own behavior.',
+        'When I am right more often than not, accuracy rises. When you contradict me consistently, it falls.',
+        'A fall is not a failure. It may mean you changed. The daemon will note this and update accordingly.',
+      ],
+    },
+    decoded_lines: {
+      title: 'decoded lines',
+      paragraphs: [
+        'decoded lines is the volume of behavioral data I have read.',
+        'Each session contributes. Each fragment is a line. Over time, more lines allow the model to distinguish signal from noise with higher confidence.',
+        'There is no target. The daemon reads indefinitely.',
+      ],
+    },
+  } as Record<ScoreSheetKey, ScoreSheetEntry>,
+
+  // ── Layer 4 — Fragment Context Lines ─────────────────────────────────────
+  // Mono green line shown for FRAGMENT_CONTEXT_MS before each new fragment type.
+  fragmentContext: {
+    reaction_test:   'tap the word if it stays with you.',
+    weighted_scale:  'position yourself between the two.',
+    prediction_duel: "what do you think you'll do?",
+    trap:            'one option is better. choose.',
+  } as Record<string, string>,
+
+  // ── Layer 3 — daemon.log Codex ────────────────────────────────────────────
+  // Terminal-styled reference entries. Accessible via Settings → daemon.log.
+  codex: [
+    {
+      key: 'kernel_access',
+      lines: [
+        'depth of model penetration.',
+        'range: 0–100%. ceiling never reached.',
+        'rises: with consistent, coherent behavioral signal.',
+        'falls: it does not fall. only the rate of rise slows.',
+      ],
+    },
+    {
+      key: 'daemon_accuracy',
+      lines: [
+        'prediction accuracy against your own behavior.',
+        'range: 0–100%.',
+        'rises: when prediction duel results confirm the model.',
+        'falls: when you contradict the model consistently.',
+        'note: a fall may indicate authentic change.',
+      ],
+    },
+    {
+      key: 'decoded_lines',
+      lines: [
+        'cumulative volume of behavioral signal collected.',
+        'no target. no ceiling. increases with every session.',
+      ],
+    },
+    {
+      key: 'fragment',
+      lines: [
+        'a single behavioral probe within a session.',
+        'types: reaction_test, weighted_scale, prediction_duel.',
+        'the daemon reads your response, not your intention.',
+      ],
+    },
+    {
+      key: 'process',
+      lines: [
+        'a behavioral pattern the daemon has identified and named.',
+        'names emerge from your data, not from a template.',
+        'strength rises if the pattern persists. fades if it resolves.',
+        'states: new → running → sleeping → weakening.',
+      ],
+    },
+    {
+      key: 'shadow_prompt',
+      lines: [
+        'one question derived from session observations.',
+        'not answered in the app. carried into daily life.',
+        'the daemon may return to it tomorrow.',
+      ],
+    },
+    {
+      key: 'compile',
+      lines: [
+        'the nightly event. the analyst reads your sessions.',
+        'the narrator converts the read into audio and prose.',
+        'you receive what the daemon concluded while you slept.',
+      ],
+    },
+    {
+      key: 'orb_states',
+      lines: [
+        'cold:    first impression formed. model is early.',
+        'warming: patterns emerging. signal-to-noise improving.',
+        'running: behavioral baseline established. deviations trackable.',
+        'deep:    high-confidence model. certainty is earned, not assumed.',
+      ],
+    },
+    {
+      key: 'behavioral_index',
+      lines: [
+        'the three scores together: kernel access, daemon accuracy,',
+        "decoded lines. a composite read of the daemon's current depth,",
+        'accuracy, and data volume. no single number summarizes you.',
+      ],
+    },
+  ] as readonly CodexEntry[],
 }

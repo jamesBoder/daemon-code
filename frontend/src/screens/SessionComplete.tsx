@@ -6,7 +6,7 @@ import { NamingCeremony } from '../components/daemon/NamingCeremony'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
 import { haptic } from '../lib/haptics'
-import { MODAL_MAX_WIDTH } from '../lib/constants'
+import { LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
 import type { ShadowProfile, OrbState, ProcessDiff } from '../types'
 
 // named first (most dramatic), then new processes, then strength changes
@@ -82,7 +82,7 @@ export function SessionComplete() {
       gap: 'var(--space-6)',
       padding: 'var(--space-8)',
     }}>
-      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
         session complete
       </p>
 
@@ -117,7 +117,7 @@ export function SessionComplete() {
 }
 
 function DiffCard({ entry }: { entry: ProcessDiff }) {
-  const monoBase = { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', letterSpacing: '0.04em' }
+  const monoBase = { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', letterSpacing: LETTER_SPACING_PROCESS }
 
   if (entry.change === 'named') {
     return (
@@ -139,7 +139,7 @@ function DiffCard({ entry }: { entry: ProcessDiff }) {
         <span style={{ ...monoBase, color: 'var(--text-primary)', minWidth: 0, wordBreak: 'break-word' }}>
           {entry.name}
         </span>
-        <span style={{ ...monoBase, color: 'var(--text-muted)', letterSpacing: '0.06em', flexShrink: 0 }}>
+        <span style={{ ...monoBase, color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, flexShrink: 0 }}>
           new
         </span>
       </div>
@@ -158,7 +158,7 @@ function DiffCard({ entry }: { entry: ProcessDiff }) {
       <span style={{ ...monoBase, color: 'var(--text-primary)', minWidth: 0, wordBreak: 'break-word' }}>
         {entry.name}
       </span>
-      <span style={{ ...monoBase, color, letterSpacing: '0.06em', flexShrink: 0 }}>
+      <span style={{ ...monoBase, color, letterSpacing: LETTER_SPACING_WIDE, flexShrink: 0 }}>
         {arrow} strength{deltaStr}
       </span>
     </div>

@@ -1,10 +1,11 @@
-import { HAIRLINE, LETTER_SPACING_WIDE, SCREEN_HEADER_HEIGHT } from '../../lib/constants'
+import { HAIRLINE, HEADER_Z_INDEX, LETTER_SPACING_WIDE, MIN_TOUCH_TARGET, SCREEN_HEADER_HEIGHT } from '../../lib/constants'
 
 interface ScreenHeaderProps {
-  title: string
+  title:   string
+  onBack?: () => void
 }
 
-export function ScreenHeader({ title }: ScreenHeaderProps) {
+export function ScreenHeader({ title, onBack }: ScreenHeaderProps) {
   return (
     <div style={{
       position: 'fixed',
@@ -18,8 +19,33 @@ export function ScreenHeader({ title }: ScreenHeaderProps) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 50,
+      zIndex: HEADER_Z_INDEX,
     }}>
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{
+            position:   'absolute',
+            left:       0,
+            top:        'env(safe-area-inset-top)',
+            height:     SCREEN_HEADER_HEIGHT,
+            minWidth:   MIN_TOUCH_TARGET,
+            paddingLeft:'var(--space-5)',
+            paddingRight:'var(--space-3)',
+            background: 'none',
+            border:     'none',
+            cursor:     'pointer',
+            fontFamily: 'var(--font-mono)',
+            fontSize:   'var(--text-xs)',
+            color:      'var(--text-muted)',
+            letterSpacing: LETTER_SPACING_WIDE,
+            display:    'flex',
+            alignItems: 'center',
+          }}
+        >
+          ←
+        </button>
+      )}
       <span style={{
         fontFamily: 'var(--font-mono)',
         fontSize: 'var(--text-xs)',

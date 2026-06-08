@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
+import { SignalWhisper } from '../components/daemon/SignalWhisper'
 import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
 import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import { copy } from '../lib/copy'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { ChronicleEntry, OrbState } from '../types'
 
@@ -73,6 +75,11 @@ export function Chronicle() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+              <SignalWhisper
+                hintKey="chronicle_first"
+                text={copy.signalHints.chronicle_first}
+                condition={entries.length > 0}
+              />
               {entries.map((entry, i) => (
                 <ChronicleCard key={entry.date} entry={entry} index={i} />
               ))}

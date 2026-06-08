@@ -42,6 +42,11 @@ type compileStat struct {
 	Value string `json:"value"`
 }
 
+// snapshotThreshold is the minimum compile count before score deltas are shown.
+// Mirrors snapshotInterval in analyst.go — deltas are meaningless before the
+// first snapshot is taken.
+const snapshotThreshold = 30
+
 type homeResponse struct {
 	Day               int           `json:"day"`
 	ConsecutiveDays   int           `json:"consecutiveDays"`
@@ -54,6 +59,14 @@ type homeResponse struct {
 	DailySignalAuthor string        `json:"dailySignalAuthor"`
 	OrbState          string        `json:"orbState"`
 	DaemonAudioURL    string        `json:"daemonAudioUrl,omitempty"`
+	// Scoring system — three persistent scores
+	KernelAccess   int32 `json:"kernelAccess"`
+	DaemonAccuracy int32 `json:"daemonAccuracy"`
+	DecodedLines   int32 `json:"decodedLines"`
+	// Deltas vs. last monthly snapshot — zero until compile 30
+	KernelAccessDelta   int32 `json:"kernelAccessDelta"`
+	DaemonAccuracyDelta int32 `json:"daemonAccuracyDelta"`
+	DecodedLinesDelta   int32 `json:"decodedLinesDelta"`
 }
 
 func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
@@ -140,8 +153,20 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 		Stats: []compileStat{
 			{Label: "fragments decoded", Value: strconv.Itoa(int(profile.FragmentsDecoded))},
 			{Label: "kernel access", Value: strconv.Itoa(int(profile.KernelAccess)) + "%"},
+			{Label: "daemon accuracy", Value: strconv.Itoa(int(profile.DaemonAccuracy)) + "%"},
 			{Label: "processes", Value: strconv.Itoa(len(patterns)) + " active"},
 		},
+		// Scoring system
+		KernelAccess:   profile.KernelAccess,
+		DaemonAccuracy: profile.DaemonAccuracy,
+		DecodedLines:   profile.FragmentsDecoded,
+	}
+
+	// Deltas vs. last snapshot — only meaningful after the first snapshot at compile snapshotThreshold
+	if profile.CompileCount >= snapshotThreshold {
+		resp.KernelAccessDelta = profile.KernelAccess - profile.KernelAccessPrev
+		resp.DaemonAccuracyDelta = profile.DaemonAccuracy - profile.DaemonAccuracyPrev
+		resp.DecodedLinesDelta = profile.FragmentsDecoded - profile.DecodedLinesPrev
 	}
 
 	if state != nil {

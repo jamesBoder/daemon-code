@@ -34,6 +34,13 @@ export interface CompileData {
   dailySignalAuthor: string
   orbState: OrbState
   daemonAudioUrl?: string
+  // Scoring system
+  kernelAccess: number
+  daemonAccuracy: number
+  decodedLines: number
+  kernelAccessDelta: number
+  daemonAccuracyDelta: number
+  decodedLinesDelta: number
 }
 
 // Data shape for a single process entry (component is ProcessEntry, type is ProcessEntryData)
@@ -85,6 +92,13 @@ export interface HomeData {
   dailySignalAuthor: string
   orbState: OrbState
   daemonAudioUrl?: string
+  // Scoring system
+  kernelAccess: number
+  daemonAccuracy: number
+  decodedLines: number
+  kernelAccessDelta: number
+  daemonAccuracyDelta: number
+  decodedLinesDelta: number
 }
 
 // Session fragments — Fragment is from DynamoDB with explicit json tags

@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { jwtDecode } from 'jwt-decode'
 import { Play } from 'lucide-react'
@@ -27,6 +27,7 @@ const TOGGLE = {
 const VOICE_ANIM = {
   radioDotSize:  16,
   radioInnerSize: 6,
+  transS:        '0.15s',  // faster than ROUTE_TRANSITION_MS — selection feedback, not page change
 } as const
 
 const VOICE_OPTIONS = [
@@ -54,6 +55,8 @@ export function Settings() {
   const [previewPlaying, setPreviewPlaying] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null }, [])
 
   const { data: profile } = useQuery({
     queryKey: ['profile'],
@@ -169,7 +172,7 @@ export function Settings() {
                         border: `${HAIRLINE} solid ${isSelected ? 'var(--accent)' : 'var(--border-active)'}`,
                         background: isSelected ? 'var(--accent)' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.15s, border-color 0.15s',
+                        transition: `background ${VOICE_ANIM.transS}, border-color ${VOICE_ANIM.transS}`,
                       }}>
                         {isSelected && (
                           <span style={{ width: VOICE_ANIM.radioInnerSize, height: VOICE_ANIM.radioInnerSize, borderRadius: '50%', background: 'var(--background)' }} />
@@ -179,7 +182,7 @@ export function Settings() {
                         fontFamily: 'var(--font-sans)',
                         fontSize: 'var(--text-sm)',
                         color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        transition: 'color 0.15s',
+                        transition: `color ${VOICE_ANIM.transS}`,
                       }}>
                         {description}
                       </span>
@@ -187,6 +190,7 @@ export function Settings() {
 
                     {id !== null ? (
                       <motion.button
+                        aria-label={`Preview ${description}`}
                         onClick={() => handlePreview(id)}
                         whileTap={previewLoading ? {} : { scale: BUTTON_TAP_SCALE, opacity: BUTTON_TAP_OPACITY }}
                         style={{
@@ -197,7 +201,7 @@ export function Settings() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: previewPlaying === id ? 'var(--accent)' : 'var(--text-muted)',
                           opacity: previewLoading === id ? 0.4 : 1,
-                          transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                          transition: `border-color ${VOICE_ANIM.transS}, background ${VOICE_ANIM.transS}, color ${VOICE_ANIM.transS}`,
                         }}
                       >
                         <Play size={14} strokeWidth={1.5} />
@@ -210,6 +214,46 @@ export function Settings() {
               })}
             </div>
           </div>
+
+          {/* daemon.log — reference codex */}
+          <Link
+            to="/codex"
+            className="glass-card"
+            style={{
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'space-between',
+              padding:        'var(--space-4) var(--space-5)',
+              textDecoration: 'none',
+              minHeight:      MIN_TOUCH_TARGET,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+              <span style={{
+                fontFamily:    'var(--font-mono)',
+                fontSize:      'var(--text-xs)',
+                color:         'var(--compile-green)',
+                letterSpacing: LETTER_SPACING_WIDE,
+              }}>
+                daemon.log
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize:   'var(--text-xs)',
+                color:      'var(--text-muted)',
+              }}>
+                system reference
+              </span>
+            </div>
+            <span style={{
+              fontFamily:    'var(--font-mono)',
+              fontSize:      'var(--text-xs)',
+              color:         'var(--text-muted)',
+              letterSpacing: LETTER_SPACING_WIDE,
+            }}>
+              →
+            </span>
+          </Link>
 
           {/* Preferences */}
           <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>

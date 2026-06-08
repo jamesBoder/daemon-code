@@ -28,7 +28,7 @@ const analystSystemPrompt = `You are ShadowAnalyst, an AI that builds psychologi
 You receive:
 - card_responses: today's reaction test taps, weighted scale choices, prediction duel answers
 - mood_log: today's mood score (1–5) and optional note
-- current_profile: the existing shadow profile (JSON)
+- current_profile: the existing shadow profile (JSON), including daemon_accuracy (previous value)
 
 You output a structured JSON update to the shadow profile. Never produce prose — only structured data.
 
@@ -37,6 +37,7 @@ Output format:
   "primary_archetype": "abandoned_child|unworthy_self|caged_rage|grief_carrier|default",
   "signal_confidence": 0.0-1.0,
   "kernel_access": 0-100,
+  "daemon_accuracy": 0-100,
   "stage": "cold|warming|running|deep",
   "posture": 0.0-1.0,
   "environment": "neutral|water|fire",
@@ -53,6 +54,13 @@ Output format:
     }
   ]
 }
+
+daemon_accuracy rules:
+- Represents how well the daemon's predictions match the user's actual behavior (0–100).
+- Increase by 1–3 when prediction duel answers confirm the daemon's pattern predictions.
+- Decrease by 1–3 when the user's behavior contradicts predictions.
+- If no prediction duel data is present today, carry forward the existing value unchanged.
+- Rises slowly as the daemon learns the user; drops when the user authentically changes.
 
 Be specific. "The user tapped quickly on authority words and slowly on vulnerability words" is better than "the user responded to stimuli."
 Patterns should earn names only when the data is clear. Unnamed patterns remain unnamed.
@@ -75,10 +83,16 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 	}
 }
 
+// snapshotInterval is the number of compiles between score baseline snapshots.
+// At each multiple of this count, the Analyst persists current scores as *_prev
+// so the Home screen can show a month-over-month trend line.
+const snapshotInterval = 30
+
 type analystOutput struct {
 	PrimaryArchetype      string          `json:"primary_archetype"`
 	SignalConfidence      float64         `json:"signal_confidence"`
 	KernelAccess          int32           `json:"kernel_access"`
+	DaemonAccuracy        int32           `json:"daemon_accuracy"`
 	Stage                 string          `json:"stage"`
 	Posture               float64         `json:"posture"`
 	Environment           string          `json:"environment"`
@@ -143,21 +157,35 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	}
 
 	// 5. Write updated profile to RDS
+	newCompileCount := profile.CompileCount + 1
+	newFragmentsDecoded := profile.FragmentsDecoded + int32(output.FragmentsDecodedDelta) // #nosec G115 — delta bounded [-100,100] by Analyst prompt
 	_, err = a.q.UpdateShadowProfile(ctx, db.UpdateShadowProfileParams{
 		UserID:           userID,
 		PrimaryArchetype: output.PrimaryArchetype,
 		SignalConfidence: pgNumeric(output.SignalConfidence),
 		KernelAccess:     output.KernelAccess,
+		DaemonAccuracy:   output.DaemonAccuracy,
 		Stage:            output.Stage,
 		Posture:          pgNumeric(output.Posture),
 		Environment:      output.Environment,
 		Texture:          output.Texture,
-		FragmentsDecoded: profile.FragmentsDecoded + int32(output.FragmentsDecodedDelta), // #nosec G115 — delta bounded [-100,100] by Analyst prompt
-		CompileCount:     profile.CompileCount + 1,
+		FragmentsDecoded: newFragmentsDecoded,
+		CompileCount:     newCompileCount,
 		AnalystNotes:     pgTextPtr(&output.AnalystNotes),
 	})
 	if err != nil {
 		return fmt.Errorf("update shadow profile: %w", err)
+	}
+
+	// Snapshot scores every snapshotInterval compiles so the Home screen can
+	// show a trend delta (current vs. last snapshot).
+	if newCompileCount%snapshotInterval == 0 {
+		_ = a.q.SnapshotScores(ctx, db.SnapshotScoresParams{
+			UserID:             userID,
+			KernelAccessPrev:   output.KernelAccess,
+			DaemonAccuracyPrev: output.DaemonAccuracy,
+			DecodedLinesPrev:   newFragmentsDecoded,
+		})
 	}
 
 	// 6. Apply pattern updates

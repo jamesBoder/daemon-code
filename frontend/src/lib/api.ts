@@ -62,5 +62,11 @@ export function homeToCompileData(home: HomeData): CompileData {
       ? (home.orbState as OrbState)
       : 'cold',
     daemonAudioUrl: home.daemonAudioUrl,
+    kernelAccess:       home.kernelAccess       ?? 0,
+    daemonAccuracy:     home.daemonAccuracy      ?? 0,
+    decodedLines:       home.decodedLines        ?? 0,
+    kernelAccessDelta:  home.kernelAccessDelta   ?? 0,
+    daemonAccuracyDelta: home.daemonAccuracyDelta ?? 0,
+    decodedLinesDelta:  home.decodedLinesDelta   ?? 0,
   }
 }

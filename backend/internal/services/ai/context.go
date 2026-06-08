@@ -16,6 +16,7 @@ type analystContext struct {
 	MoodLog               []db.MoodLog           `json:"mood_log"`
 	CurrentProfile        db.ShadowProfile       `json:"current_profile"`
 	ProfileDimensions     json.RawMessage        `json:"profile_dimensions"`
+	ProfileDimensionsPrev json.RawMessage        `json:"profile_dimensions_prev"`
 	SessionQuality        sessionQualityCtx      `json:"session_quality"`
 	DimensionSignalsToday map[string]interface{} `json:"dimension_signals_today"`
 	GrimTriggerSignal     grimTriggerCtx         `json:"grim_trigger_signal"`
@@ -78,6 +79,9 @@ func assembleContext(
 	}
 	if len(profile.ProfileDimensions) > 0 {
 		ac.ProfileDimensions = json.RawMessage(profile.ProfileDimensions)
+	}
+	if len(profile.ProfileDimensionsPrev) > 0 {
+		ac.ProfileDimensionsPrev = json.RawMessage(profile.ProfileDimensionsPrev)
 	}
 
 	reactionTimes := collectReactionTimes(responses)

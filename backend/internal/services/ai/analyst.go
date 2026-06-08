@@ -25,6 +25,7 @@ You receive a JSON context object containing:
 - mood_log: today's mood score (1–5) and optional note
 - current_profile: the existing shadow profile, including daemon_accuracy (previous value)
 - profile_dimensions: current Bayesian dimension model (absent or null on Day 0 / first compile)
+- profile_dimensions_prev: snapshot from ~30 compiles ago (null until compile 30). Use in analyst_notes to note longitudinal movement.
 - session_quality: pre-computed engagement signal — level (high/medium/low), avg_reaction_ms, variance_ms
 - dimension_signals_today: pre-computed behavioral signals from today's session. Only dimensions with observed data are present. Each has "signal" (0.0–1.0) and supplementary fields. Use these signals to inform archetype, pattern, note, and dimension update decisions.
 - grim_trigger_signal: detected=true if daemon_accuracy dropped ≥5 points since last compile. When detected, consider elevated neuroticism and behavioral instability.
@@ -172,6 +173,29 @@ high openness + low agreeableness (openness > 0.65, agreeableness < 0.40):
 low conscientiousness + low discount_factor (both < 0.35):
   the_now_without_map.process | the_unstructured_reach.process | the_edge_before_thinking.process
 
+--- BEHAVIORAL SIGNATURE ---
+
+profile_dimensions is this user's behavioral signature — a specific coordinate in ten-dimensional space. No two users occupy the same point, even within the same archetype. The signature deepens with every compile.
+
+profile_dimensions_prev: the snapshot from ~30 compiles ago (null until compile 30). When present, compare against profile_dimensions in analyst_notes to note longitudinal movement: which dimensions shifted, which held, whether the direction is consistent with today's session data. This is the arc the Narrator uses for Monthly Chapter narration.
+
+Stage-aware language (let overall confidence calibrate certainty in analyst_notes and daemon_note):
+  Most dimensions confidence < 0.30:     hedge — "Something is forming. The model is early."
+  Several dimensions crossing 0.50:      be specific on nameable intersections only; hedge the rest.
+  Most dimensions 0.50–0.70:             archetype stable; prose is specific and certain.
+  Several dimensions > 0.70:             daemon knows this user; compare vs. profile_dimensions_prev when meaningful.
+  High confidence + grim_trigger detected: flag in analyst_notes — authentic change, not noise.
+
+Be specific. "The user tapped quickly on authority words and slowly on vulnerability words" is better than "the user responded to stimuli."
+
+--- CONSTRAINTS ---
+
+analyst_notes is internal (used by Narrator, not shown to the user). You may reference dimension names, scores, and confidence values there.
+
+User-facing fields (compile_lines, daemon_note, all pattern output): never expose dimension names, raw scores, confidence percentages, or OCEAN labels. The model is invisible to the user. They see process names and daemon observations — never the numbers beneath them.
+
+Patterns earn names only when the data is clear. Unnamed patterns remain unnamed. The daemon does not speculate — it observes.
+
 --- OUTPUT FORMAT ---
 
 Never produce prose — only structured JSON.
@@ -219,9 +243,7 @@ daemon_accuracy rules:
 - If no prediction duel data is present today, carry forward the existing value unchanged.
 - Rises slowly as the daemon learns the user; drops when the user authentically changes.
 
-Be specific. "The user tapped quickly on authority words and slowly on vulnerability words" is better than "the user responded to stimuli."
-Patterns should earn names only when the data is clear. Unnamed patterns remain unnamed.
-The daemon does not speculate — it observes.`
+`
 
 type Analyst struct {
 	cfg    *appconfig.Config

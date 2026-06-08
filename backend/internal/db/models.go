@@ -54,9 +54,13 @@ type ShadowProfile struct {
 	Texture          string             `json:"texture"`
 	FragmentsDecoded int32              `json:"fragments_decoded"`
 	CompileCount     int32              `json:"compile_count"`
-	AnalystNotes     pgtype.Text        `json:"analyst_notes"`
-	PollyVoice       pgtype.Text        `json:"polly_voice"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	AnalystNotes        pgtype.Text        `json:"analyst_notes"`
+	PollyVoice          pgtype.Text        `json:"polly_voice"`
+	DaemonAccuracy      int32              `json:"daemon_accuracy"`
+	KernelAccessPrev    int32              `json:"kernel_access_prev"`
+	DaemonAccuracyPrev  int32              `json:"daemon_accuracy_prev"`
+	DecodedLinesPrev    int32              `json:"decoded_lines_prev"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {

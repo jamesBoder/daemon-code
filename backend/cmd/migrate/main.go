@@ -19,6 +19,7 @@ func main() {
 	migrations := []string{
 		"internal/db/migrations/001_initial_schema.sql",
 		"internal/db/migrations/002_add_polly_voice.sql",
+		"internal/db/migrations/003_add_daemon_accuracy.sql",
 	}
 
 	for _, path := range migrations {

@@ -319,56 +319,45 @@ type patternUpdate struct {
 	DaemonNote    string  `json:"daemon_note"`
 }
 
-// RunForUser is called with the raw SQS message body (JSON: {"user_id": "<uuid>"}).
-func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
-	var msg struct {
-		UserID string `json:"user_id"`
-	}
-	if err := json.Unmarshal([]byte(sqsBody), &msg); err != nil {
-		return fmt.Errorf("parse sqs body: %w", err)
-	}
-
-	userID, err := uuid.Parse(msg.UserID)
-	if err != nil {
-		return fmt.Errorf("parse user_id: %w", err)
-	}
-
-	today := time.Now().UTC().Format("2006-01-02")
-
-	// 1. Load today's card responses
+// RunForUserOnDate executes the full analyst pipeline for a given date.
+// Exposed so devrun can drive it directly without SQS/Lambda — pass userID and a
+// "2006-01-02" date string. Returns compile_lines from the Analyst output so the
+// caller can chain to the Narrator if needed.
+func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date string) ([]string, error) {
+	// 1. Load card responses for the given date
 	responses, err := a.q.GetResponsesForDate(ctx, db.GetResponsesForDateParams{
 		UserID:      userID,
-		SessionDate: pgDate(today),
+		SessionDate: pgDate(date),
 	})
 	if err != nil {
-		return fmt.Errorf("get responses: %w", err)
+		return nil, fmt.Errorf("get responses: %w", err)
 	}
 
-	// 2. Load today's mood logs
+	// 2. Load mood logs for the given date
 	moods, err := a.q.GetMoodLogsForDate(ctx, db.GetMoodLogsForDateParams{
 		UserID:  userID,
-		LogDate: pgDate(today),
+		LogDate: pgDate(date),
 	})
 	if err != nil {
-		return fmt.Errorf("get mood logs: %w", err)
+		return nil, fmt.Errorf("get mood logs: %w", err)
 	}
 
 	// 3. Load current shadow profile
 	profile, err := a.q.GetShadowProfile(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("get shadow profile: %w", err)
+		return nil, fmt.Errorf("get shadow profile: %w", err)
 	}
 
 	// 4. Load recent responses (last 7 session dates) for cross-session signals
 	recentResponses, err := a.q.GetRecentResponses(ctx, userID, recentSessionWindow)
 	if err != nil {
-		return fmt.Errorf("get recent responses: %w", err)
+		return nil, fmt.Errorf("get recent responses: %w", err)
 	}
 
 	// 5. Snapshot current daemon_accuracy before the Analyst overwrites it.
 	// This gives grim trigger detection an accurate pre-Analyst baseline next compile.
 	if err := a.q.SnapshotDaemonAccuracy(ctx, userID, profile.DaemonAccuracy); err != nil {
-		return fmt.Errorf("snapshot daemon accuracy: %w", err)
+		return nil, fmt.Errorf("snapshot daemon accuracy: %w", err)
 	}
 
 	// 6. Assemble the full context object and call Anthropic.
@@ -385,7 +374,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	ac := assembleContext(responses, moods, profile, recentResponses, lastCompile)
 	output, err := a.callAnthropic(ctx, ac)
 	if err != nil {
-		return fmt.Errorf("anthropic call: %w", err)
+		return nil, fmt.Errorf("anthropic call: %w", err)
 	}
 
 	// 6b. Validate critical Analyst output fields before committing anything to the DB.
@@ -394,7 +383,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	// Returning an error here is safe: UpdateShadowProfile has not run yet, so an SQS retry
 	// re-snapshots the same pre-Analyst accuracy with no corruption.
 	if output.DaemonAccuracy < 1 || output.DaemonAccuracy > 100 {
-		return fmt.Errorf("analyst returned out-of-range daemon_accuracy: %d (expected 1–100)", output.DaemonAccuracy)
+		return nil, fmt.Errorf("analyst returned out-of-range daemon_accuracy: %d (expected 1–100)", output.DaemonAccuracy)
 	}
 
 	// 7. Write updated profile to RDS
@@ -415,7 +404,7 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		AnalystNotes:     pgTextPtr(&output.AnalystNotes),
 	})
 	if err != nil {
-		return fmt.Errorf("update shadow profile: %w", err)
+		return nil, fmt.Errorf("update shadow profile: %w", err)
 	}
 
 	// Snapshot scores every snapshotInterval compiles so the Home screen can
@@ -446,15 +435,34 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	// committed by UpdateShadowProfile, corrupting the grim trigger baseline.
 	_ = a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
 
-	// 9. Emit ShadowAnalystComplete to custom EventBridge bus — non-fatal for the same reason.
-	changeFlags := output.ChangeFlags
-	if changeFlags == nil {
-		changeFlags = []changeFlag{}
+	return output.CompileLines, nil
+}
+
+// RunForUser is the SQS Lambda entry point. It parses the message body, calls
+// RunForUserOnDate for today, then emits ShadowAnalystComplete to EventBridge.
+func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
+	var msg struct {
+		UserID string `json:"user_id"`
 	}
+	if err := json.Unmarshal([]byte(sqsBody), &msg); err != nil {
+		return fmt.Errorf("parse sqs body: %w", err)
+	}
+	userID, err := uuid.Parse(msg.UserID)
+	if err != nil {
+		return fmt.Errorf("parse user_id: %w", err)
+	}
+
+	today := time.Now().UTC().Format("2006-01-02")
+	compileLines, err := a.RunForUserOnDate(ctx, userID, today)
+	if err != nil {
+		return err
+	}
+
+	// 9. Emit ShadowAnalystComplete to custom EventBridge bus — non-fatal.
 	detail, _ := json.Marshal(map[string]interface{}{
 		"user_id":       userID.String(),
-		"compile_lines": output.CompileLines,
-		"change_flags":  changeFlags,
+		"compile_lines": compileLines,
+		"change_flags":  []changeFlag{},
 	})
 	_, _ = a.eb.PutEvents(ctx, &eventbridge.PutEventsInput{
 		Entries: []ebtypes.PutEventsRequestEntry{

@@ -26,6 +26,11 @@ const (
 	confidenceDecayRatePerDay = 0.005 // fractional confidence lost per day beyond grace
 	confidenceDecayFloorMult  = 0.60  // multiplier floor: maximum 40% total decay
 	confidenceDecayFloorMin   = 0.10  // absolute confidence floor regardless of absence
+
+	// maxTimingMs is an upper-bound sanity cap for user-timing fields (deliberation, duel response).
+	// Guards against epoch-magnitude values (~1.7e12 ms) that occur when the frontend's
+	// useEffect timing ref fires after a fast interaction — the > 0 guard alone is insufficient.
+	maxTimingMs = 300_000 // 5 minutes; any real user interaction is far below this
 )
 
 // analystContext is the complete pre-computed context object passed to the Analyst Lambda.
@@ -235,7 +240,7 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 			continue
 		}
 		for _, res := range results {
-			if res.DeliberationTimeMs > 0 {
+			if res.DeliberationTimeMs > 0 && res.DeliberationTimeMs < maxTimingMs {
 				deliberationMs = append(deliberationMs, float64(res.DeliberationTimeMs))
 			}
 			pair, ok := signal.LookupPair(res.Left, res.Right)
@@ -358,7 +363,7 @@ func computeKLevel(recentResponses []db.CardResponse) kLevelCtx {
 			if json.Unmarshal(r.ResponseData, &d) != nil {
 				continue
 			}
-			if d.DuelResponseTimeMs > 0 {
+			if d.DuelResponseTimeMs > 0 && d.DuelResponseTimeMs < maxTimingMs {
 				duelTimes = append(duelTimes, float64(d.DuelResponseTimeMs))
 			}
 		}

@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MG, isDesktop } from '../../lib/minigame'
@@ -26,7 +26,11 @@ export function WeightedScale({ pairs, onComplete }: Props) {
   const [pairVisible, setPairVisible] = useState(true)
   const [dragMax, setDragMax]       = useState(120)
   const resultsRef                  = useRef<WeightedScaleResult[]>([])
-  const pairStartTimeRef            = useRef(Date.now())
+  // Initialize to 0; useEffect resets after first paint so pair-0 deliberation time
+  // measures from when the component is visible, not during the route-transition fade-in.
+  // Mirrors PredictionDuel's mountTimeRef pattern.
+  const pairStartTimeRef            = useRef(0)
+  useEffect(() => { pairStartTimeRef.current = Date.now() }, [])
   const trackRef                    = useRef<HTMLDivElement>(null)
   const onCompleteRef               = useRef(onComplete)
   onCompleteRef.current             = onComplete

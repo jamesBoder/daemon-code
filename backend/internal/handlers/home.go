@@ -44,8 +44,8 @@ type compileStat struct {
 }
 
 // snapshotThreshold is the minimum compile count before score deltas are shown.
-// Mirrors snapshotInterval in analyst.go — deltas are meaningless before the
-// first snapshot is taken.
+// Must equal snapshotInterval in internal/services/ai/analyst.go — deltas are
+// meaningless before the first snapshot is taken.
 const snapshotThreshold = 30
 
 type homeResponse struct {

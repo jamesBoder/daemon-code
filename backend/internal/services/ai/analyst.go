@@ -180,7 +180,7 @@ low conscientiousness + low discount_factor (both < 0.35):
 
 profile_dimensions is this user's behavioral signature — a specific coordinate in ten-dimensional space. No two users occupy the same point, even within the same archetype. The signature deepens with every compile.
 
-profile_dimensions_prev: the prior score snapshot (taken every SNAP_INTERVAL compiles; 1–SNAP_INTERVAL compiles old; null until compile SNAP_INTERVAL). When present, compare against profile_dimensions in analyst_notes to note longitudinal movement: which dimensions shifted, which held, whether direction is consistent with today. Small deltas right after a snapshot boundary may be noise — look for agreement between session data and the delta before calling it meaningful. This is the arc the Narrator uses for Monthly Chapter narration.
+profile_dimensions_prev: the prior score snapshot (taken every SNAP_INTERVAL compiles; 1–SNAP_INTERVAL compiles old; null until compile SNAP_INTERVAL). When present, compare against profile_dimensions in analyst_notes to note longitudinal movement: which dimensions shifted, which held, whether direction is consistent with today. Small deltas right after a snapshot boundary may be noise — look for agreement between session data and the delta before calling it meaningful. This is the arc the Narrator uses for Monthly Chapter narration. Important: when comparing profile_dimensions_prev to profile_dimensions, use only score and n values — do not interpret confidence differences between the two objects as behavioral signals; confidence in the prev snapshot does not account for decay applied since that snapshot was taken.
 
 Stage-aware language (let overall confidence calibrate certainty in analyst_notes and daemon_note):
   Most dimensions confidence < 0.30:     hedge — "Something is forming. The model is early."
@@ -272,11 +272,16 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 // snapshotInterval is the number of compiles between score baseline snapshots.
 // At each multiple of this count, the Analyst persists current scores as *_prev
 // so the Home screen can show a month-over-month trend line.
+// NOTE: snapshotThreshold in internal/handlers/home.go must equal this value.
 const snapshotInterval = 30
 
 // recentSessionWindow is the number of distinct session dates loaded for cross-session signals
 // (k_level deliberation ratio, grim trigger session count). Matches the GetRecentResponses call.
 const recentSessionWindow = 7
+
+// analystMaxTokens caps the Anthropic response for the Analyst Lambda.
+// Narrator uses narratorMaxTokens (768); Analyst needs more room for dimension JSON + patterns.
+const analystMaxTokens = 2048
 
 type analystOutput struct {
 	PrimaryArchetype      string          `json:"primary_archetype"`
@@ -366,8 +371,18 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 		return fmt.Errorf("snapshot daemon accuracy: %w", err)
 	}
 
-	// 6. Assemble the full context object and call Anthropic
-	ac := assembleContext(responses, moods, profile, recentResponses)
+	// 6. Assemble the full context object and call Anthropic.
+	// Pass the previous compile timestamp so assembleContext can decay dimension
+	// confidence for users returning after a long break.
+	// Invariant: profile.UpdatedAt is only advanced by UpdateShadowProfile (step 7 below).
+	// No other UPDATE on shadow_profiles sets updated_at — if one ever does, the decay
+	// clock will be anchored to the wrong event. Do not add updated_at = NOW() to
+	// SnapshotDaemonAccuracy, UpdateProfileDimensions, SnapshotScores, or UpdatePollyVoice.
+	var lastCompile time.Time
+	if profile.UpdatedAt.Valid {
+		lastCompile = profile.UpdatedAt.Time
+	}
+	ac := assembleContext(responses, moods, profile, recentResponses, lastCompile)
 	output, err := a.callAnthropic(ctx, ac)
 	if err != nil {
 		return fmt.Errorf("anthropic call: %w", err)
@@ -521,7 +536,7 @@ func (a *Analyst) callAnthropic(ctx context.Context, ac analystContext) (*analys
 
 	payload := map[string]interface{}{
 		"model":      "claude-sonnet-4-6",
-		"max_tokens": 2048,
+		"max_tokens": analystMaxTokens,
 		"system": []map[string]interface{}{
 			{
 				"type":          "text",

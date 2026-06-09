@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"math"
+	"time"
 
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/signal"
@@ -17,6 +18,14 @@ const (
 	grimTriggerMinDrop     = 5     // accuracy point drop required to detect grim trigger
 	grimTriggerMedDrop     = 10    // medium magnitude floor
 	grimTriggerHighDrop    = 20    // high magnitude floor
+
+	// Confidence decay parameters — applied to profile_dimensions once per compile.
+	// Decay is a function of days absent, not days elapsed since last compile, so
+	// running it twice for the same compile produces the same result (idempotent).
+	confidenceDecayGraceDays  = 14    // days of absence before any decay begins
+	confidenceDecayRatePerDay = 0.005 // fractional confidence lost per day beyond grace
+	confidenceDecayFloorMult  = 0.60  // multiplier floor: maximum 40% total decay
+	confidenceDecayFloorMin   = 0.10  // absolute confidence floor regardless of absence
 )
 
 // analystContext is the complete pre-computed context object passed to the Analyst Lambda.
@@ -77,11 +86,13 @@ type duelResponseData struct {
 
 // assembleContext builds the full Analyst context object from today's data and the user's profile.
 // recentResponses should be card_responses from the last 7 session dates for cross-session signals.
+// lastCompile is the timestamp of the previous compile (profile.UpdatedAt); zero value skips decay.
 func assembleContext(
 	responses []db.CardResponse,
 	moods []db.MoodLog,
 	profile db.ShadowProfile,
 	recentResponses []db.CardResponse,
+	lastCompile time.Time,
 ) analystContext {
 	ac := analystContext{
 		CardResponses:  responses,
@@ -89,7 +100,7 @@ func assembleContext(
 		CurrentProfile: profile,
 	}
 	if len(profile.ProfileDimensions) > 0 {
-		ac.ProfileDimensions = json.RawMessage(profile.ProfileDimensions)
+		ac.ProfileDimensions = decayDimensions(json.RawMessage(profile.ProfileDimensions), lastCompile, time.Now().UTC())
 	}
 	if len(profile.ProfileDimensionsPrev) > 0 {
 		ac.ProfileDimensionsPrev = json.RawMessage(profile.ProfileDimensionsPrev)
@@ -211,7 +222,7 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 	}
 
 	// --- Scale-based dimensions ---
-	dimSums   := make(map[string]float64)
+	dimSums := make(map[string]float64)
 	dimCounts := make(map[string]int)
 	var deliberationMs []float64
 
@@ -389,6 +400,58 @@ func countUniqueDates(responses []db.CardResponse) int {
 		}
 	}
 	return len(seen)
+}
+
+// decayDimensions applies confidence decay for long breaks (Section 4d).
+// Confidence decays only; scores are preserved unchanged.
+// Idempotent: the same lastCompile + now pair always produces the same result.
+// Zero lastCompile (new users with no prior compile) skips decay.
+func decayDimensions(dims json.RawMessage, lastCompile time.Time, now time.Time) json.RawMessage {
+	if len(dims) == 0 || lastCompile.IsZero() {
+		return dims
+	}
+	daysSince := int(now.Sub(lastCompile).Hours() / 24)
+	daysBeyondGrace := daysSince - confidenceDecayGraceDays
+	if daysBeyondGrace <= 0 {
+		return dims
+	}
+
+	multiplier := 1.0 - float64(daysBeyondGrace)*confidenceDecayRatePerDay
+	if multiplier < confidenceDecayFloorMult {
+		multiplier = confidenceDecayFloorMult
+	}
+
+	var dimMap map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(dims, &dimMap); err != nil {
+		return dims
+	}
+
+	for key, entry := range dimMap {
+		rawConf, ok := entry["confidence"]
+		if !ok {
+			continue
+		}
+		var conf float64
+		if err := json.Unmarshal(rawConf, &conf); err != nil {
+			continue
+		}
+		newConf := conf * multiplier
+		if newConf < confidenceDecayFloorMin {
+			newConf = confidenceDecayFloorMin
+		}
+		b, err := json.Marshal(round2(newConf))
+		if err != nil {
+			continue
+		}
+		entry["confidence"] = b
+		dimMap[key] = entry
+	}
+
+	result, err := json.Marshal(dimMap)
+	if err != nil {
+		return dims
+	}
+	return result
 }
 
 // --- Numeric helpers ---

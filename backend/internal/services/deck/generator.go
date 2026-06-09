@@ -156,7 +156,7 @@ func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile, order int
 func pickScalePairs(n int, compileCount int32) [][2]string {
 	var pool [][2]string
 	for _, p := range signal.Pairs {
-		if int32(p.IntroducedAfterDay) <= compileCount {
+		if p.IntroducedAfterDay <= int(compileCount) {
 			pool = append(pool, [2]string{p.Left, p.Right})
 		}
 	}

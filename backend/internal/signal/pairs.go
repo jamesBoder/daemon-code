@@ -429,7 +429,7 @@ var Pairs = []Pair{
 		Right:  "the one you wrote and deleted",
 		DimensionSignals: map[string]DimSignal{
 			// Immediate = reactive = low k_level; deleted = over-revised = high neuroticism
-			"k_level":   {LeftHigh: false},
+			"k_level":     {LeftHigh: false},
 			"neuroticism": {LeftHigh: false},
 		},
 		IntroducedAfterDay: 0,
@@ -683,8 +683,8 @@ var Pairs = []Pair{
 		Right:  "the one you question",
 		DimensionSignals: map[string]DimSignal{
 			// Makes sense = conventional = low openness; question = internal judgment = high locus
-			"openness":          {LeftHigh: false},
-			"locus_of_control":  {LeftHigh: false},
+			"openness":         {LeftHigh: false},
+			"locus_of_control": {LeftHigh: false},
 		},
 		IntroducedAfterDay: 7,
 		Difficulty:         "medium",

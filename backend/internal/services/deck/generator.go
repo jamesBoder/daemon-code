@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
+	"github.com/jamesboder/daemon-code/internal/signal"
 )
 
 const (
@@ -75,7 +76,7 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	fragments = append(fragments, g.buildReactionTest(profile, 0))
 	fragments = append(fragments, g.buildReactionTestExplore(profile, 1))
 
-	pairs := pickScalePairs(scalesPerSession)
+	pairs := pickScalePairs(scalesPerSession, profile.CompileCount)
 	for i, pair := range pairs {
 		fragments = append(fragments, buildWeightedScaleFragment(pair[0], pair[1], 2+i))
 	}
@@ -148,26 +149,17 @@ func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile, order int
 	}
 }
 
-// evergreen scale pairs — evergreen behavioral/abstract pairs where neither side signals "correct."
-// From the Jeopardy Principle: both sides must have genuine pull.
-var evergreenPairs = [][2]string{
-	{"arriving 10 minutes early", "arriving exactly on time"},
-	{"winning the argument", "ending it"},
-	{"what you built", "how you made people feel"},
-	{"the apology you gave", "the apology you're owed"},
-	{"a clean slate", "everything you've built"},
-	{"the city you're from", "the city you chose"},
-	{"the 5-year plan", "the feeling in your gut"},
-	{"ending a great book", "starting a new one"},
-	{"the advice you gave", "the advice you followed"},
-	{"speaking first", "listening first"},
-	{"being right", "being at peace"},
-	{"the version of you people remember", "the version you remember"},
-}
-
-func pickScalePairs(n int) [][2]string {
-	pool := make([][2]string, len(evergreenPairs))
-	copy(pool, evergreenPairs)
+// pickScalePairs selects n random weighted-scale pairs eligible for this user's compile count.
+// Pairs with IntroducedAfterDay > compileCount are excluded — they require more session history
+// before the behavioral signal they probe is meaningful.
+// signal.Pairs is the single source of truth for pair text and dimension tags.
+func pickScalePairs(n int, compileCount int32) [][2]string {
+	var pool [][2]string
+	for _, p := range signal.Pairs {
+		if p.IntroducedAfterDay <= int(compileCount) {
+			pool = append(pool, [2]string{p.Left, p.Right})
+		}
+	}
 	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
 	if n > len(pool) {
 		n = len(pool)

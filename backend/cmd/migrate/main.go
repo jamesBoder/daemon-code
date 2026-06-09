@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -16,13 +18,14 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
-	migrations := []string{
-		"internal/db/migrations/001_initial_schema.sql",
-		"internal/db/migrations/002_add_polly_voice.sql",
-		"internal/db/migrations/003_add_daemon_accuracy.sql",
+	matches, err := filepath.Glob("internal/db/migrations/*.sql")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "glob failed: %v\n", err)
+		os.Exit(1)
 	}
+	sort.Strings(matches)
 
-	for _, path := range migrations {
+	for _, path := range matches {
 		sql, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "read %s: %v\n", path, err)

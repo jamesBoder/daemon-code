@@ -111,11 +111,11 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     const raw = JSON.parse(fragment.payload) as Record<string, unknown>
     switch (fragment.type) {
       case 'reaction_test':
-        return <ReactionTest words={raw.words as string[]} durationMs={raw.duration_ms as number} onComplete={(r) => handleFragmentComplete(r)} />
+        return <ReactionTest key={fragment.id} words={raw.words as string[]} durationMs={raw.duration_ms as number} onComplete={(r) => handleFragmentComplete(r)} />
       case 'weighted_scale':
-        return <WeightedScale pairs={[{ left: raw.left as string, right: raw.right as string }]} onComplete={(r) => handleFragmentComplete(r)} />
+        return <WeightedScale key={fragment.id} pairs={[{ left: raw.left as string, right: raw.right as string }]} onComplete={(r) => handleFragmentComplete(r)} />
       case 'prediction_duel':
-        return <PredictionDuel pattern={raw.pattern as string} prediction={raw.prediction as string} onComplete={(r) => handleFragmentComplete(r)} />
+        return <PredictionDuel key={fragment.id} pattern={raw.pattern as string} prediction={raw.prediction as string} onComplete={(r) => handleFragmentComplete(r)} />
       default:
         return null
     }

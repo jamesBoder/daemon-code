@@ -44,7 +44,7 @@ function App() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: ROUTE_TRANSITION_MS / 1000, ease: 'easeInOut' }}
-        style={{ position: 'fixed', inset: 0 }}
+        style={{ position: 'fixed', inset: 0, overflowY: 'auto' }}
       >
         <Routes location={location}>
           <Route path="/welcome" element={<Welcome />} />

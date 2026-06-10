@@ -13,35 +13,41 @@ import (
 
 const pulseSortKey = "pulse"
 
-// PulseStimulus is the behavioral probe generated nightly.
-// All type-specific fields use omitempty — only the fields for the given Type are populated.
-type PulseStimulus struct {
-	StimulusID       string            `dynamodbav:"stimulus_id"                  json:"stimulus_id"`
-	Type             string            `dynamodbav:"type"                         json:"type"`
-	Word             string            `dynamodbav:"word,omitempty"               json:"word,omitempty"`
-	Left             string            `dynamodbav:"left,omitempty"               json:"left,omitempty"`
-	Right            string            `dynamodbav:"right,omitempty"              json:"right,omitempty"`
-	Scenario         string            `dynamodbav:"scenario,omitempty"           json:"scenario,omitempty"`
-	DaemonPrediction string            `dynamodbav:"daemon_prediction,omitempty"  json:"daemon_prediction,omitempty"`
-	DimensionProbed  string            `dynamodbav:"dimension_probed"             json:"dimension_probed"`
-	DaemonObs        map[string]string `dynamodbav:"daemon_observations"          json:"daemon_observations"`
+// PulseScenario is the daily Map scenario with its pre-generated daemon text.
+type PulseScenario struct {
+	ScenarioID       string `dynamodbav:"scenario_id"`
+	Type             string `dynamodbav:"type"`
+	Tier             string `dynamodbav:"tier"`
+	Text             string `dynamodbav:"text"`
+	DaemonObs        string `dynamodbav:"daemon_observation"`
+	DaemonPrediction string `dynamodbav:"daemon_prediction"`
 }
 
-// PulseWordOption is a word chip for Pick a Word, with its two signal axes.
-type PulseWordOption struct {
-	Word     string `dynamodbav:"word"     json:"word"`
-	Approach bool   `dynamodbav:"approach" json:"approach"`
-	Abstract bool   `dynamodbav:"abstract" json:"abstract"`
+// PulseNodeSignal is one directional dimension tag on a node.
+type PulseNodeSignal struct {
+	Direction string `dynamodbav:"direction"`
 }
 
-// PulseItem is the daily pulse stored in tableDecks with sort key "pulse".
+// PulseNode is one of the 6 selected Map nodes.
+// DimensionSignals are server-only — the handler strips them before responding.
+// NodeID is the stable library node ID from signal/scenarios.go, never positional.
+type PulseNode struct {
+	NodeID           string                     `dynamodbav:"node_id"`
+	Text             string                     `dynamodbav:"text"`
+	DimensionSignals map[string]PulseNodeSignal `dynamodbav:"dimension_signals"`
+}
+
+// PulseItem is the daily Map stored in tableDecks with sort key "pulse".
+// Full replacement of the old stimulus/word_options schema; old items are
+// detected by Scenario.ScenarioID == "" and treated as not-found (they expire
+// within the 26h TTL).
 type PulseItem struct {
-	UserID      string            `dynamodbav:"user_id"`
-	Date        string            `dynamodbav:"date"`
-	Stimulus    PulseStimulus     `dynamodbav:"stimulus"`
-	WordOptions []PulseWordOption `dynamodbav:"word_options"`
-	CompletedAt string            `dynamodbav:"completed_at"` // ISO timestamp; empty = not yet completed
-	TTL         int64             `dynamodbav:"ttl"`
+	UserID      string        `dynamodbav:"user_id"`
+	Date        string        `dynamodbav:"date"`
+	Scenario    PulseScenario `dynamodbav:"scenario"`
+	Nodes       []PulseNode   `dynamodbav:"nodes"`
+	CompletedAt string        `dynamodbav:"completed_at"` // ISO timestamp; empty = not yet completed
+	TTL         int64         `dynamodbav:"ttl"`
 }
 
 const pulseTTL = 26 * time.Hour

@@ -45,7 +45,7 @@ export function PulseEntryCard({ visible }: Props) {
           color: 'var(--text-primary)',
           lineHeight: 'var(--leading-snug)',
         }}>
-          the daemon is reading.
+          the daemon has a map.
         </span>
         <span style={{
           fontFamily: 'var(--font-mono)',

@@ -53,7 +53,6 @@ export const COMPILE_PLAYED_KEY = 'compile_played_day'  // sessionStorage — pr
 
 // Touch targets
 export const MIN_TOUCH_TARGET = 44  // px — Apple HIG minimum tappable dimension
-export const PULSE_REACTION_WINDOW_MS = 2000  // ms — countdown window for Pulse Reaction Test stimulus
 
 // Layout geometry
 export const BOTTOM_NAV_HEIGHT    = 80        // px — BottomNav height; used in safe-area calc across all screens

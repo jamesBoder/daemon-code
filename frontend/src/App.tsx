@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ProtectedRoute } from './components/ui/ProtectedRoute'
@@ -5,16 +6,17 @@ import { useAuthStore } from './stores/authStore'
 import { Welcome } from './screens/Welcome'
 import { Register } from './screens/auth/Register'
 import { Login } from './screens/auth/Login'
-import { Onboarding } from './screens/Onboarding'
 import { Home } from './screens/Home'
-import { Session } from './screens/Session'
-import { SessionComplete } from './screens/SessionComplete'
+import { Chronicle } from './screens/Chronicle'
 import { ProcessLog } from './screens/ProcessLog'
 import { Settings } from './screens/Settings'
-import { Chronicle } from './screens/Chronicle'
-import { Codex } from './screens/Codex'
-import { Pulse } from './screens/Pulse'
 import { ROUTE_TRANSITION_MS } from './lib/constants'
+
+const Onboarding     = lazy(() => import('./screens/Onboarding').then(m => ({ default: m.Onboarding })))
+const Session        = lazy(() => import('./screens/Session').then(m => ({ default: m.Session })))
+const SessionComplete = lazy(() => import('./screens/SessionComplete').then(m => ({ default: m.SessionComplete })))
+const Codex          = lazy(() => import('./screens/Codex').then(m => ({ default: m.Codex })))
+const Pulse          = lazy(() => import('./screens/Pulse').then(m => ({ default: m.Pulse })))
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them
 const BOTTOM_NAV_PATHS = new Set(['/home', '/chronicle', '/processes', '/settings'])
@@ -46,26 +48,28 @@ function App() {
         transition={{ duration: ROUTE_TRANSITION_MS / 1000, ease: 'easeInOut' }}
         style={{ position: 'fixed', inset: 0, overflowY: 'auto' }}
       >
-        <Routes location={location}>
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/auth/register" element={<Register />} />
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+        <Suspense fallback={null}>
+          <Routes location={location}>
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
 
-          {/* BottomNav routes share the '__nav' key above — instant swap, no crossfade */}
-          <Route path="/home"      element={<ProtectedRoute><Home /></ProtectedRoute>} />
-          <Route path="/chronicle" element={<ProtectedRoute><Chronicle /></ProtectedRoute>} />
-          <Route path="/processes" element={<ProtectedRoute><ProcessLog /></ProtectedRoute>} />
-          <Route path="/settings"  element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            {/* BottomNav routes share the '__nav' key above — instant swap, no crossfade */}
+            <Route path="/home"      element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/chronicle" element={<ProtectedRoute><Chronicle /></ProtectedRoute>} />
+            <Route path="/processes" element={<ProtectedRoute><ProcessLog /></ProtectedRoute>} />
+            <Route path="/settings"  element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-          <Route path="/codex"            element={<ProtectedRoute><Codex /></ProtectedRoute>} />
-          <Route path="/pulse"            element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
-          <Route path="/session"          element={<ProtectedRoute><Session /></ProtectedRoute>} />
-          <Route path="/session/complete" element={<ProtectedRoute><SessionComplete /></ProtectedRoute>} />
+            <Route path="/codex"            element={<ProtectedRoute><Codex /></ProtectedRoute>} />
+            <Route path="/pulse"            element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
+            <Route path="/session"          element={<ProtectedRoute><Session /></ProtectedRoute>} />
+            <Route path="/session/complete" element={<ProtectedRoute><SessionComplete /></ProtectedRoute>} />
 
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   )

@@ -42,8 +42,8 @@ var wordDimensions = [2]string{"approach_avoidance", "openness"}
 // archetypeWordFilter maps archetype names to the word signal direction for the stability check.
 // Based on Section 2 spec archetype anchor table.
 var archetypeWordFilter = map[string]struct {
-	approach bool
-	abstract bool
+	approach    bool
+	abstract    bool
 	useAbstract bool // when true, filter by Abstract; when false, filter by Approach
 }{
 	"abandoned_child": {approach: true, useAbstract: false},
@@ -178,7 +178,7 @@ func (g *Generator) pickBestPairStimulus(dims map[string]dimEntry, excluded map[
 		if excluded[p.PairID] {
 			continue
 		}
-		if int32(p.IntroducedAfterDay) > compileCount {
+		if p.IntroducedAfterDay > int(compileCount) {
 			continue
 		}
 		for dim := range p.DimensionSignals {
@@ -221,7 +221,7 @@ func (g *Generator) pickBestPairStimulus(dims map[string]dimEntry, excluded map[
 		}
 		pool = append(pool, c)
 	}
-	chosen := pool[rand.Intn(len(pool))]
+	chosen := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto selection of behavioral stimulus
 	p := chosen.pair
 
 	// v1: always weighted_scale. prediction_duel support is stubbed in computePulseSignals
@@ -265,7 +265,7 @@ func (g *Generator) pickWordStimulus(dims map[string]dimEntry, excluded map[stri
 		return nil
 	}
 
-	w := pool[rand.Intn(len(pool))]
+	w := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto selection of behavioral stimulus
 	return &dynamo.PulseStimulus{
 		StimulusID:      w.Text,
 		Type:            "reaction_test",

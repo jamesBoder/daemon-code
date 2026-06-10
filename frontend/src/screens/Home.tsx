@@ -218,7 +218,7 @@ export function Home() {
               <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
             )}
 
-            <PulseEntryCard visible={!!(pulse?.stimulus && !pulse.completed)} />
+            <PulseEntryCard visible={!!(pulse?.scenario && !pulse.completed)} />
 
             {/* Secondary actions — share + chronicle */}
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>

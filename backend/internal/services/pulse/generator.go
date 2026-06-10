@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
@@ -21,12 +22,25 @@ import (
 const (
 	pulseModel     = "claude-haiku-4-5-20251001"
 	pulseMaxTokens = 512
-	repeatGapDays  = 14 // primary repeat gap in days
-	relaxedGapDays = 7  // fallback repeat gap when no stimulus passes primary
-	nearThreshLo   = 0.40
-	nearThreshHi   = 0.49
-	challengeConf  = 0.65 // dimensions above this confidence are challenged
+
+	nodesPerMap = 6
+
+	// Tier unlock gates in compile-count units (the profile has no account-age field).
+	dimensionalUnlockCompiles = 30
+	personalUnlockCompiles    = 60
+
+	// profile_stage thresholds on mean dimensional confidence.
+	stageEarlyBelow = 0.35
+	stageDeepAbove  = 0.60
 )
+
+// allDimensions is the canonical 10-dimension list from the profile_dimensions schema.
+// Dimensions absent from the profile count as confidence 0 (a sparse profile is early).
+var allDimensions = [10]string{
+	"openness", "conscientiousness", "agreeableness", "neuroticism",
+	"locus_of_control", "approach_avoidance", "temporal_focus",
+	"discount_factor", "grim_trigger", "k_level",
+}
 
 // dimEntry mirrors the profile_dimensions JSONB entry shape.
 type dimEntry struct {
@@ -35,37 +49,8 @@ type dimEntry struct {
 	N          int     `json:"n"`
 }
 
-// wordDimensions are the only two axes signal/words.go can probe.
-// Pair-level stimuli cover all 10 dimensions via signal/pairs.go.
-var wordDimensions = [2]string{"approach_avoidance", "openness"}
-
-// archetypeWordFilter maps archetype names to the word signal direction for the stability check.
-// Based on Section 2 spec archetype anchor table.
-var archetypeWordFilter = map[string]struct {
-	approach    bool
-	abstract    bool
-	useAbstract bool // when true, filter by Abstract; when false, filter by Approach
-}{
-	"abandoned_child": {approach: true, useAbstract: false},
-	"unworthy_self":   {approach: false, useAbstract: false},
-	"caged_rage":      {approach: true, useAbstract: false},
-	"grief_carrier":   {approach: false, useAbstract: false},
-	"default":         {abstract: true, useAbstract: true},
-}
-
-// resultBuckets returns the result bucket names for a given stimulus type.
-func resultBuckets(stimType string) []string {
-	switch stimType {
-	case "weighted_scale":
-		return []string{"strong_left", "strong_right", "center"}
-	case "prediction_duel":
-		return []string{"agree", "disagree"}
-	default: // reaction_test
-		return []string{"fast", "slow", "skip"}
-	}
-}
-
-// Generator runs nightly to select one Pulse stimulus per user and generate observation text.
+// Generator runs nightly to select one Map scenario per user and generate the
+// daemon observation + prediction.
 type Generator struct {
 	cfg    *appconfig.Config
 	q      *db.Queries
@@ -106,9 +91,12 @@ func (g *Generator) RunForUser(ctx context.Context, userID string) error {
 	if err != nil {
 		return fmt.Errorf("load recent pulse responses: %w", err)
 	}
-	recentIDs := make(map[string]bool, len(recentPulse))
+	lastPlayed := make(map[string]time.Time, len(recentPulse))
 	for _, r := range recentPulse {
-		recentIDs[r.FragmentID] = true
+		t := r.SessionDate.Time
+		if existing, ok := lastPlayed[r.FragmentID]; !ok || t.After(existing) {
+			lastPlayed[r.FragmentID] = t
+		}
 	}
 
 	// --- Parse profile_dimensions ---
@@ -122,296 +110,223 @@ func (g *Generator) RunForUser(ctx context.Context, userID string) error {
 		archetype = "default"
 	}
 
-	// --- Phase A: select one stimulus ---
-	stim := g.selectStimulus(dims, recentIDs, profile.CompileCount)
-	if stim == nil {
-		// Nothing passable found — skip this run rather than emit a bad stimulus.
+	// --- Phase A: select scenario + nodes algorithmically (no Claude) ---
+	scenario := selectScenario(dims, lastPlayed, profile.CompileCount)
+	if scenario == nil {
+		// Empty library only — relaxation otherwise always yields a scenario.
 		return nil
 	}
+	nodes := selectNodes(scenario, dims)
 
-	// --- Phase B: generate observation text ---
-	obs, err := g.generateObservations(ctx, stim, archetype)
-	if err != nil {
-		return fmt.Errorf("generate observations: %w", err)
+	// --- Phase B: Claude generates observation + prediction (one call) ---
+	confidences := make(map[string]float64, len(allDimensions))
+	for _, dim := range allDimensions {
+		confidences[dim] = dims[dim].Confidence // confidence levels only — never raw scores
 	}
-	stim.DaemonObs = obs
-
-	// --- Word list selection ---
-	wordOpts := selectWordOptions(dims, archetype)
+	obs, pred, err := g.generateDaemonText(ctx, scenario, nodes, archetype, profileStage(dims), confidences)
+	if err != nil {
+		// Failure fallback: a hedged Map beats no Map.
+		obs = signal.FallbackObservation
+		pred = signal.FallbackPredictions[rand.Intn(len(signal.FallbackPredictions))] // #nosec G404 — non-crypto content selection
+	}
 
 	// --- Write to DynamoDB ---
-	return g.ddb.PutPulse(ctx, dynamo.PulseItem{
-		UserID:      userID,
-		Stimulus:    *stim,
-		WordOptions: wordOpts,
-	})
+	item := dynamo.PulseItem{
+		UserID: userID,
+		Scenario: dynamo.PulseScenario{
+			ScenarioID:       scenario.ScenarioID,
+			Type:             string(scenario.Type),
+			Tier:             string(scenario.Tier),
+			Text:             scenario.Text,
+			DaemonObs:        obs,
+			DaemonPrediction: pred,
+		},
+		Nodes: make([]dynamo.PulseNode, 0, len(nodes)),
+	}
+	for _, n := range nodes {
+		sigs := make(map[string]dynamo.PulseNodeSignal, len(n.DimensionSignals))
+		for dim, s := range n.DimensionSignals {
+			sigs[dim] = dynamo.PulseNodeSignal{Direction: s.Direction}
+		}
+		item.Nodes = append(item.Nodes, dynamo.PulseNode{
+			NodeID:           n.NodeID,
+			Text:             n.Text,
+			DimensionSignals: sigs,
+		})
+	}
+	return g.ddb.PutPulse(ctx, item)
 }
 
-// selectStimulus runs Phase A: choose the single best stimulus from signal/pairs.go or signal/words.go.
-// Returns nil only if no valid stimulus can be found after constraint relaxation.
-// First pass enforces the 14-day repeat gap; second pass drops the constraint entirely
-// (GetRecentPulseResponses only returns 14 days, so 7-day discrimination is not possible).
-func (g *Generator) selectStimulus(dims map[string]dimEntry, recentIDs map[string]bool, compileCount int32) *dynamo.PulseStimulus {
-	for _, useRecentIDs := range []map[string]bool{recentIDs, nil} {
-		if stim := g.pickBestPairStimulus(dims, useRecentIDs, compileCount); stim != nil {
-			return stim
-		}
-		if stim := g.pickWordStimulus(dims, useRecentIDs); stim != nil {
-			return stim
-		}
+// maxAllowedTier returns the highest tier unlocked at this compile count.
+func maxAllowedTier(compileCount int32) signal.ScenarioTier {
+	switch {
+	case compileCount >= personalUnlockCompiles:
+		return signal.TierPersonal
+	case compileCount >= dimensionalUnlockCompiles:
+		return signal.TierDimensional
+	default:
+		return signal.TierUniversal
 	}
-	return nil
 }
 
-// pickBestPairStimulus selects a Weighted Scale or Prediction Duel pair stimulus.
-// Priority: (1) near-threshold confirmation, (2) lowest-confidence probe, (3) challenge.
-func (g *Generator) pickBestPairStimulus(dims map[string]dimEntry, excluded map[string]bool, compileCount int32) *dynamo.PulseStimulus {
-	type candidate struct {
-		pair     signal.Pair
-		dim      string
-		priority int // lower = higher priority
+func tierAllowed(tier signal.ScenarioTier, maxTier signal.ScenarioTier) bool {
+	rank := map[signal.ScenarioTier]int{
+		signal.TierUniversal:   0,
+		signal.TierDimensional: 1,
+		signal.TierPersonal:    2,
 	}
+	return rank[tier] <= rank[maxTier]
+}
 
-	var candidates []candidate
+// selectScenario picks the scenario whose DimensionAffinity targets the
+// lowest-confidence dimensions, enforcing the 14-day repeat gap.
+// Relaxation fallback: if every eligible scenario was played within the gap
+// window (zero library headroom), pick the least-recently-played one instead
+// of skipping the day.
+func selectScenario(dims map[string]dimEntry, lastPlayed map[string]time.Time, compileCount int32) *signal.Scenario {
+	maxTier := maxAllowedTier(compileCount)
 
-	for _, p := range signal.Pairs {
-		if excluded[p.PairID] {
+	var eligible []*signal.Scenario
+	for i := range signal.Scenarios {
+		s := &signal.Scenarios[i]
+		if !tierAllowed(s.Tier, maxTier) {
 			continue
 		}
-		if p.IntroducedAfterDay > int(compileCount) {
+		if s.IntroducedAfterDay > int(compileCount) {
 			continue
 		}
-		for dim := range p.DimensionSignals {
-			entry, hasDim := dims[dim]
-			if !hasDim {
-				// Unknown dimension — treat as lowest confidence; use as generic probe.
-				candidates = append(candidates, candidate{pair: p, dim: dim, priority: 2})
-				continue
-			}
-			c := entry.Confidence
-			switch {
-			case c >= nearThreshLo && c <= nearThreshHi:
-				// Near-threshold: highest priority (confirmatory)
-				candidates = append(candidates, candidate{pair: p, dim: dim, priority: 1})
-			case c < nearThreshLo:
-				// Low confidence: second priority (probe)
-				candidates = append(candidates, candidate{pair: p, dim: dim, priority: 2})
-			case c > challengeConf:
-				// High confidence: third priority (challenge)
-				candidates = append(candidates, candidate{pair: p, dim: dim, priority: 3})
-			}
-		}
+		eligible = append(eligible, s)
 	}
-
-	if len(candidates) == 0 {
+	if len(eligible) == 0 {
 		return nil
 	}
 
-	// Sort by priority, shuffle within same priority.
-	sort.SliceStable(candidates, func(i, j int) bool {
-		return candidates[i].priority < candidates[j].priority
-	})
-
-	// Pick randomly from the top-priority group.
-	top := candidates[0].priority
-	var pool []candidate
-	for _, c := range candidates {
-		if c.priority != top {
-			break
+	// Pass 1: enforce repeat gap (GetRecentPulseResponses already windows to 14 days).
+	var fresh []*signal.Scenario
+	for _, s := range eligible {
+		if _, played := lastPlayed[s.ScenarioID]; !played {
+			fresh = append(fresh, s)
 		}
-		pool = append(pool, c)
 	}
-	chosen := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto selection of behavioral stimulus
-	p := chosen.pair
-
-	// v1: always weighted_scale. prediction_duel support is stubbed in computePulseSignals
-	// and can be activated here once the generation and scoring direction are finalized.
-	stimType := "weighted_scale"
-
-	return &dynamo.PulseStimulus{
-		StimulusID:      p.PairID,
-		Type:            stimType,
-		Left:            p.Left,
-		Right:           p.Right,
-		DimensionProbed: chosen.dim,
+	if len(fresh) > 0 {
+		return lowestConfidenceAffinity(fresh, dims)
 	}
+
+	// Relaxation: all eligible scenarios sit inside the gap window, so every
+	// play date is visible — take the least recently played.
+	sort.Slice(eligible, func(i, j int) bool {
+		return lastPlayed[eligible[i].ScenarioID].Before(lastPlayed[eligible[j].ScenarioID])
+	})
+	return eligible[0]
 }
 
-// pickWordStimulus selects a Reaction Test word stimulus targeting approach_avoidance or openness.
-func (g *Generator) pickWordStimulus(dims map[string]dimEntry, excluded map[string]bool) *dynamo.PulseStimulus {
-	// Pick whichever word dimension has lower confidence.
-	targetDim := "approach_avoidance"
-	if aa, ok1 := dims["approach_avoidance"]; ok1 {
-		if op, ok2 := dims["openness"]; ok2 && op.Confidence < aa.Confidence {
-			targetDim = "openness"
-		}
+// lowestConfidenceAffinity returns the scenario whose affinity dimensions have
+// the lowest mean confidence, choosing randomly among near-ties.
+func lowestConfidenceAffinity(pool []*signal.Scenario, dims map[string]dimEntry) *signal.Scenario {
+	type scored struct {
+		s     *signal.Scenario
+		score float64 // mean confidence of affinity dims; lower = better target
 	}
-
-	// Build eligible word pool based on dimension and current score direction.
-	var pool []signal.Word
-	for _, w := range signal.Words {
-		if excluded[w.Text] {
+	scoredPool := make([]scored, 0, len(pool))
+	for _, s := range pool {
+		if len(s.DimensionAffinity) == 0 {
+			scoredPool = append(scoredPool, scored{s: s, score: 1.0})
 			continue
 		}
-		switch targetDim {
-		case "approach_avoidance":
-			pool = append(pool, w) // both directions probe approach_avoidance
-		case "openness":
-			pool = append(pool, w) // both abstract and concrete probe openness
+		var sum float64
+		for _, dim := range s.DimensionAffinity {
+			sum += dims[dim].Confidence // missing dim = zero value = confidence 0
 		}
+		scoredPool = append(scoredPool, scored{s: s, score: sum / float64(len(s.DimensionAffinity))})
 	}
 
-	if len(pool) == 0 {
-		return nil
-	}
-
-	w := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto selection of behavioral stimulus
-	return &dynamo.PulseStimulus{
-		StimulusID:      w.Text,
-		Type:            "reaction_test",
-		Word:            w.Text,
-		DimensionProbed: targetDim,
-	}
+	rand.Shuffle(len(scoredPool), func(i, j int) { scoredPool[i], scoredPool[j] = scoredPool[j], scoredPool[i] }) // #nosec G404 — non-crypto tie-break
+	sort.SliceStable(scoredPool, func(i, j int) bool { return scoredPool[i].score < scoredPool[j].score })
+	return scoredPool[0].s
 }
 
-// selectWordOptions builds the 6 Pick a Word chips.
-// Composition: 2 direct probe + 2 confirmatory + 2 archetype stability.
-func selectWordOptions(dims map[string]dimEntry, archetype string) []dynamo.PulseWordOption {
-	// Determine lower-confidence word dimension for direct probe.
-	directDim := "approach_avoidance"
-	if aa, ok1 := dims["approach_avoidance"]; ok1 {
-		if op, ok2 := dims["openness"]; ok2 && op.Confidence < aa.Confidence {
-			directDim = "openness"
+// selectNodes picks 6 nodes from the scenario pool, weighted toward the
+// dimensions the profile is least confident about. The obliqueness rule is
+// enforced at the content level (curation), not here.
+func selectNodes(scenario *signal.Scenario, dims map[string]dimEntry) []signal.ScenarioNode {
+	type scored struct {
+		node signal.ScenarioNode
+		gap  float64 // summed (1 - confidence) over the node's tagged dims; higher = better probe
+	}
+	pool := make([]scored, 0, len(scenario.NodePool))
+	for _, n := range scenario.NodePool {
+		var gap float64
+		for dim := range n.DimensionSignals {
+			gap += 1.0 - dims[dim].Confidence // missing dim = confidence 0 = max gap
 		}
+		pool = append(pool, scored{node: n, gap: gap})
 	}
 
-	// Build pools by word axis.
-	approachWords := filterWords(true, false)
-	avoidanceWords := filterWords(false, false)
-	abstractWords := filterWords(false, true) // Abstract=true; Approach irrelevant here
+	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] }) // #nosec G404 — non-crypto tie-break
+	sort.SliceStable(pool, func(i, j int) bool { return pool[i].gap > pool[j].gap })
 
-	pick2 := func(pool []signal.Word, seen map[string]bool) []dynamo.PulseWordOption {
-		var eligible []signal.Word
-		for _, w := range pool {
-			if !seen[w.Text] {
-				eligible = append(eligible, w)
-			}
-		}
-		if len(eligible) == 0 {
-			return nil
-		}
-		rand.Shuffle(len(eligible), func(i, j int) { eligible[i], eligible[j] = eligible[j], eligible[i] })
-		var out []dynamo.PulseWordOption
-		for i := 0; i < 2 && i < len(eligible); i++ {
-			out = append(out, dynamo.PulseWordOption{
-				Word:     eligible[i].Text,
-				Approach: eligible[i].Approach,
-				Abstract: eligible[i].Abstract,
-			})
-			seen[eligible[i].Text] = true
-		}
-		return out
+	count := nodesPerMap
+	if count > len(pool) {
+		count = len(pool)
 	}
-
-	seen := make(map[string]bool)
-	var opts []dynamo.PulseWordOption
-
-	// Slot 1 — direct probe (2 words, direction chosen by current score)
-	var directPool []signal.Word
-	switch directDim {
-	case "approach_avoidance":
-		entry := dims["approach_avoidance"]
-		if entry.Score >= 0.5 {
-			directPool = approachWords
-		} else {
-			directPool = avoidanceWords
-		}
-	case "openness":
-		directPool = abstractWords
-	}
-	opts = append(opts, pick2(directPool, seen)...)
-
-	// Slot 2 — confirmatory: near-threshold dim, or duplicate direct probe
-	confPool := directPool
-	for _, wd := range wordDimensions {
-		e, ok := dims[wd]
-		if ok && e.Confidence >= nearThreshLo && e.Confidence <= nearThreshHi {
-			if wd == "approach_avoidance" {
-				if e.Score >= 0.5 {
-					confPool = approachWords
-				} else {
-					confPool = avoidanceWords
-				}
-			} else {
-				confPool = abstractWords
-			}
-			break
-		}
-	}
-	opts = append(opts, pick2(confPool, seen)...)
-
-	// Slot 3 — archetype stability check
-	filter, ok := archetypeWordFilter[archetype]
-	if !ok {
-		filter = archetypeWordFilter["default"]
-	}
-	var stabilityPool []signal.Word
-	if filter.useAbstract {
-		stabilityPool = abstractWords
-	} else if filter.approach {
-		stabilityPool = approachWords
-	} else {
-		stabilityPool = avoidanceWords
-	}
-	opts = append(opts, pick2(stabilityPool, seen)...)
-
-	return opts
-}
-
-// filterWords returns words from signal.Words matching the given axis filter.
-// When filterAbstract=true, filter by Abstract=true (openness probe); otherwise filter by Approach.
-func filterWords(approach bool, filterAbstract bool) []signal.Word {
-	var out []signal.Word
-	for _, w := range signal.Words {
-		if filterAbstract {
-			if w.Abstract {
-				out = append(out, w)
-			}
-		} else {
-			if w.Approach == approach {
-				out = append(out, w)
-			}
-		}
+	out := make([]signal.ScenarioNode, 0, count)
+	for i := 0; i < count; i++ {
+		out = append(out, pool[i].node)
 	}
 	return out
 }
 
-// generateObservations calls Claude Haiku to generate 2-3 pre-written daemon observations
-// for the selected stimulus. Returns a map of result_bucket → observation string.
-func (g *Generator) generateObservations(ctx context.Context, stim *dynamo.PulseStimulus, archetype string) (map[string]string, error) {
+// profileStage maps mean dimensional confidence to the Phase B prose register.
+func profileStage(dims map[string]dimEntry) string {
+	var sum float64
+	for _, dim := range allDimensions {
+		sum += dims[dim].Confidence // missing = 0
+	}
+	mean := sum / float64(len(allDimensions))
+	switch {
+	case mean < stageEarlyBelow:
+		return "early"
+	case mean > stageDeepAbove:
+		return "deep"
+	default:
+		return "mid"
+	}
+}
+
+// generateDaemonText calls Claude Haiku once to produce the pre-generated
+// observation and prediction for tomorrow's Map.
+func (g *Generator) generateDaemonText(ctx context.Context, scenario *signal.Scenario, nodes []signal.ScenarioNode, archetype, stage string, confidences map[string]float64) (string, string, error) {
+	nodeTexts := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		nodeTexts = append(nodeTexts, n.Text)
+	}
+
 	req := map[string]interface{}{
-		"stimulus_type":    stim.Type,
-		"word":             stim.Word,
-		"left":             stim.Left,
-		"right":            stim.Right,
-		"dimension_probed": stim.DimensionProbed,
-		"result_buckets":   resultBuckets(stim.Type),
-		"archetype":        archetype,
+		"scenario":      scenario.Text,
+		"scenario_type": string(scenario.Type),
+		"nodes":         nodeTexts,
+		"archetype":     archetype,
+		"profile_stage": stage,
+		"confidences":   confidences,
 	}
 	reqJSON, _ := json.Marshal(req)
 
-	systemPrompt := `You generate daemon observation text for a behavioral micro-interaction called The Pulse.
+	systemPrompt := `You generate daemon text for a daily behavioral game called The Map. The user will see a scenario and 6 abstract nodes, and draw wires between the ones that activate for them. Your text is written BEFORE they play.
 
-For each result bucket, write one observation (1-2 sentences, max 12 words each).
+Write two outputs:
 
-Rules:
-- Daemon voice: second person or observational, contemplative register (like Fraunces italic)
-- Never describe the user's action, timing, or what they did. Only express what the daemon reads from the choice.
-- The user should feel "how did it know that" — not "oh, it tracked my click speed"
-- No behavioral transcript: forbidden phrases include "you moved", "you paused", "you tapped", "you skipped", "quickly", "slowly", "hesitated"
-- Match register to archetype where possible — darker for caged_rage, gentler for abandoned_child
+daemon_observation — daemon prose calibrated to profile_stage:
+- "early": hedged, e.g. "Something in the pattern. The daemon is still reading."
+- "mid": pattern-referencing, e.g. "This room has a wall you've stood against before. The daemon is watching what you do near it."
+- "deep": specific and historically-aware, e.g. "Everything you wired today carries weight from behind you. The daemon has seen this before."
 
-Return ONLY valid JSON: { "bucket_name": "observation text", ... }
+HARD RULE — no topology claims: the observation is generated before the user plays. It must make NO assertion about which nodes get wired, the center, the edges, isolation, counts, or density. Reference scenario texture, node themes, and the accumulated profile — claims that survive any wiring, including a session with zero wires. Never describe connection mechanics. Never be traceable to a specific wire. 1-2 sentences.
+
+daemon_prediction — one behavioral prediction sentence. Near-future. Specific enough to be verifiable, oblique enough to be deniable. Never uses the word "predict". Never references the game mechanic.
+
+Voice: daemon register — second person or observational, contemplative (Fraunces italic). Darker for caged_rage, gentler for abandoned_child.
+
+Return ONLY valid JSON: { "daemon_observation": "...", "daemon_prediction": "..." }
 No markdown, no explanation.`
 
 	payload := map[string]interface{}{
@@ -426,7 +341,7 @@ No markdown, no explanation.`
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", g.cfg.AnthropicAPIKey)
@@ -434,13 +349,13 @@ No markdown, no explanation.`
 
 	resp, err := g.httpCl.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("anthropic error %d: %s", resp.StatusCode, respBody)
+		return "", "", fmt.Errorf("anthropic error %d: %s", resp.StatusCode, respBody)
 	}
 
 	var apiResp struct {
@@ -449,15 +364,21 @@ No markdown, no explanation.`
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(respBody, &apiResp); err != nil || len(apiResp.Content) == 0 {
-		return nil, fmt.Errorf("parse anthropic response: %w", err)
+		return "", "", fmt.Errorf("parse anthropic response: %w", err)
 	}
 
 	text := stripFence(apiResp.Content[0].Text)
-	var obs map[string]string
-	if err := json.Unmarshal([]byte(text), &obs); err != nil {
-		return nil, fmt.Errorf("parse observation JSON: %w", err)
+	var out struct {
+		DaemonObservation string `json:"daemon_observation"`
+		DaemonPrediction  string `json:"daemon_prediction"`
 	}
-	return obs, nil
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		return "", "", fmt.Errorf("parse daemon text JSON: %w", err)
+	}
+	if out.DaemonObservation == "" || out.DaemonPrediction == "" {
+		return "", "", fmt.Errorf("daemon text incomplete")
+	}
+	return out.DaemonObservation, out.DaemonPrediction, nil
 }
 
 // stripFence removes optional markdown code fences (```json ... ``` or ``` ... ```) from Claude's response.

@@ -268,4 +268,3 @@ func pgDate(dateStr string) pgtype.Date {
 	t, _ := time.Parse("2006-01-02", dateStr)
 	return pgtype.Date{Time: t, Valid: true}
 }
-

@@ -27,31 +27,38 @@ export async function apiFetchJson<T>(path: string, init?: RequestInit): Promise
   return r.json() as Promise<T>
 }
 
-// --- Pulse ---
+// --- Pulse (The Map) ---
 
-export interface PulseStimulus {
-  stimulus_id: string
-  type: 'reaction_test' | 'weighted_scale' | 'prediction_duel'
-  word?: string
-  left?: string
-  right?: string
-  scenario?: string
-  daemon_prediction?: string
-  daemon_observations: Record<string, string>
+export interface PulseScenario {
+  scenario_id: string
+  type: string
+  text: string
+  daemon_observation: string
+  daemon_prediction: string
+}
+
+export interface PulseNode {
+  node_id: string
+  text: string
 }
 
 export interface PulseTodayResponse {
   completed: boolean
-  stimulus?: PulseStimulus
-  word_options?: string[]
+  scenario?: PulseScenario
+  nodes?: PulseNode[]
+}
+
+export interface PulseConnection {
+  a: string
+  b: string
 }
 
 export interface PostPulseResponseBody {
-  stimulus_id: string
-  stimulus_type: string
-  result_bucket: string
+  scenario_id: string
+  connections: PulseConnection[]
+  isolated_nodes: string[]
+  first_wire_delay_ms: number | null
   duration_ms: number
-  word_selected: string | null
 }
 
 export async function getPulseToday(): Promise<PulseTodayResponse> {

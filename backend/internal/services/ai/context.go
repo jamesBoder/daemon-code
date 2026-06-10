@@ -423,116 +423,215 @@ func filterNonPulse(responses []db.CardResponse) []db.CardResponse {
 	return out
 }
 
-// pulseResponseData is the shape of response_data JSONB for fragment_type == "pulse".
-type pulseResponseData struct {
-	StimulusType string  `json:"stimulus_type"`
-	StimulusID   string  `json:"stimulus_id"`
-	ResultBucket string  `json:"result_bucket"`
-	WordSelected *string `json:"word_selected"`
+// Map signal computation weights (The Map spec, Signal Computation section).
+const (
+	pulseConfidenceModifier = 0.75 // richer than a single reaction (×0.5), less rich than a full session
+
+	mapCenterWeight     = 1.5 // wire to the center scenario anchor
+	mapOneSidedWeight   = 0.5 // dimension tagged on only one endpoint of a wire
+	mapIsolatedWeight   = 0.5 // isolated node, opposite pole of its primary dimension
+	mapFirstWireWeight  = 1.3
+	mapSecondWireWeight = 1.0
+	mapThirdWireWeight  = 0.8
+)
+
+// pulseMapConnection mirrors the POST /pulse/response connection shape.
+type pulseMapConnection struct {
+	A string `json:"a"`
+	B string `json:"b"`
 }
 
-// computePulseSignals derives dimension signals from Pulse responses.
-// These carry a ×0.5 confidence modifier (communicated to the Analyst via pulse_signals_today).
-// Pulse responses do NOT increment dimension n — the Analyst prompt enforces this.
+// pulseMapResponseData is the connections-based response_data shape written by
+// the Map handler. Connections is a pointer so a missing key (old stimulus-shape
+// rows from the deploy window) is distinguishable from an explicit empty array
+// (a valid zero-wire sparse session).
+type pulseMapResponseData struct {
+	ScenarioID       string                `json:"scenario_id"`
+	Connections      *[]pulseMapConnection `json:"connections"`
+	IsolatedNodes    []string              `json:"isolated_nodes"`
+	FirstWireDelayMs *int64                `json:"first_wire_delay_ms"`
+	DurationMs       int64                 `json:"duration_ms"`
+}
+
+// directionValue maps a node direction to the 0–1 dimension score space:
+// high/internal/future → 1.0; low/external/past → 0.0.
+func directionValue(direction string) (float64, bool) {
+	switch direction {
+	case "high", "internal", "future":
+		return 1.0, true
+	case "low", "external", "past":
+		return 0.0, true
+	default:
+		return 0, false
+	}
+}
+
+// wireOrderWeight returns the draw-order weight for the i-th wire (0-based).
+func wireOrderWeight(i int) float64 {
+	switch i {
+	case 0:
+		return mapFirstWireWeight
+	case 1:
+		return mapSecondWireWeight
+	default:
+		return mapThirdWireWeight
+	}
+}
+
+// computePulseSignals derives dimension signals from Map (pulse) responses.
+// These carry a ×0.75 confidence modifier (communicated to the Analyst via
+// pulse_signals_today). Pulse responses do NOT increment dimension n — the
+// Analyst prompt enforces this.
+//
+// Wire contribution rules: a dimension tagged on both endpoints with the same
+// direction contributes at full weight; opposite directions contribute nothing
+// (ambiguous, dropped); tagged on one endpoint only contributes at half weight.
+// A wire to the center anchor carries only the outer node's tags at ×1.5.
+// An isolated node contributes the opposite pole of its primary dimension at
+// ×0.5. Per dimension the output is the weighted mean of contributions.
 func computePulseSignals(responses []db.CardResponse) map[string]interface{} {
-	out := make(map[string]interface{})
-	approachN, avoidanceN := 0, 0
-	abstractN, concreteN := 0, 0
-	dimSums := make(map[string]float64)
-	dimCounts := make(map[string]int)
+	type contribution struct {
+		value  float64
+		weight float64
+	}
+	dimContribs := make(map[string][]contribution)
+	centerIsolated := false
+	var firstWireDelayMs *int64
+	var durationMs int64
+	haveTiming := false
+
+	addContrib := func(dim string, value, weight float64) {
+		dimContribs[dim] = append(dimContribs[dim], contribution{value: value, weight: weight})
+	}
 
 	for _, r := range responses {
 		if r.FragmentType != "pulse" {
 			continue
 		}
-		var rd pulseResponseData
+		var rd pulseMapResponseData
 		if json.Unmarshal(r.ResponseData, &rd) != nil {
 			continue
 		}
+		// Transition-day rows: old stimulus-shape response_data has no
+		// connections key — skip silently (one day of pulse signal lost).
+		if rd.Connections == nil {
+			continue
+		}
+		scenarioID := rd.ScenarioID
+		if scenarioID == "" {
+			scenarioID = r.FragmentID
+		}
+		if _, ok := signal.LookupScenario(scenarioID); !ok {
+			continue
+		}
 
-		switch rd.StimulusType {
-		case "reaction_test":
-			// Word tap: derive approach/openness signal from the word's tags.
-			w, ok := signal.Lookup(rd.StimulusID)
+		for i, conn := range *rd.Connections {
+			orderW := wireOrderWeight(i)
+
+			// Center wire: only the outer node's tags, at ×1.5.
+			if conn.A == "center" || conn.B == "center" {
+				outerID := conn.A
+				if outerID == "center" {
+					outerID = conn.B
+				}
+				node, ok := signal.LookupScenarioNode(scenarioID, outerID)
+				if !ok {
+					continue
+				}
+				for dim, sig := range node.DimensionSignals {
+					if v, ok := directionValue(sig.Direction); ok {
+						addContrib(dim, v, orderW*mapCenterWeight)
+					}
+				}
+				continue
+			}
+
+			nodeA, okA := signal.LookupScenarioNode(scenarioID, conn.A)
+			nodeB, okB := signal.LookupScenarioNode(scenarioID, conn.B)
+			if !okA || !okB {
+				continue
+			}
+			dims := make(map[string]bool)
+			for dim := range nodeA.DimensionSignals {
+				dims[dim] = true
+			}
+			for dim := range nodeB.DimensionSignals {
+				dims[dim] = true
+			}
+			for dim := range dims {
+				sigA, inA := nodeA.DimensionSignals[dim]
+				sigB, inB := nodeB.DimensionSignals[dim]
+				switch {
+				case inA && inB:
+					vA, okVA := directionValue(sigA.Direction)
+					vB, okVB := directionValue(sigB.Direction)
+					if !okVA || !okVB || vA != vB {
+						continue // opposite directions — ambiguous, dropped
+					}
+					addContrib(dim, vA, orderW)
+				case inA:
+					if v, ok := directionValue(sigA.Direction); ok {
+						addContrib(dim, v, orderW*mapOneSidedWeight)
+					}
+				case inB:
+					if v, ok := directionValue(sigB.Direction); ok {
+						addContrib(dim, v, orderW*mapOneSidedWeight)
+					}
+				}
+			}
+		}
+
+		for _, id := range rd.IsolatedNodes {
+			if id == "center" {
+				// The center has no dimension tags — surfaced to the Analyst
+				// as a context flag, not a numeric signal.
+				centerIsolated = true
+				continue
+			}
+			node, ok := signal.LookupScenarioNode(scenarioID, id)
+			if !ok || node.PrimaryDimension == "" {
+				continue
+			}
+			sig, ok := node.DimensionSignals[node.PrimaryDimension]
 			if !ok {
 				continue
 			}
-			if w.Approach {
-				approachN++
-			} else {
-				avoidanceN++
-			}
-			if w.Abstract {
-				abstractN++
-			} else {
-				concreteN++
-			}
-
-		case "weighted_scale":
-			var val float64
-			switch rd.ResultBucket {
-			case "strong_left":
-				val = -1.0
-			case "strong_right":
-				val = 1.0
-			case "center":
-				val = 0.0
-			default:
-				continue
-			}
-			pair, ok := signal.LookupPairByID(rd.StimulusID)
-			if !ok {
-				continue
-			}
-			for dim, sig := range pair.DimensionSignals {
-				dimSums[dim] += scaleScore(val, sig.LeftHigh)
-				dimCounts[dim]++
-			}
-
-			// prediction_duel: not yet generated by PulseGenerator (stimType always "weighted_scale").
-			// Add scoring here when prediction_duel stimuli are activated.
-		}
-
-		// Word selected in Pick a Word also carries approach/openness signal.
-		if rd.WordSelected != nil && *rd.WordSelected != "" {
-			w, ok := signal.Lookup(*rd.WordSelected)
-			if !ok {
-				continue
-			}
-			if w.Approach {
-				approachN++
-			} else {
-				avoidanceN++
-			}
-			if w.Abstract {
-				abstractN++
-			} else {
-				concreteN++
+			if v, ok := directionValue(sig.Direction); ok {
+				// Opposite pole: the user avoided what the node probes.
+				addContrib(node.PrimaryDimension, 1.0-v, mapIsolatedWeight)
 			}
 		}
+
+		firstWireDelayMs = rd.FirstWireDelayMs
+		durationMs = rd.DurationMs
+		haveTiming = true
 	}
 
-	if n := approachN + avoidanceN; n > 0 {
-		out["approach_avoidance"] = map[string]interface{}{
-			"signal":              round2(float64(approachN) / float64(n)),
-			"n_words":             n,
-			"confidence_modifier": 0.5,
+	out := make(map[string]interface{})
+	for dim, contribs := range dimContribs {
+		var weightedSum, weightSum float64
+		for _, c := range contribs {
+			weightedSum += c.value * c.weight
+			weightSum += c.weight
 		}
-	}
-	if n := abstractN + concreteN; n > 0 {
-		out["openness"] = map[string]interface{}{
-			"signal":              round2(float64(abstractN) / float64(n)),
-			"n_words":             n,
-			"confidence_modifier": 0.5,
+		if weightSum == 0 {
+			continue
 		}
-	}
-	for dim, sum := range dimSums {
-		n := dimCounts[dim]
 		out[dim] = map[string]interface{}{
-			"signal":              round2(sum / float64(n)),
-			"n_pairs":             n,
-			"confidence_modifier": 0.5,
+			"signal":              round2(weightedSum / weightSum),
+			"n_contributions":     len(contribs),
+			"confidence_modifier": pulseConfidenceModifier,
 		}
+	}
+	if centerIsolated {
+		out["center_isolated"] = true
+	}
+	if haveTiming {
+		deliberation := map[string]interface{}{"duration_ms": durationMs}
+		if firstWireDelayMs != nil {
+			deliberation["first_wire_delay_ms"] = *firstWireDelayMs
+		}
+		out["deliberation"] = deliberation
 	}
 
 	if len(out) == 0 {

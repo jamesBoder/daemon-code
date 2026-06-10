@@ -12,6 +12,7 @@ interface Props {
   pattern:    string
   prediction: string
   onComplete: (result: PredictionDuelResult) => void
+  isEmbedded?: boolean  // when true: relative positioning (for Pulse context)
 }
 
 type Phase = 'idle' | 'waiting' | 'reveal'
@@ -34,7 +35,7 @@ const WRONG_REVEALS = [
   'The daemon was wrong. That is noted.',
 ] as const
 
-export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Props) {
+export function PredictionDuel({ pattern: _pattern, prediction, onComplete, isEmbedded = false }: Props) {
   const reduced = useReducedMotion()
 
   const [phase,   setPhase]   = useState<Phase>('idle')
@@ -67,7 +68,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
+      ...(isEmbedded ? { position: 'relative' } : { position: 'fixed', inset: 0 }),
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       padding: 'var(--space-8)',

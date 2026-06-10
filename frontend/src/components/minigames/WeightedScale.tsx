@@ -13,11 +13,12 @@ export interface WeightedScaleResult {
 interface Props {
   pairs: { left: string; right: string }[]
   onComplete: (results: WeightedScaleResult[]) => void
+  isEmbedded?: boolean  // when true: relative positioning + no progress indicator (for Pulse context)
 }
 
 const { track: T, scale: S, type: TY, spring: SPR } = MG
 
-export function WeightedScale({ pairs, onComplete }: Props) {
+export function WeightedScale({ pairs, onComplete, isEmbedded = false }: Props) {
   const reduced = useReducedMotion()
 
   const [idx, setIdx]               = useState(0)
@@ -94,7 +95,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
 
   // ── Shared elements ────────────────────────────────────────────────────────
 
-  const progressEl = (
+  const progressEl = isEmbedded ? null : (
     <p style={{ fontFamily: TY.mono.family, fontSize: TY.mono.size, color: 'var(--text-muted)', letterSpacing: '0.06em', flexShrink: 0 }}>
       {idx + 1} of {pairs.length}
     </p>
@@ -152,7 +153,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
   if (!isDesktop) {
     return (
       <div style={{
-        position: 'fixed', inset: 0,
+        ...(isEmbedded ? { position: 'relative' } : { position: 'fixed', inset: 0 }),
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: MG.space.mobilePad,
@@ -184,7 +185,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
+      ...(isEmbedded ? { position: 'relative' } : { position: 'fixed', inset: 0 }),
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       padding: MG.space.desktopPad,

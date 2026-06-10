@@ -5,6 +5,7 @@ import { DaemonOrb } from './DaemonOrb'
 import { DaemonProse } from './DaemonProse'
 import { SignalWhisper } from './SignalWhisper'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { BlinkCursor } from '../ui/BlinkCursor'
 import { copy } from '../../lib/copy'
 import { COMPILE_AUTOPLAY_DELAY, HAIRLINE, LETTER_SPACING_COMPILE, LETTER_SPACING_TIGHT, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
 import type { CompileData } from '../../types'
@@ -84,23 +85,6 @@ function GlitchText({ text }: { text: string }) {
   }, [text])
 
   return <>{display}</>
-}
-
-// ── BlinkCursor ───────────────────────────────────────────────────────────────
-// Standard terminal cursor — NOT gated on reduced motion.
-
-function BlinkCursor() {
-  return (
-    <motion.span
-      aria-hidden
-      initial={{ opacity: 1 }}
-      animate={{ opacity: [1, 0, 1] }}
-      transition={{ duration: 1.0, repeat: Infinity, times: [0, 0.5, 1], ease: 'linear' }}
-      style={{ color: 'var(--compile-green)', marginLeft: '0.3em' }}
-    >
-      ▋
-    </motion.span>
-  )
 }
 
 // ── ScanLine ──────────────────────────────────────────────────────────────────

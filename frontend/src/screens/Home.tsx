@@ -10,7 +10,8 @@ import { DaemonButton } from '../components/ui/DaemonButton'
 import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { ScoreTriad } from '../components/daemon/ScoreTriad'
-import { apiFetchJson, homeToCompileData } from '../lib/api'
+import { apiFetchJson, getPulseToday, homeToCompileData } from '../lib/api'
+import { PulseEntryCard } from '../components/pulse/PulseEntryCard'
 import { applyArchetypeAccent } from '../lib/colors'
 import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
@@ -44,6 +45,13 @@ export function Home() {
     queryFn: () => apiFetchJson<Process[]>('/processes'),
     staleTime: 5 * 60 * 1000,
     enabled: !!(home && home.processingSignals > 0),
+  })
+
+  const { data: pulse } = useQuery({
+    queryKey: ['pulse'],
+    queryFn: getPulseToday,
+    staleTime: 0,
+    enabled: !homeLoading,
   })
 
   // Apply archetype accent color whenever profile loads or archetype changes
@@ -209,6 +217,8 @@ export function Home() {
             {processes.length > 0 && (
               <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
             )}
+
+            <PulseEntryCard visible={!!(pulse?.stimulus && !pulse.completed)} />
 
             {/* Secondary actions — share + chronicle */}
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>

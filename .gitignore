@@ -9,6 +9,7 @@
 # Go
 backend/bin/
 backend/seed
+backend/devrun
 *.exe
 
 # Node

@@ -13,6 +13,7 @@ import { ProcessLog } from './screens/ProcessLog'
 import { Settings } from './screens/Settings'
 import { Chronicle } from './screens/Chronicle'
 import { Codex } from './screens/Codex'
+import { Pulse } from './screens/Pulse'
 import { ROUTE_TRANSITION_MS } from './lib/constants'
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them
@@ -58,6 +59,7 @@ function App() {
           <Route path="/settings"  element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
           <Route path="/codex"            element={<ProtectedRoute><Codex /></ProtectedRoute>} />
+          <Route path="/pulse"            element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
           <Route path="/session"          element={<ProtectedRoute><Session /></ProtectedRoute>} />
           <Route path="/session/complete" element={<ProtectedRoute><SessionComplete /></ProtectedRoute>} />
 

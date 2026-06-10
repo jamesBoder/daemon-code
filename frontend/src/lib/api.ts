@@ -27,6 +27,45 @@ export async function apiFetchJson<T>(path: string, init?: RequestInit): Promise
   return r.json() as Promise<T>
 }
 
+// --- Pulse ---
+
+export interface PulseStimulus {
+  stimulus_id: string
+  type: 'reaction_test' | 'weighted_scale' | 'prediction_duel'
+  word?: string
+  left?: string
+  right?: string
+  scenario?: string
+  daemon_prediction?: string
+  daemon_observations: Record<string, string>
+}
+
+export interface PulseTodayResponse {
+  completed: boolean
+  stimulus?: PulseStimulus
+  word_options?: string[]
+}
+
+export interface PostPulseResponseBody {
+  stimulus_id: string
+  stimulus_type: string
+  result_bucket: string
+  duration_ms: number
+  word_selected: string | null
+}
+
+export async function getPulseToday(): Promise<PulseTodayResponse> {
+  return apiFetchJson<PulseTodayResponse>('/pulse/today')
+}
+
+export async function postPulseResponse(body: PostPulseResponseBody): Promise<void> {
+  const r = await apiFetch('/pulse/response', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(`POST /pulse/response ${r.status}`)
+}
+
 export async function patchProfile(polly_voice: string | null): Promise<void> {
   const r = await apiFetch('/profile', {
     method: 'PATCH',

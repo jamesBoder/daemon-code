@@ -45,7 +45,7 @@ jobs:
       - name: Build and deploy Lambdas
         working-directory: backend
         run: |
-          for cmd in api orchestrator analyst narrator deckgen notifier; do
+          for cmd in api orchestrator analyst narrator deckgen notifier pulsegenerator; do
             GOOS=linux GOARCH=arm64 go build -o bootstrap ./cmd/$cmd
             zip ${cmd}.zip bootstrap
             aws lambda update-function-code \

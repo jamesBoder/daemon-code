@@ -227,6 +227,21 @@ resource "aws_lambda_permission" "eventbridge_notifier" {
   source_arn    = aws_cloudwatch_event_rule.analyst_complete.arn
 }
 
+resource "aws_cloudwatch_event_target" "analyst_complete_pulsegen" {
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+  rule           = aws_cloudwatch_event_rule.analyst_complete.name
+  target_id      = "PulseGenerator"
+  arn            = aws_lambda_function.pulsegenerator.arn
+}
+
+resource "aws_lambda_permission" "eventbridge_pulsegen" {
+  statement_id  = "AllowEventBridgePulseGen"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.pulsegenerator.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.analyst_complete.arn
+}
+
 # ── Lambda shared env vars ─────────────────────────────────────────────────────
 
 locals {
@@ -419,6 +434,26 @@ resource "aws_lambda_function" "notifier" {
   tags = var.tags
 }
 
+resource "aws_lambda_function" "pulsegenerator" {
+  function_name = "${var.app_name}-pulsegenerator"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "bootstrap"
+  runtime       = "provided.al2023"
+  architectures = ["arm64"]
+  timeout       = 120
+  memory_size   = 256
+
+  filename         = data.archive_file.placeholder.output_path
+  source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
+
+  lifecycle { ignore_changes = [filename, source_code_hash] }
+
+  tags = var.tags
+}
+
 # ── API custom domain (api.daemoncode.app) ────────────────────────────────────
 # Step 1: apply -target=aws_acm_certificate.api → get validation records → add to Cloudflare
 # Step 2: after cert issues, apply -target=module.compute to create domain + mapping
@@ -459,7 +494,8 @@ output "orchestrator_lambda_arn" { value = aws_lambda_function.orchestrator.arn 
 output "analyst_lambda_arn"      { value = aws_lambda_function.analyst.arn }
 output "narrator_lambda_arn"     { value = aws_lambda_function.narrator.arn }
 output "deckgen_lambda_arn"      { value = aws_lambda_function.deckgen.arn }
-output "notifier_lambda_arn"     { value = aws_lambda_function.notifier.arn }
+output "notifier_lambda_arn"      { value = aws_lambda_function.notifier.arn }
+output "pulsegenerator_lambda_arn" { value = aws_lambda_function.pulsegenerator.arn }
 output "sqs_analyst_queue_url"   { value = aws_sqs_queue.analyst.url }
 output "event_bus_name"          { value = aws_cloudwatch_event_bus.main.name }
 output "api_regional_domain"     { value = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name }

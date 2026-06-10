@@ -53,6 +53,8 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 	protected.HandleFunc("GET /processes/{id}", h.GetProcess)
 	protected.HandleFunc("POST /onboarding/complete", h.OnboardingComplete)
 	protected.HandleFunc("POST /push/subscribe", h.PushSubscribe)
+	protected.HandleFunc("GET /pulse/today", h.GetPulseToday)
+	protected.HandleFunc("POST /pulse/response", h.PostPulseResponse)
 
 	mux.Handle("/", middleware.RequireAuth(cfg.JWTSecret)(protected))
 

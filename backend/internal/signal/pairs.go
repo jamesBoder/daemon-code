@@ -1087,6 +1087,18 @@ func LookupPair(left, right string) (Pair, bool) {
 	return Pair{}, false
 }
 
+// LookupPairByID returns the pair with the given PairID.
+// Used by PulseGenerator context assembly to derive dimension signals from Pulse responses,
+// where only the pair_id (not left/right strings) is stored in response_data.
+func LookupPairByID(pairID string) (Pair, bool) {
+	for _, p := range Pairs {
+		if p.PairID == pairID {
+			return p, true
+		}
+	}
+	return Pair{}, false
+}
+
 // LookupPairsByTier returns all pairs for the given tier.
 // Useful for content audits and editorial tooling; not used by the deck generator.
 func LookupPairsByTier(tier string) []Pair {

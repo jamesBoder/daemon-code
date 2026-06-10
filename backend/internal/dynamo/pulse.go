@@ -36,12 +36,12 @@ type PulseWordOption struct {
 
 // PulseItem is the daily pulse stored in tableDecks with sort key "pulse".
 type PulseItem struct {
-	UserID      string          `dynamodbav:"user_id"`
-	Date        string          `dynamodbav:"date"`
-	Stimulus    PulseStimulus   `dynamodbav:"stimulus"`
+	UserID      string            `dynamodbav:"user_id"`
+	Date        string            `dynamodbav:"date"`
+	Stimulus    PulseStimulus     `dynamodbav:"stimulus"`
 	WordOptions []PulseWordOption `dynamodbav:"word_options"`
-	CompletedAt string          `dynamodbav:"completed_at"` // ISO timestamp; empty = not yet completed
-	TTL         int64           `dynamodbav:"ttl"`
+	CompletedAt string            `dynamodbav:"completed_at"` // ISO timestamp; empty = not yet completed
+	TTL         int64             `dynamodbav:"ttl"`
 }
 
 const pulseTTL = 26 * time.Hour

@@ -11,9 +11,9 @@ import (
 )
 
 type getPulseTodayResponse struct {
-	Completed   bool                    `json:"completed"`
-	Stimulus    *pulseStimulusResponse  `json:"stimulus,omitempty"`
-	WordOptions []string                `json:"word_options,omitempty"`
+	Completed   bool                   `json:"completed"`
+	Stimulus    *pulseStimulusResponse `json:"stimulus,omitempty"`
+	WordOptions []string               `json:"word_options,omitempty"`
 }
 
 type pulseStimulusResponse struct {

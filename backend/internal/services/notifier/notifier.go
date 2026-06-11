@@ -35,8 +35,10 @@ func (n *Notifier) Run(ctx context.Context, event events.EventBridgeEvent) error
 		return fmt.Errorf("parse user_id: %w", err)
 	}
 
-	// Load today's shadow state for the prose opening line
-	state, err := n.ddb.GetShadowState(ctx, userID.String())
+	// Load the freshest shadow state for the prose opening line. The Narrator
+	// stamps items with the date they serve (tomorrow for the nightly run), so
+	// an exact-today read here would miss the prose just written.
+	state, err := n.ddb.GetLatestShadowState(ctx, userID.String())
 	if err != nil || state == nil {
 		return fmt.Errorf("get shadow state: %w", err)
 	}

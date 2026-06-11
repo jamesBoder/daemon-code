@@ -36,7 +36,7 @@ export function Session() {
         <DaemonOrb state="cold" />
         <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', textAlign: 'center', maxWidth: 280 }}>
           The daemon is still processing.<br />
-          Come back tomorrow for your first session.
+          Today&rsquo;s session isn&rsquo;t ready yet.
         </p>
         <DaemonButton onClick={() => navigate('/home')}>Return home →</DaemonButton>
       </div>

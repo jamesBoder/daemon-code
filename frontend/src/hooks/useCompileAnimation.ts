@@ -13,6 +13,8 @@ import {
   COMPILE_PROSE_DURATION,
   COMPILE_SIGNAL_DELAY,
   COMPILE_SIGNAL_DURATION,
+  COMPILE_RETURN_DELAY,
+  COMPILE_RETURN_DURATION,
 } from '../lib/constants'
 
 interface CompileAnimationControls {
@@ -84,6 +86,16 @@ export function useCompileAnimation(): CompileAnimationControls {
       duration: COMPILE_SIGNAL_DURATION,
       ease: 'power2.out',
     }, `<+=${COMPILE_SIGNAL_DELAY}`)
+
+    // Terminal lines + stats return — without this the screen's resting state
+    // after the animation differs from the static (autoPlay=false) render,
+    // making the compile info "vanish" until the user re-navigates to the tab.
+    tl.to([lines, stats], {
+      opacity: 1,
+      y: 0,
+      duration: COMPILE_RETURN_DURATION,
+      ease: 'power2.out',
+    }, `+=${COMPILE_RETURN_DELAY}`)
 
     tlRef.current = tl
   }, [])

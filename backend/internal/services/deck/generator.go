@@ -54,7 +54,9 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 	}
 
 	fragments := g.buildDeck(profile, patterns)
-	date := time.Now().UTC().Format("2006-01-02")
+	// Stamp with the date this deck serves (the following UTC day for the
+	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
+	date := dynamo.ServiceDate(time.Now())
 
 	if err := g.ddb.PutDailyDeck(ctx, dynamo.DailyDeck{
 		UserID:    userID.String(),

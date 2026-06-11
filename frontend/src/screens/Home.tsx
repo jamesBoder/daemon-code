@@ -12,6 +12,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { ScoreTriad } from '../components/daemon/ScoreTriad'
 import { apiFetchJson, getPulseToday, homeToCompileData } from '../lib/api'
 import { PulseEntryCard } from '../components/pulse/PulseEntryCard'
+import { ProcessStatus } from '../components/processlog/ProcessStatus'
 import { applyArchetypeAccent } from '../lib/colors'
 import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
@@ -100,13 +101,22 @@ export function Home() {
       const namedProcesses = processes
         .filter(p => !p.unnamed && p.name)
         .slice(0, 3)
-        .map(p => p.name as string)
+        .map(p => ({ name: p.name as string, state: p.state as ProcessState, strength: p.strength }))
       await generateAndShareCard({
-        prose:        home.daemonProse,
-        day:          home.day,
-        orbState:     home.orbState,
-        processNames: namedProcesses,
+        prose:               home.daemonProse,
+        day:                 home.day,
+        orbState:            home.orbState,
+        processes:           namedProcesses,
         accent,
+        kernelAccess:        home.kernelAccess,
+        daemonAccuracy:      home.daemonAccuracy,
+        decodedLines:        home.decodedLines,
+        kernelAccessDelta:   home.kernelAccessDelta,
+        daemonAccuracyDelta: home.daemonAccuracyDelta,
+        decodedLinesDelta:   home.decodedLinesDelta,
+        consecutiveDays:     home.consecutiveDays,
+        signalQuote:         home.dailySignalQuote,
+        signalAuthor:        home.dailySignalAuthor,
       })
     } catch (err) {
       // AbortError means the user cancelled the share sheet — not an error
@@ -267,23 +277,19 @@ export function Home() {
   )
 }
 
-const STATE_COLORS: Record<ProcessState, string> = {
-  running:   'var(--compile-green)',
-  sleeping:  'var(--text-muted)',
-  weakening: 'var(--warning)',
-  new:       'var(--accent)',
-}
-
-const STRIP_MAX = 3  // process rows shown in the home strip
+const STRIP = {
+  max:  3,  // process rows shown in the home strip
+  barH: 2,  // px — strength bar height, mirrors ProcessEntry
+} as const
 
 function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAll: () => void }) {
   const active = processes.filter(p => p.state === 'running' || p.state === 'new')
   const rest   = processes.filter(p => p.state !== 'running' && p.state !== 'new')
-  const top    = [...active, ...rest].slice(0, STRIP_MAX)
+  const top    = [...active, ...rest].slice(0, STRIP.max)
 
   return (
-    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
           active processes
         </span>
@@ -298,24 +304,36 @@ function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAl
         const name = p.name
           ? p.name
           : `unnamed_process_${String(i + 1).padStart(3, '0')}`
-        const color = STATE_COLORS[p.state as ProcessState] ?? 'var(--text-muted)'
         return (
-          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) 0' }}>
-            <span style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-xs)',
-              color: p.unnamed ? 'var(--text-muted)' : 'var(--text-primary)',
-              letterSpacing: LETTER_SPACING_PROCESS,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-            }}>
-              {name}
-            </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color, letterSpacing: LETTER_SPACING_PROCESS, flexShrink: 0 }}>
-              {p.state}
-            </span>
+          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', minWidth: 0, flex: 1 }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-xs)',
+                color: p.unnamed ? 'var(--text-muted)' : 'var(--text-primary)',
+                letterSpacing: LETTER_SPACING_PROCESS,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {name}
+              </span>
+              {p.unnamed ? (
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', lineHeight: 'var(--leading-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  {copy.processLog.stillForming}
+                </span>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <div style={{ flex: 1, height: STRIP.barH, background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${p.strength}%`, background: 'var(--accent)', borderRadius: 'var(--radius-full)', transition: 'width 0.6s ease' }} />
+                  </div>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_PROCESS, flexShrink: 0 }}>
+                    {p.strength}%
+                  </span>
+                </div>
+              )}
+            </div>
+            <ProcessStatus state={p.state as ProcessState} />
           </div>
         )
       })}

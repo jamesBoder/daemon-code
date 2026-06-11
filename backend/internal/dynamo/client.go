@@ -50,23 +50,32 @@ type ShadowState struct {
 	TTL             int64  `dynamodbav:"ttl"`
 }
 
-func (c *Client) GetShadowState(ctx context.Context, userID string) (*ShadowState, error) {
-	date := time.Now().UTC().Format("2006-01-02")
-	out, err := c.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(c.tableState),
-		Key: map[string]types.AttributeValue{
-			"user_id": &types.AttributeValueMemberS{Value: userID},
-			"date":    &types.AttributeValueMemberS{Value: date},
+// GetLatestShadowState returns the most recent nightly compile entry for a user,
+// regardless of date. Used by Home, the recent-diff endpoint, and the Notifier so
+// the freshest compile is always served even when "today's" item does not exist
+// yet (the nightly run stamps items with the date they serve — see ServiceDate).
+// begins_with "20" excludes non-date sort keys ("pulse", "push_subscription").
+func (c *Client) GetLatestShadowState(ctx context.Context, userID string) (*ShadowState, error) {
+	limit := int32(1)
+	out, err := c.ddb.Query(ctx, &dynamodb.QueryInput{
+		TableName:                aws.String(c.tableState),
+		KeyConditionExpression:   aws.String("user_id = :uid AND begins_with(#d, :prefix)"),
+		ExpressionAttributeNames: map[string]string{"#d": "date"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid":    &types.AttributeValueMemberS{Value: userID},
+			":prefix": &types.AttributeValueMemberS{Value: "20"},
 		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            &limit,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("latest shadow state query: %w", err)
 	}
-	if out.Item == nil {
+	if len(out.Items) == 0 {
 		return nil, nil
 	}
 	var s ShadowState
-	if err := attributevalue.UnmarshalMap(out.Item, &s); err != nil {
+	if err := attributevalue.UnmarshalMap(out.Items[0], &s); err != nil {
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 	return &s, nil

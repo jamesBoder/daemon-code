@@ -28,7 +28,9 @@ func main() {
 
 	// Triggered by EventBridge after the nightly Analyst batch completes.
 	awslambda.Start(func(ctx context.Context) error {
-		date := time.Now().UTC().Format("2006-01-02")
+		// Must match the Narrator's ShadowState sort key — both stamp the
+		// date the nightly output serves, not the write-time date.
+		date := dynamo.ServiceDate(time.Now())
 
 		users, err := queries.GetAllActiveUsers(ctx)
 		if err != nil {

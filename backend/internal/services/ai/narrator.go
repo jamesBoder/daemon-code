@@ -108,7 +108,9 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 		return fmt.Errorf("anthropic call: %w", err)
 	}
 
-	date := time.Now().UTC().Format("2006-01-02")
+	// Stamp with the date this compile serves (the following UTC day for the
+	// 23:00 UTC nightly run) so Home/Session lookups match all next day.
+	date := dynamo.ServiceDate(time.Now())
 	voice := resolveVoice(profile.PollyVoice, profile.PrimaryArchetype)
 	audioURL, err := n.synthesizeVoice(ctx, output.Prose, profile.Stage, voice, userID.String(), date)
 	if err != nil {

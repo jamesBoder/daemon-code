@@ -21,7 +21,7 @@ type processDiff struct {
 func (h *handler) GetSessionRecentDiff(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
-	state, err := h.ddb.GetShadowState(r.Context(), userID.String())
+	state, err := h.ddb.GetLatestShadowState(r.Context(), userID.String())
 	if err != nil || state == nil || state.RecentDiff == "" {
 		respondWithJSON(w, http.StatusOK, []processDiff{})
 		return

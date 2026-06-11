@@ -90,7 +90,9 @@ func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
 	})
 	g.Go(func() error {
 		var err error
-		state, err = h.ddb.GetShadowState(ctx, userID.String())
+		// Latest compile, not exact-today — if a nightly run is missed, Home
+		// shows the most recent prose and relativeDate renders "yesterday".
+		state, err = h.ddb.GetLatestShadowState(ctx, userID.String())
 		return err
 	})
 	g.Go(func() error {
@@ -223,6 +225,11 @@ func relativeDate(date, today string) string {
 		return "recently"
 	}
 	tod, _ := time.Parse("2006-01-02", today)
+	// Nightly outputs are stamped with the date they serve — in the hour between
+	// the 23:00 UTC run and UTC midnight the freshest compile is dated tomorrow.
+	if t.After(tod) {
+		return "today"
+	}
 	if tod.Sub(t).Hours() < 48 {
 		return "yesterday"
 	}

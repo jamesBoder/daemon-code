@@ -14,7 +14,7 @@ import { apiFetchJson, getPulseToday, homeToCompileData } from '../lib/api'
 import { PulseEntryCard } from '../components/pulse/PulseEntryCard'
 import { ProcessStatus } from '../components/processlog/ProcessStatus'
 import { applyArchetypeAccent } from '../lib/colors'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, DAY_QUERY_STALE_MS, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
 import { generateAndShareCard } from '../lib/shareCard'
 import { usePushPrompt } from '../hooks/usePushPrompt'
@@ -32,7 +32,9 @@ export function Home() {
   const { data: home, isLoading: homeLoading, isError: homeError, refetch } = useQuery({
     queryKey: ['home'],
     queryFn: () => apiFetchJson<HomeData>('/home'),
-    staleTime: 23 * 60 * 60 * 1000,
+    // Same shape as the session query: only a compile that actually delivered
+    // prose is worth caching for the day — an empty answer stays stale.
+    staleTime: query => (query.state.data?.daemonProse ? DAY_QUERY_STALE_MS : 0),
   })
 
   const { data: profile, isLoading: profileLoading } = useQuery({

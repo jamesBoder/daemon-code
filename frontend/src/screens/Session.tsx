@@ -4,7 +4,7 @@ import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
-import { ORB_LAYOUT_ID } from '../lib/constants'
+import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID } from '../lib/constants'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
@@ -14,7 +14,10 @@ export function Session() {
   const { data, isLoading } = useQuery({
     queryKey: ['session-today'],
     queryFn: () => apiFetchJson<SessionTodayResponse>('/session/today'),
-    staleTime: 23 * 60 * 60 * 1000,
+    // A ready deck holds all day; "not ready" must stay stale so the screen
+    // re-asks the server once the overnight deck lands instead of caching
+    // this morning's miss for 23 hours.
+    staleTime: query => (query.state.data?.ready ? DAY_QUERY_STALE_MS : 0),
   })
 
   function handleComplete(fragmentCount: number) {

@@ -22,6 +22,11 @@ export const COMPILE_RETURN_DURATION      = 0.60   // terminal lines + stats fad
 export const MAX_CONTENT_WIDTH = 480   // px — max page width (mobile-first)
 export const PROSE_MAX_WIDTH   = 320   // px — max width for daemon prose text
 
+// Daily query caching — satisfied answers (deck ready, prose present) hold until
+// the next compile; unsatisfied answers must never be cached, or the app keeps
+// showing "still processing" long after the overnight pipeline has delivered.
+export const DAY_QUERY_STALE_MS = 23 * 60 * 60 * 1000
+
 // Token refresh
 export const TOKEN_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000  // refresh if expiry < 24h away
 

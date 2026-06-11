@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -243,10 +244,10 @@ Never produce prose — only structured JSON.
 }
 
 daemon_accuracy rules:
-- Represents how well the daemon's predictions match the user's actual behavior (0–100).
+- Represents how well the daemon's predictions match the user's actual behavior (1–100). Always 1–100 — never output 0.
 - Increase by 1–3 when prediction duel answers confirm the daemon's pattern predictions.
 - Decrease by 1–3 when the user's behavior contradicts predictions.
-- If no prediction duel data is present today, carry forward the existing value unchanged.
+- If no prediction duel data is present today, carry forward the existing value unchanged — unless that value is 0 (new user), in which case initialize to 50: even odds until the duels say otherwise.
 - Rises slowly as the daemon learns the user; drops when the user authentically changes.
 
 `
@@ -271,6 +272,10 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 		httpCl: &http.Client{Timeout: 60 * time.Second},
 	}
 }
+
+// baselineDaemonAccuracy is the starting accuracy for a profile that has never
+// recorded a valid value (schema default is 0) — even odds until duels say otherwise.
+const baselineDaemonAccuracy = 50
 
 // snapshotInterval is the number of compiles between score baseline snapshots.
 // At each multiple of this count, the Analyst persists current scores as *_prev
@@ -380,13 +385,19 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 		return nil, fmt.Errorf("anthropic call: %w", err)
 	}
 
-	// 6b. Validate critical Analyst output fields before committing anything to the DB.
-	// daemon_accuracy=0 (zero-value from malformed JSON) written to the DB would cause a
-	// spurious high-magnitude grim_trigger on the next compile (drop = last_compile − 0).
-	// Returning an error here is safe: UpdateShadowProfile has not run yet, so an SQS retry
-	// re-snapshots the same pre-Analyst accuracy with no corruption.
+	// 6b. Repair out-of-range daemon_accuracy instead of failing the night. The schema
+	// seeds daemon_accuracy at 0 and the prompt's carry-forward rule faithfully echoes
+	// it back when no duel data exists, so a hard error here deadlocks the pipeline —
+	// every SQS retry fails identically and the user gets no compile, no prose, and no
+	// session deck. Carry the stored value forward when valid; otherwise start at the
+	// baseline. Logged loudly so model-output drift stays visible.
 	if output.DaemonAccuracy < 1 || output.DaemonAccuracy > 100 {
-		return nil, fmt.Errorf("analyst returned out-of-range daemon_accuracy: %d (expected 1–100)", output.DaemonAccuracy)
+		repaired := profile.DaemonAccuracy
+		if repaired < 1 || repaired > 100 {
+			repaired = baselineDaemonAccuracy
+		}
+		log.Printf("analyst: repaired out-of-range daemon_accuracy %d → %d for user %s", output.DaemonAccuracy, repaired, userID)
+		output.DaemonAccuracy = repaired
 	}
 
 	// 7. Write updated profile to RDS

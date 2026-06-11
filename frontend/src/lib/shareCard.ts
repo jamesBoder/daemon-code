@@ -1,4 +1,4 @@
-import { SHARE_CARD_SIZE } from './constants'
+import { SHARE_CARD_SIZE, STREAK_MIN_DAYS } from './constants'
 import type { OrbState } from '../types'
 
 // All card geometry for the 1080×1080 shareable card.
@@ -8,48 +8,77 @@ const S = SHARE_CARD_SIZE  // 1080
 const CARD = {
   size:         S,
   // Glass card frame
-  w:            840,
-  h:            700,
-  x:            (S - 840) / 2,               // 120
-  y:            (S - 700) / 2,               // 190
+  w:            880,
+  h:            880,
+  x:            (S - 880) / 2,               // 100
+  y:            72,
   radius:       28,
-  padH:         56,                           // horizontal padding inside card
+  padH:         64,                           // horizontal padding inside card
+  // Accent glow behind orb
+  glowR:        300,
+  glowAlpha:    0.08,
   // Orb
-  orbR:         88,
+  orbR:         64,
   orbCx:        S / 2,                        // 540
-  orbCy:        (S - 700) / 2 + 140,          // 330
-  // Prose (Fraunces)
-  proseFontPx:  40,
-  proseLineH:   56,
-  proseCx:      S / 2,                        // 540
-  proseY:       (S - 700) / 2 + 140 + 88 + 64,  // 482 = orbCy + orbR + 64
-  proseMaxW:    840 - 56 * 2,                 // 728 = w - padH * 2
-  // Separator hairline (between prose and processes)
-  sepY:         (S - 700) / 2 + 460,          // 650
-  // Process names (JetBrains Mono)
-  procFontPx:   26,
-  procLineH:    44,
-  procX:        (S - 840) / 2 + 56,           // 176 = x + padH
-  procY:        (S - 700) / 2 + 480,          // 670
-  // Footer (day · orbState)
+  orbCy:        72 + 128,                     // 200
+  // Status line (day · stage · streak)
+  statusFontPx: 22,
+  statusY:      296,
+  // Prose (Fraunces italic)
+  proseFontPx:  36,
+  proseLineH:   52,
+  proseMaxLines:3,
+  proseMaxChars:200,
+  proseCx:      S / 2,
+  proseY:       352,
+  proseMaxW:    880 - 64 * 2,                 // 752
+  // Separators
+  sep1Y:        548,
+  sep2Y:        726,
+  // Behavioral index triad
+  triadLabelPx: 18,
+  triadLabelY:  584,
+  triadValuePx: 48,
+  triadValueY:  616,
+  triadDeltaPx: 20,
+  triadDeltaY:  682,
+  // column centers: content split into thirds
+  triadCols:    [1 / 6, 3 / 6, 5 / 6],
+  // Processes block (or daily signal fallback)
+  sectionFontPx:18,
+  sectionY:     758,
+  procFontPx:   24,
+  procLineH:    40,
+  procY:        796,
+  procMax:      3,
+  // Daily signal fallback (when no named processes)
+  quoteFontPx:  26,
+  quoteLineH:   38,
+  quoteMaxLines:2,
+  quoteY:       788,
+  authorFontPx: 20,
+  // Footer (compile complete.)
   footFontPx:   22,
-  footY:        (S - 700) / 2 + 700 - 54,     // 836 = y + h - 54
+  footY:        905,
   // Brand mark
-  brandFontPx:  20,
-  brandY:       S - 32,                       // 1048
+  brandFontPx:  22,
+  brandY:       S - 84,                       // 996
   // Design tokens — canvas equivalents of CSS custom properties
   bg:           '#070809',
   cardFill:     'rgba(13, 16, 24, 0.78)',
   cardBorder:   'rgba(255, 255, 255, 0.06)',
+  textPrimary:  '#e2e8f0',
   textDaemon:   '#c4c9d4',
-  textProc:     '#64748b',
+  textMuted:    '#64748b',
   textFoot:     '#475569',
-  textBrand:    '#2d3748',
+  green:        '#22c55e',                    // --compile-green
+  warn:         '#f59e0b',                    // --warning
   orbSurface:   '#0d1018',
   orbBorderA:   'rgba(255, 255, 255, 0.12)',  // border-active equivalent
   orbBorderS:   'rgba(255, 255, 255, 0.03)',  // border-subtle equivalent
   noiseAlpha:   0.04,
   hairline:     0.5,                          // canvas lineWidth for all border strokes
+  letterSpacing:'1.5px',                      // mono labels — canvas equivalent of 0.06em
 } as const
 
 // Mirrors DaemonOrb.tsx orbVisuals — must stay in sync if that component changes
@@ -60,9 +89,31 @@ const ORB_VISUALS: Record<OrbState, { outerOpacity: number; innerScale: number; 
   deep:    { outerOpacity: 0.90, innerScale: 0.86, glowOpacity: 0.44 },
 }
 
-function drawBackground(ctx: CanvasRenderingContext2D): void {
+const FONT = {
+  prose:   `italic 300 ${CARD.proseFontPx}px Fraunces`,
+  quote:   `italic 300 ${CARD.quoteFontPx}px Fraunces`,
+  mono:    (px: number) => `400 ${px}px "JetBrains Mono"`,
+  monoMed: (px: number) => `500 ${px}px "JetBrains Mono"`,
+} as const
+
+function setLetterSpacing(ctx: CanvasRenderingContext2D, value: string): void {
+  // letterSpacing is recent canvas API — silently ignored where unsupported
+  if ('letterSpacing' in ctx) ctx.letterSpacing = value
+}
+
+function drawBackground(ctx: CanvasRenderingContext2D, accent: string): void {
   ctx.fillStyle = CARD.bg
   ctx.fillRect(0, 0, CARD.size, CARD.size)
+
+  // Accent wash radiating from the orb — ties the card to the user's archetype color
+  ctx.save()
+  ctx.globalAlpha = CARD.glowAlpha
+  const grad = ctx.createRadialGradient(CARD.orbCx, CARD.orbCy, 0, CARD.orbCx, CARD.orbCy, CARD.glowR)
+  grad.addColorStop(0, accent)
+  grad.addColorStop(1, accent + '00')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, CARD.size, CARD.size)
+  ctx.restore()
 }
 
 async function drawNoise(ctx: CanvasRenderingContext2D): Promise<void> {
@@ -140,7 +191,20 @@ function drawOrb(ctx: CanvasRenderingContext2D, orbState: OrbState, accent: stri
   ctx.restore()
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLines = 2): string[] {
+function drawStatusLine(ctx: CanvasRenderingContext2D, day: number, orbState: OrbState, consecutiveDays: number): void {
+  const parts = [`day ${day}`, orbState]
+  if (consecutiveDays >= STREAK_MIN_DAYS) parts.push(`${consecutiveDays}-day streak`)
+  ctx.save()
+  ctx.font = FONT.mono(CARD.statusFontPx)
+  setLetterSpacing(ctx, CARD.letterSpacing)
+  ctx.fillStyle = CARD.textMuted
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText(parts.join('  ·  '), CARD.size / 2, CARD.statusY)
+  ctx.restore()
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
   const words = text.split(' ')
   const lines: string[] = []
   let current = ''
@@ -158,7 +222,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, max
   return lines
 }
 
-function extractFirstSentence(prose: string, maxChars = 130): string {
+function extractExcerpt(prose: string, maxChars: number): string {
   const match = prose.match(/^.{20,}?[.!?](?:\s|$)/)
   const sentence = (match ? match[0] : prose).trim()
   if (sentence.length <= maxChars) return sentence
@@ -167,75 +231,148 @@ function extractFirstSentence(prose: string, maxChars = 130): string {
 
 function drawProse(ctx: CanvasRenderingContext2D, prose: string): void {
   ctx.save()
-  ctx.font = `400 ${CARD.proseFontPx}px Fraunces`
+  ctx.font = FONT.prose
   ctx.fillStyle = CARD.textDaemon
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  const text = extractFirstSentence(prose)
-  const lines = wrapText(ctx, text, CARD.proseMaxW)
+  const text = `“${extractExcerpt(prose, CARD.proseMaxChars)}”`
+  const lines = wrapText(ctx, text, CARD.proseMaxW, CARD.proseMaxLines)
   lines.forEach((line, i) => {
     ctx.fillText(line, CARD.proseCx, CARD.proseY + i * CARD.proseLineH)
   })
   ctx.restore()
 }
 
-function drawSeparator(ctx: CanvasRenderingContext2D): void {
+function drawSeparator(ctx: CanvasRenderingContext2D, y: number): void {
   ctx.save()
   ctx.strokeStyle = CARD.cardBorder
   ctx.lineWidth = CARD.hairline
   ctx.beginPath()
-  ctx.moveTo(CARD.x + CARD.padH, CARD.sepY)
-  ctx.lineTo(CARD.x + CARD.w - CARD.padH, CARD.sepY)
+  ctx.moveTo(CARD.x + CARD.padH, y)
+  ctx.lineTo(CARD.x + CARD.w - CARD.padH, y)
   ctx.stroke()
   ctx.restore()
 }
 
-function drawProcesses(ctx: CanvasRenderingContext2D, names: string[]): void {
-  if (names.length === 0) return
+interface TriadStat {
+  label:  string
+  value:  string
+  delta:  number
+}
+
+function drawTriad(ctx: CanvasRenderingContext2D, stats: TriadStat[]): void {
+  const contentX = CARD.x + CARD.padH
+  const contentW = CARD.w - CARD.padH * 2
   ctx.save()
-  ctx.font = `400 ${CARD.procFontPx}px "JetBrains Mono"`
-  ctx.fillStyle = CARD.textProc
-  ctx.textAlign = 'left'
+  ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  names.slice(0, 3).forEach((name, i) => {
-    ctx.fillText(name, CARD.procX, CARD.procY + i * CARD.procLineH)
+  stats.forEach((stat, i) => {
+    const cx = contentX + contentW * CARD.triadCols[i]
+    ctx.font = FONT.mono(CARD.triadLabelPx)
+    setLetterSpacing(ctx, CARD.letterSpacing)
+    ctx.fillStyle = CARD.textMuted
+    ctx.fillText(stat.label, cx, CARD.triadLabelY)
+    setLetterSpacing(ctx, '0px')
+
+    ctx.font = FONT.monoMed(CARD.triadValuePx)
+    ctx.fillStyle = CARD.textPrimary
+    ctx.fillText(stat.value, cx, CARD.triadValueY)
+
+    if (stat.delta !== 0) {
+      ctx.font = FONT.mono(CARD.triadDeltaPx)
+      ctx.fillStyle = stat.delta > 0 ? CARD.green : CARD.warn
+      ctx.fillText(`${stat.delta > 0 ? '+' : ''}${stat.delta}`, cx, CARD.triadDeltaY)
+    }
   })
   ctx.restore()
 }
 
-function drawFooter(ctx: CanvasRenderingContext2D, day: number, orbState: OrbState): void {
+function drawProcesses(ctx: CanvasRenderingContext2D, names: string[]): void {
   ctx.save()
-  ctx.font = `400 ${CARD.footFontPx}px "JetBrains Mono"`
+  ctx.textBaseline = 'top'
+
+  ctx.font = FONT.mono(CARD.sectionFontPx)
+  setLetterSpacing(ctx, CARD.letterSpacing)
   ctx.fillStyle = CARD.textFoot
+  ctx.textAlign = 'left'
+  ctx.fillText('active processes', CARD.x + CARD.padH, CARD.sectionY)
+  setLetterSpacing(ctx, '0px')
+
+  ctx.font = FONT.mono(CARD.procFontPx)
+  names.slice(0, CARD.procMax).forEach((name, i) => {
+    const y = CARD.procY + i * CARD.procLineH
+    ctx.fillStyle = CARD.green
+    ctx.fillText('>', CARD.x + CARD.padH, y)
+    ctx.fillStyle = CARD.textMuted
+    ctx.fillText(name, CARD.x + CARD.padH + CARD.procFontPx, y)
+  })
+  ctx.restore()
+}
+
+// Fallback when the daemon hasn't named processes yet — the daily signal quote
+function drawSignal(ctx: CanvasRenderingContext2D, quote: string, author?: string): void {
+  ctx.save()
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(`day ${day} · ${orbState}`, CARD.size / 2, CARD.footY)
+  ctx.font = FONT.quote
+  ctx.fillStyle = CARD.textMuted
+  const lines = wrapText(ctx, `“${quote}”`, CARD.proseMaxW, CARD.quoteMaxLines)
+  lines.forEach((line, i) => {
+    ctx.fillText(line, CARD.size / 2, CARD.quoteY + i * CARD.quoteLineH)
+  })
+  if (author) {
+    ctx.font = FONT.mono(CARD.authorFontPx)
+    ctx.fillStyle = CARD.textFoot
+    ctx.fillText(`— ${author}`, CARD.size / 2, CARD.quoteY + lines.length * CARD.quoteLineH + CARD.quoteLineH / 2)
+  }
+  ctx.restore()
+}
+
+function drawFooter(ctx: CanvasRenderingContext2D): void {
+  ctx.save()
+  ctx.font = FONT.mono(CARD.footFontPx)
+  setLetterSpacing(ctx, CARD.letterSpacing)
+  ctx.fillStyle = CARD.green
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('compile complete. ▋', CARD.size / 2, CARD.footY)
   ctx.restore()
 }
 
 function drawBrand(ctx: CanvasRenderingContext2D): void {
   ctx.save()
-  ctx.font = `400 ${CARD.brandFontPx}px "JetBrains Mono"`
-  ctx.fillStyle = CARD.textBrand
+  ctx.font = FONT.mono(CARD.brandFontPx)
+  setLetterSpacing(ctx, CARD.letterSpacing)
+  ctx.fillStyle = CARD.textFoot
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText('daemon code', CARD.size / 2, CARD.brandY)
+  ctx.fillText('daemoncode.app', CARD.size / 2, CARD.brandY)
   ctx.restore()
 }
 
 export interface CardInput {
-  prose:        string
-  day:          number
-  orbState:     OrbState
-  processNames: string[]  // already filtered to named only, max 3
-  accent:       string    // current --accent value, e.g. '#6366f1'
+  prose:               string
+  day:                 number
+  orbState:            OrbState
+  processNames:        string[]  // already filtered to named only, max 3
+  accent:              string    // current --accent value, e.g. '#6366f1'
+  kernelAccess:        number
+  daemonAccuracy:      number
+  decodedLines:        number
+  kernelAccessDelta:   number
+  daemonAccuracyDelta: number
+  decodedLinesDelta:   number
+  consecutiveDays:     number
+  signalQuote?:        string
+  signalAuthor?:       string
 }
 
 export async function generateAndShareCard(input: CardInput): Promise<void> {
   // Ensure fonts are loaded before canvas measures or renders them
   await Promise.all([
-    document.fonts.load(`400 ${CARD.proseFontPx}px Fraunces`),
-    document.fonts.load(`400 ${CARD.procFontPx}px "JetBrains Mono"`),
+    document.fonts.load(FONT.prose),
+    document.fonts.load(FONT.mono(CARD.procFontPx)),
+    document.fonts.load(FONT.monoMed(CARD.triadValuePx)),
   ])
 
   const canvas = document.createElement('canvas')
@@ -244,16 +381,25 @@ export async function generateAndShareCard(input: CardInput): Promise<void> {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  drawBackground(ctx)
+  drawBackground(ctx, input.accent)
   await drawNoise(ctx)
   drawGlassCard(ctx)
   drawOrb(ctx, input.orbState, input.accent)
+  drawStatusLine(ctx, input.day, input.orbState, input.consecutiveDays)
   drawProse(ctx, input.prose)
+  drawSeparator(ctx, CARD.sep1Y)
+  drawTriad(ctx, [
+    { label: 'kernel access',   value: `${input.kernelAccess}%`,            delta: input.kernelAccessDelta },
+    { label: 'daemon accuracy', value: `${input.daemonAccuracy}%`,          delta: input.daemonAccuracyDelta },
+    { label: 'decoded lines',   value: input.decodedLines.toLocaleString(), delta: input.decodedLinesDelta },
+  ])
+  drawSeparator(ctx, CARD.sep2Y)
   if (input.processNames.length > 0) {
-    drawSeparator(ctx)
     drawProcesses(ctx, input.processNames)
+  } else if (input.signalQuote) {
+    drawSignal(ctx, input.signalQuote, input.signalAuthor)
   }
-  drawFooter(ctx, input.day, input.orbState)
+  drawFooter(ctx)
   drawBrand(ctx)
 
   const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))

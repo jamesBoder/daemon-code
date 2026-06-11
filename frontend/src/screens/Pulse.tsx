@@ -20,6 +20,7 @@ import {
   LETTER_SPACING_WIDE,
   LETTER_SPACING_COMPILE,
   LETTER_SPACING_PROCESS,
+  SCREEN_HEADER_HEIGHT,
 } from '../lib/constants'
 import type { OrbState, HomeData } from '../types'
 
@@ -209,7 +210,9 @@ export function Pulse() {
   const handleBack = () => navigate('/home', { replace: true })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+    // paddingTop clears the fixed ScreenHeader — without it the scenario text and
+    // top nodes render behind the header with no way to reach them (overflow hidden)
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))` }}>
       {phase < 4 && <ScreenHeader title="" onBack={handleBack} />}
 
       <div style={{ flex: 1, position: 'relative' }}>

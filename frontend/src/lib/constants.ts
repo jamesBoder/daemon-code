@@ -15,6 +15,8 @@ export const COMPILE_PROSE_DELAY          = 0.10   // after fade-out before pros
 export const COMPILE_PROSE_DURATION       = 0.60   // prose fade-in
 export const COMPILE_SIGNAL_DELAY         = 1.60   // after prose starts before signal (3.8s mark)
 export const COMPILE_SIGNAL_DURATION      = 0.40   // daily signal fade-in
+export const COMPILE_RETURN_DELAY         = 0.30   // after signal lands before terminal text returns
+export const COMPILE_RETURN_DURATION      = 0.60   // terminal lines + stats fade back in (resting state matches static render)
 
 // Layout
 export const MAX_CONTENT_WIDTH = 480   // px — max page width (mobile-first)

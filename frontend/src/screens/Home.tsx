@@ -102,11 +102,20 @@ export function Home() {
         .slice(0, 3)
         .map(p => p.name as string)
       await generateAndShareCard({
-        prose:        home.daemonProse,
-        day:          home.day,
-        orbState:     home.orbState,
-        processNames: namedProcesses,
+        prose:               home.daemonProse,
+        day:                 home.day,
+        orbState:            home.orbState,
+        processNames:        namedProcesses,
         accent,
+        kernelAccess:        home.kernelAccess,
+        daemonAccuracy:      home.daemonAccuracy,
+        decodedLines:        home.decodedLines,
+        kernelAccessDelta:   home.kernelAccessDelta,
+        daemonAccuracyDelta: home.daemonAccuracyDelta,
+        decodedLinesDelta:   home.decodedLinesDelta,
+        consecutiveDays:     home.consecutiveDays,
+        signalQuote:         home.dailySignalQuote,
+        signalAuthor:        home.dailySignalAuthor,
       })
     } catch (err) {
       // AbortError means the user cancelled the share sheet — not an error

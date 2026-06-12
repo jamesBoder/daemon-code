@@ -20,6 +20,33 @@ export const copy = {
     exitConfirm:  'Leave',
     exitCancel:   'Stay',
   },
+  mood: {
+    // One prompt is drawn at random per session so the closing beat varies.
+    prompts: [
+      'How do you feel right now?',
+      'Where is the signal today?',
+      'How clear are you, right now?',
+    ],
+    lowLabel:  'static',
+    highLabel: 'clear',
+    confirm:   'Log it →',
+    hint:      'drag to answer',
+    // Acknowledgement line buckets by score; one line drawn at random.
+    acks: {
+      low: [
+        'logged. the daemon adjusts for interference.',
+        'noted. heavy-signal days still count.',
+      ],
+      mid: [
+        'logged. baseline holds.',
+        'noted. steady state read.',
+      ],
+      high: [
+        'logged. clear signal improves the read.',
+        'noted. the daemon works best in this range.',
+      ],
+    },
+  },
   duel: {
     recordLabel: 'daemon record',
     // One reveal line is drawn at random per duel.

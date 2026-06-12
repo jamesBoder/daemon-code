@@ -69,14 +69,21 @@ export const MG = {
     revealS:    0.25, // generic reveal fade (confirm buttons, etc.)
   },
 
-  // ── Session chrome (progress bar + exit button + mood) ────────────────────
+  // ── Session chrome (progress bar + exit button) ────────────────────────────
   session: {
     closeW:        52,   // px — wider than 44 to clear safe-area edge
     closeH:        44,   // px — = MIN_TOUCH_TARGET
     closeIconSize: 18,
     closeStroke:   1.5,
-    moodSize:      56,   // px — mood tile width and height
-    moodTapScale:  0.92, // mild tap (larger target — softer than BUTTON_TAP_SCALE)
+  },
+
+  // ── MoodCheck (end-of-session spectrum) ────────────────────────────────────
+  mood: {
+    orbSize:    140,  // px — DaemonOrb diameter above the spectrum
+    trackMaxW:  360,  // px — spectrum track max width
+    ackHoldMs: 1400,  // how long the acknowledgement line shows before navigating
+    scoreMin:     1,  // mood score domain — matches /session/mood contract
+    scoreMax:     5,
   },
 
   // ── Onboarding compile animation ──────────────────────────────────────────

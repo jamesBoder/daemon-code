@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { SignalWhisper } from '../daemon/SignalWhisper'
 import { fragmentRegistry } from './registry'
+import { MoodCheck } from './MoodCheck'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { apiFetch } from '../../lib/api'
 import { copy } from '../../lib/copy'
@@ -19,8 +20,7 @@ interface Props {
 
 type Phase = 'game' | 'mood'
 
-const MOOD_SCORES = [1, 2, 3, 4, 5]
-const transMs     = MG.transition.fragmentMs
+const transMs = MG.transition.fragmentMs
 
 export function SessionContainer({ fragments, onComplete }: Props) {
   const navigate  = useNavigate()
@@ -184,24 +184,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
             </>
           )
         ) : (
-          <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-8)', padding: 'var(--space-8)' }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)', textAlign: 'center' }}>
-              How do you feel right now?
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-              {MOOD_SCORES.map(score => (
-                <motion.button
-                  key={score}
-                  onClick={() => handleMoodSelect(score)}
-                  whileTap={{ scale: MG.session.moodTapScale }}
-                  className="glass-card"
-                  style={{ width: MG.session.moodSize, height: MG.session.moodSize, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)', background: 'transparent' }}
-                >
-                  {score}
-                </motion.button>
-              ))}
-            </div>
-          </div>
+          <MoodCheck onSelect={handleMoodSelect} />
         )}
       </motion.div>
 

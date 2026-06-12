@@ -21,6 +21,7 @@ const (
 	scalesMax              = 3   // most weighted scale fragments per deck
 	speedPromptsPerRound   = 4   // prompts sampled into one speed_round fragment
 	speedRoundMinCompiles  = 1   // compiles before speed rounds enter the deck rotation
+	wordsPerTest           = 6   // words sampled into one reaction_test fragment
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -28,6 +29,7 @@ const (
 type exclusions struct {
 	pairIDs        map[string]bool
 	speedPromptIDs map[string]bool
+	reactionWords  map[string]bool
 }
 
 type Generator struct {
@@ -132,8 +134,8 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 // between the other reaction word set and a speed round once the user has
 // enough compiles. Which of the two opens is also random.
 func (g *Generator) pickFastGames(profile db.ShadowProfile, exclude exclusions) [2]dynamo.Fragment {
-	reaction := g.buildReactionTest(profile)
-	other := g.buildReactionTestExplore(profile)
+	reaction := g.buildReactionTest(profile, exclude)
+	other := g.buildReactionTestExplore(profile, exclude)
 	if rand.Intn(2) == 0 {
 		reaction, other = other, reaction
 	}
@@ -210,12 +212,25 @@ func adjacencyViolations(fragments []dynamo.Fragment, prevType string) int {
 // sampling can exclude them. Payloads written before IDs were stamped simply
 // contribute nothing.
 func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
-	ex := exclusions{pairIDs: make(map[string]bool), speedPromptIDs: make(map[string]bool)}
+	ex := exclusions{
+		pairIDs:        make(map[string]bool),
+		speedPromptIDs: make(map[string]bool),
+		reactionWords:  make(map[string]bool),
+	}
 	if prev == nil {
 		return ex
 	}
 	for _, f := range prev.Fragments {
 		switch f.Type {
+		case "reaction_test":
+			var p struct {
+				Words []string `json:"words"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil {
+				for _, w := range p.Words {
+					ex.reactionWords[w] = true
+				}
+			}
 		case "weighted_scale":
 			var p struct {
 				PairID string `json:"pair_id"`
@@ -290,51 +305,44 @@ func buildSpeedRound(compileCount int32, exclude map[string]bool) (dynamo.Fragme
 	}, true
 }
 
-func (g *Generator) buildReactionTest(profile db.ShadowProfile) dynamo.Fragment {
-	wordSets := map[string][]string{
-		"abandoned_child": {"safety", "rejection", "belonging", "distance", "warmth", "abandonment"},
-		"unworthy_self":   {"achievement", "failure", "worth", "inadequacy", "success", "shame"},
-		"caged_rage":      {"control", "freedom", "power", "constraint", "authority", "resistance"},
-		"grief_carrier":   {"loss", "memory", "absence", "presence", "grief", "continuity"},
-		"default":         {"safety", "achievement", "control", "loss", "belonging", "freedom"},
-	}
-
-	archetype := profile.PrimaryArchetype
-	words, ok := wordSets[archetype]
-	if !ok {
-		words = wordSets["default"]
-	}
-
-	payload, _ := json.Marshal(map[string]interface{}{
-		"words":          words,
-		"duration_ms":    reactionWordDurationMs,
-		"archetype_hint": archetype,
-	})
-
-	return dynamo.Fragment{
-		ID:         uuid.New().String(),
-		Type:       "reaction_test",
-		Payload:    string(payload),
-		DaemonNote: "Observe what moves quickly.",
-	}
+// buildReactionTest samples the primary nightly word set from the archetype's
+// core pool in signal.Words — the words that probe the archetype directly.
+func (g *Generator) buildReactionTest(profile db.ShadowProfile, exclude exclusions) dynamo.Fragment {
+	words := sampleWords(signal.CoreWords(profile.PrimaryArchetype), wordsPerTest, exclude.reactionWords)
+	return reactionTestFragment(words, profile.PrimaryArchetype, "Observe what moves quickly.")
 }
 
-// buildReactionTestExplore uses a broader word set to surface signals beyond the primary archetype.
-func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile) dynamo.Fragment {
-	exploreSets := map[string][]string{
-		"abandoned_child": {"purpose", "visibility", "silence", "voice", "loyalty", "trust"},
-		"unworthy_self":   {"approval", "identity", "boundaries", "effort", "rest", "pride"},
-		"caged_rage":      {"surrender", "clarity", "change", "stability", "truth", "anger"},
-		"grief_carrier":   {"joy", "comfort", "risk", "certainty", "doubt", "connection"},
-		"default":         {"purpose", "approval", "surrender", "joy", "clarity", "identity"},
-	}
+// buildReactionTestExplore samples from the rest of the library to surface
+// signals beyond the primary archetype. Its pool is disjoint from the primary
+// test's, so the two never overlap within one deck.
+func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile, exclude exclusions) dynamo.Fragment {
+	words := sampleWords(signal.ExploreWords(profile.PrimaryArchetype), wordsPerTest, exclude.reactionWords)
+	return reactionTestFragment(words, profile.PrimaryArchetype, "The second pass catches what the first one missed.")
+}
 
-	archetype := profile.PrimaryArchetype
-	words, ok := exploreSets[archetype]
-	if !ok {
-		words = exploreSets["default"]
+// sampleWords picks n random word texts from pool, holding back words served
+// yesterday unless the pool runs short without them.
+func sampleWords(pool []signal.Word, n int, exclude map[string]bool) []string {
+	var fresh, served []string
+	for _, w := range pool {
+		if exclude[w.Text] {
+			served = append(served, w.Text)
+		} else {
+			fresh = append(fresh, w.Text)
+		}
 	}
+	rand.Shuffle(len(fresh), func(i, j int) { fresh[i], fresh[j] = fresh[j], fresh[i] })
+	if len(fresh) < n {
+		rand.Shuffle(len(served), func(i, j int) { served[i], served[j] = served[j], served[i] })
+		fresh = append(fresh, served...)
+	}
+	if n > len(fresh) {
+		n = len(fresh)
+	}
+	return fresh[:n]
+}
 
+func reactionTestFragment(words []string, archetype, daemonNote string) dynamo.Fragment {
 	payload, _ := json.Marshal(map[string]interface{}{
 		"words":          words,
 		"duration_ms":    reactionWordDurationMs,
@@ -345,7 +353,7 @@ func (g *Generator) buildReactionTestExplore(profile db.ShadowProfile) dynamo.Fr
 		ID:         uuid.New().String(),
 		Type:       "reaction_test",
 		Payload:    string(payload),
-		DaemonNote: "The second pass catches what the first one missed.",
+		DaemonNote: daemonNote,
 	}
 }
 

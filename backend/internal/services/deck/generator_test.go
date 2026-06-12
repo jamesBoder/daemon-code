@@ -187,6 +187,65 @@ func TestUsedContentIDs(t *testing.T) {
 	}
 }
 
+func TestReactionTestSampling(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "abandoned_child", CompileCount: 10}
+
+	type rtPayload struct {
+		Words []string `json:"words"`
+	}
+	for i := 0; i < 100; i++ {
+		deck := g.buildDeck(profile, nil, exclusions{})
+		seen := map[string]bool{}
+		for _, f := range deck {
+			if f.Type != "reaction_test" {
+				continue
+			}
+			var p rtPayload
+			if err := json.Unmarshal([]byte(f.Payload), &p); err != nil {
+				t.Fatalf("payload: %v", err)
+			}
+			if len(p.Words) != wordsPerTest {
+				t.Fatalf("got %d words, want %d", len(p.Words), wordsPerTest)
+			}
+			for _, w := range p.Words {
+				if _, ok := signal.Lookup(w); !ok {
+					t.Fatalf("sampled word %q not in library — analyst can't score it", w)
+				}
+				if seen[w] {
+					t.Fatalf("word %q repeated within one deck", w)
+				}
+				seen[w] = true
+			}
+		}
+	}
+}
+
+func TestSampleWordsExcludesServed(t *testing.T) {
+	pool := signal.CoreWords("caged_rage") // 10 words
+	first := sampleWords(pool, 4, nil)
+	exclude := map[string]bool{}
+	for _, w := range first {
+		exclude[w] = true
+	}
+	// 6 fresh words remain for a 4-word request: exclusion must hold.
+	for i := 0; i < 50; i++ {
+		for _, w := range sampleWords(pool, 4, exclude) {
+			if exclude[w] {
+				t.Fatalf("word %q repeated despite exclusion", w)
+			}
+		}
+	}
+	// Excluding the entire pool: fallback must still fill the request.
+	all := map[string]bool{}
+	for _, w := range pool {
+		all[w.Text] = true
+	}
+	if got := len(sampleWords(pool, 4, all)); got != 4 {
+		t.Fatalf("fallback returned %d words, want 4", got)
+	}
+}
+
 func TestPickPatternWeighted(t *testing.T) {
 	if p := pickPatternWeighted(nil); p.Name.Valid {
 		t.Fatal("empty input returned a named pattern")

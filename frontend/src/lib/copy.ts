@@ -175,7 +175,10 @@ export const copy = {
       { left: 'speaking',    right: 'listening'    },
       { left: 'change',      right: 'consistency'  },
     ],
-    // 8 prompts for the Speed Round (onboarding-only)
+    // 8 prompts for the Speed Round (onboarding-only).
+    // Starter and option text must stay in sync with the tagged copies in
+    // backend/internal/signal/speedprompts.go — the Analyst scores onboarding
+    // speed_round responses by exact text match; a drift silently stops scoring.
     speedRoundPrompts: [
       { starter: 'When things go wrong, I usually...',    options: ['look inward',       'look outward',             'go quiet']              },
       { starter: 'I feel most like myself when I\'m...', options: ['alone',             'with people I trust',      'doing something']       },

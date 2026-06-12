@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -74,7 +75,14 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		prevDeck = nil
 	}
 
-	fragments := g.buildDeck(profile, patterns, usedContentIDs(prevDeck))
+	// Analyst-authored duel prediction from tonight's compile (runs before the
+	// deck generator in the nightly chain). Zero value on error → template fallback.
+	pred, err := g.q.GetTomorrowPrediction(ctx, userID)
+	if err != nil {
+		pred = db.TomorrowPrediction{}
+	}
+
+	fragments := g.buildDeck(profile, patterns, usedContentIDs(prevDeck), pred)
 	// Stamp with the date this deck serves (the following UTC day for the
 	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
 	date := dynamo.ServiceDate(time.Now())
@@ -106,7 +114,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 // assembly below, register its renderer in the frontend fragment registry, and
 // teach computeDimensionSignals (internal/services/ai/context.go) its
 // response_data shape.
-func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions) []dynamo.Fragment {
+func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions, pred db.TomorrowPrediction) []dynamo.Fragment {
 	fast := g.pickFastGames(profile, exclude)
 	opener, second := fast[0], fast[1]
 
@@ -119,7 +127,7 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 
 	deck := append([]dynamo.Fragment{opener}, middle...)
 	if len(patterns) > 0 {
-		deck = append(deck, g.buildPredictionDuel(profile, patterns))
+		deck = append(deck, g.buildPredictionDuel(profile, patterns, pred))
 	}
 
 	for i := range deck {
@@ -400,15 +408,28 @@ func buildWeightedScaleFragment(pair signal.Pair) dynamo.Fragment {
 	}
 }
 
-func (g *Generator) buildPredictionDuel(profile db.ShadowProfile, patterns []db.PatternLibrary) dynamo.Fragment {
+// buildPredictionDuel serves the Analyst-authored prediction when one was
+// written tonight, falling back to a humanized template otherwise. The
+// daemon_record stamped here is current all day: the Analyst (which moves
+// daemon_accuracy) runs before the deck generator in the nightly chain.
+func (g *Generator) buildPredictionDuel(profile db.ShadowProfile, patterns []db.PatternLibrary, pred db.TomorrowPrediction) dynamo.Fragment {
 	patternName := "unknown_pattern"
 	if picked := pickPatternWeighted(patterns); picked.Name.Valid {
 		patternName = picked.Name.String
 	}
 
+	prediction := fmt.Sprintf("You will notice %s today.", humanizePatternName(patternName))
+	if pred.Text != "" {
+		prediction = pred.Text
+		if pred.PatternName != "" {
+			patternName = pred.PatternName
+		}
+	}
+
 	payload, _ := json.Marshal(map[string]interface{}{
-		"pattern":    patternName,
-		"prediction": fmt.Sprintf("You will notice %s today.", patternName),
+		"pattern":       patternName,
+		"prediction":    prediction,
+		"daemon_record": profile.DaemonAccuracy,
 	})
 
 	return dynamo.Fragment{
@@ -417,6 +438,17 @@ func (g *Generator) buildPredictionDuel(profile db.ShadowProfile, patterns []db.
 		Payload:    string(payload),
 		DaemonNote: "The daemon made a prediction. Was it right?",
 	}
+}
+
+// humanizePatternName turns an internal pattern name into duel-readable text:
+// "the_approval_loop.process" → "the approval loop". The internal form never
+// reaches the user.
+func humanizePatternName(name string) string {
+	if name == "unknown_pattern" {
+		return "a familiar pattern"
+	}
+	name = strings.TrimSuffix(name, ".process")
+	return strings.ReplaceAll(name, "_", " ")
 }
 
 // pickPatternWeighted selects a named pattern with probability proportional to

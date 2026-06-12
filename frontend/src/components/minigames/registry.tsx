@@ -38,6 +38,7 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
     <PredictionDuel
       pattern={raw.pattern as string}
       prediction={raw.prediction as string}
+      record={raw.daemon_record as number | undefined}
       onComplete={onComplete}
     />
   ),

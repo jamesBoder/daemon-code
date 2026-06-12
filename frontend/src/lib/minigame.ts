@@ -55,6 +55,9 @@ export const MG = {
     revealMs:      1500, // how long reveal text shows before onComplete fires
     revealFadeS:   0.3,  // reveal text fade-in duration
     cardTransition: '0.15s', // card border/color CSS transition
+    recordMin:     1,    // daemon record domain bounds — mirror analyst 1-100 rule
+    recordMax:     100,
+    recordTick:    1,    // visual record movement on reveal
   },
 
   // ── Transitions — component-to-component and state-to-state ───────────────

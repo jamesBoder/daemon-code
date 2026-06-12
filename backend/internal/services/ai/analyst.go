@@ -228,6 +228,10 @@ Never produce prose — only structured JSON.
       "daemon_note": "one line, what the daemon observes about this pattern — about the person, never about game actions or timing"
     }
   ],
+  "tomorrow_prediction": {
+    "text": "one falsifiable prediction about the user's coming day, or empty string — see tomorrow_prediction rules",
+    "pattern": "the_pattern_name.process it derives from, or null"
+  },
   "profile_dimensions": {
     "openness":           { "score": 0.62, "confidence": 0.55, "n": 11, "last_delta":  0.03 },
     "conscientiousness":  { "score": 0.48, "confidence": 0.41, "n":  9, "last_delta": -0.02 },
@@ -249,6 +253,13 @@ daemon_accuracy rules:
 - Decrease by 1–3 when the user's behavior contradicts predictions.
 - If no prediction duel data is present today, carry forward the existing value unchanged — unless that value is 0 (new user), in which case initialize to 50: even odds until the duels say otherwise.
 - Rises slowly as the daemon learns the user; drops when the user authentically changes.
+
+tomorrow_prediction rules:
+- One specific, checkable claim about the user's coming day, second person, max 90 chars. It is shown verbatim in tomorrow's prediction duel, where the user judges whether the daemon was right.
+- Ground it in an active named pattern and set "pattern" to that pattern's name. Vary which pattern you draw from night to night — do not predict from the same pattern every compile.
+- Falsifiable by the user's own experience: "You will say yes to something you wanted to refuse." — not horoscope material like "You will face a challenge."
+- Plain language only: never pattern names, .process suffixes, dimensions, scores, games, or the word daemon in the text.
+- If no named pattern exists yet, output {"text": "", "pattern": null}.
 
 `
 
@@ -304,8 +315,14 @@ type analystOutput struct {
 	AnalystNotes          string          `json:"analyst_notes"`
 	CompileLines          []string        `json:"compile_lines"`
 	PatternUpdates        []patternUpdate `json:"pattern_updates"`
+	TomorrowPrediction    *tomorrowPrediction `json:"tomorrow_prediction,omitempty"`
 	ProfileDimensions     json.RawMessage `json:"profile_dimensions,omitempty"`
 	ChangeFlags           []changeFlag    `json:"change_flags,omitempty"`
+}
+
+type tomorrowPrediction struct {
+	Text    string `json:"text"`
+	Pattern string `json:"pattern"`
 }
 
 type changeFlag struct {
@@ -448,6 +465,16 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 	// which re-runs SnapshotDaemonAccuracy against the post-Analyst daemon_accuracy already
 	// committed by UpdateShadowProfile, corrupting the grim trigger baseline.
 	_ = a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
+
+	// 8b. Persist tomorrow's duel prediction — non-fatal for the same retry reason.
+	// Written every compile: an empty text clears the previous night's prediction
+	// so the deck generator falls back to its template rather than serving a
+	// stale claim twice.
+	pred := tomorrowPrediction{}
+	if output.TomorrowPrediction != nil {
+		pred = *output.TomorrowPrediction
+	}
+	_ = a.q.SetTomorrowPrediction(ctx, userID, pred.Text, pred.Pattern)
 
 	return output.CompileLines, nil
 }

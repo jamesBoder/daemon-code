@@ -26,7 +26,7 @@ func TestBuildDeckArc(t *testing.T) {
 
 	sawSpeedRound := false
 	for i := 0; i < 200; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{})
+		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
 
 		if len(deck) < 5 || len(deck) > 6 {
 			t.Fatalf("deck length %d, want 5-6", len(deck))
@@ -73,7 +73,7 @@ func TestBuildDeckBeforeSpeedRoundEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 0}
 	for i := 0; i < 50; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}) {
+		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "speed_round" {
 				t.Fatal("speed round appeared before eligibility")
 			}
@@ -125,7 +125,7 @@ func TestBuildSpeedRoundExcludesServed(t *testing.T) {
 
 func TestBuildDeckNoPatternsHasNoDuel(t *testing.T) {
 	g := &Generator{}
-	deck := g.buildDeck(db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{})
+	deck := g.buildDeck(db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{}, db.TomorrowPrediction{})
 	for _, f := range deck {
 		if f.Type == "prediction_duel" {
 			t.Fatal("duel present without patterns")
@@ -195,7 +195,7 @@ func TestReactionTestSampling(t *testing.T) {
 		Words []string `json:"words"`
 	}
 	for i := 0; i < 100; i++ {
-		deck := g.buildDeck(profile, nil, exclusions{})
+		deck := g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{})
 		seen := map[string]bool{}
 		for _, f := range deck {
 			if f.Type != "reaction_test" {
@@ -243,6 +243,60 @@ func TestSampleWordsExcludesServed(t *testing.T) {
 	}
 	if got := len(sampleWords(pool, 4, all)); got != 4 {
 		t.Fatalf("fallback returned %d words, want 4", got)
+	}
+}
+
+func TestBuildPredictionDuelPayload(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{DaemonAccuracy: 63}
+	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
+
+	type duelPayload struct {
+		Pattern      string `json:"pattern"`
+		Prediction   string `json:"prediction"`
+		DaemonRecord int32  `json:"daemon_record"`
+	}
+
+	// Template fallback: humanized name, no internal form, record stamped.
+	var p duelPayload
+	frag := g.buildPredictionDuel(profile, patterns, db.TomorrowPrediction{})
+	if err := json.Unmarshal([]byte(frag.Payload), &p); err != nil {
+		t.Fatalf("payload: %v", err)
+	}
+	if p.Prediction != "You will notice the approval loop today." {
+		t.Fatalf("fallback prediction = %q", p.Prediction)
+	}
+	if p.DaemonRecord != 63 {
+		t.Fatalf("daemon_record = %d, want 63", p.DaemonRecord)
+	}
+	if p.Pattern != "the_approval_loop.process" {
+		t.Fatalf("pattern metadata = %q", p.Pattern)
+	}
+
+	// Analyst-authored prediction served verbatim with its own pattern.
+	pred := db.TomorrowPrediction{Text: "You will say yes to something you wanted to refuse.", PatternName: "the_other_first.process"}
+	frag = g.buildPredictionDuel(profile, patterns, pred)
+	if err := json.Unmarshal([]byte(frag.Payload), &p); err != nil {
+		t.Fatalf("payload: %v", err)
+	}
+	if p.Prediction != pred.Text {
+		t.Fatalf("prediction = %q, want analyst text", p.Prediction)
+	}
+	if p.Pattern != pred.PatternName {
+		t.Fatalf("pattern = %q, want analyst pattern", p.Pattern)
+	}
+}
+
+func TestHumanizePatternName(t *testing.T) {
+	cases := map[string]string{
+		"the_approval_loop.process": "the approval loop",
+		"the_never_again.process":   "the never again",
+		"unknown_pattern":           "a familiar pattern",
+	}
+	for in, want := range cases {
+		if got := humanizePatternName(in); got != want {
+			t.Fatalf("humanizePatternName(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

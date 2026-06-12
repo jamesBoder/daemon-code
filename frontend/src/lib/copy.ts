@@ -20,6 +20,24 @@ export const copy = {
     exitConfirm:  'Leave',
     exitCancel:   'Stay',
   },
+  duel: {
+    recordLabel: 'daemon record',
+    // One reveal line is drawn at random per duel.
+    correctReveals: [
+      'Predicted correctly. The daemon notes the confirmation.',
+      'Expected. The model holds.',
+      'Consistent. Logged.',
+      'The daemon anticipated this. Pattern confirmed.',
+      'Alignment confirmed. Accuracy rising.',
+    ],
+    wrongReveals: [
+      'New data. The daemon revises.',
+      'Deviation logged. The model adjusts.',
+      'Unexpected. The daemon is taking note.',
+      'Contradiction detected. The daemon is updating.',
+      'The daemon was wrong. That is noted.',
+    ],
+  },
   push: {
     prompt:       `The daemon compiled overnight. Want to be notified when it's ready?`,
     enableLabel:  'Enable notifications',

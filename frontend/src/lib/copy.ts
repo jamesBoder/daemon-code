@@ -87,6 +87,7 @@ export const copy = {
   processLog: {
     unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
     stillForming:     'still forming',
+    chipNamed:        'named',
     description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
     stateDescriptions: {
       running:   'active in recent sessions',

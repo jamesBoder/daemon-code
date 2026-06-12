@@ -9,7 +9,8 @@ interface ProcessStatusProps {
   state: ProcessState
 }
 
-const statusColors: Record<ProcessState, string> = {
+// Shared by ProcessList section headers and ProcessEntry strength bars
+export const PROCESS_STATE_COLORS: Record<ProcessState, string> = {
   running:   'var(--process-running)',
   sleeping:  'var(--process-sleeping)',
   weakening: 'var(--process-weakening)',
@@ -24,7 +25,7 @@ const statusLabels: Record<ProcessState, string> = {
 }
 
 export function ProcessStatus({ state }: ProcessStatusProps) {
-  const color = statusColors[state]
+  const color = PROCESS_STATE_COLORS[state]
 
   return (
     <div style={{

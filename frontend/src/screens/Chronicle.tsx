@@ -9,6 +9,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
 import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
+import { formatDateLong } from '../lib/dates'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { ChronicleEntry, OrbState } from '../types'
 
@@ -25,12 +26,6 @@ const STAGE_COLORS: Record<OrbState, string> = {
   warming: 'var(--warning)',
   running: 'var(--compile-green)',
   deep:    'var(--text-daemon)',
-}
-
-function formatDate(iso: string): string {
-  const [year, month, day] = iso.split('-')
-  const d = new Date(Number(year), Number(month) - 1, Number(day))
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 export function Chronicle() {
@@ -166,7 +161,7 @@ function ChronicleCard({ entry, index, playing, onPlayClick }: {
       {/* Date + day + stage */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
-          {formatDate(entry.date)}
+          {formatDateLong(entry.date)}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {entry.day > 0 && (

@@ -19,8 +19,16 @@ const (
 	reactionWordDurationMs = 800 // ms words are displayed in the ReactionTest; must match frontend default
 	scalesMin              = 2   // fewest weighted scale fragments per deck
 	scalesMax              = 3   // most weighted scale fragments per deck
-	middleOrderAttempts    = 8   // shuffle retries to find a middle with no same-type neighbors
+	speedPromptsPerRound   = 4   // prompts sampled into one speed_round fragment
+	speedRoundMinCompiles  = 1   // compiles before speed rounds enter the deck rotation
 )
+
+// exclusions holds content IDs served by the previous deck, kept out of
+// tonight's sampling so consecutive sessions don't repeat.
+type exclusions struct {
+	pairIDs        map[string]bool
+	speedPromptIDs map[string]bool
+}
 
 type Generator struct {
 	cfg *appconfig.Config
@@ -64,7 +72,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		prevDeck = nil
 	}
 
-	fragments := g.buildDeck(profile, patterns, usedPairIDs(prevDeck))
+	fragments := g.buildDeck(profile, patterns, usedContentIDs(prevDeck))
 	// Stamp with the date this deck serves (the following UTC day for the
 	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
 	date := dynamo.ServiceDate(time.Now())
@@ -84,25 +92,28 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 // buildDeck produces the next day's fragment queue using a fixed pacing arc
 // with randomized composition and order:
 //
-//	opener — a fast, low-friction game (one of the two reaction tests, random which)
-//	middle — the other reaction test + 2–3 weighted scales, shuffled so no two
+//	opener — a fast, low-friction game (random among tonight's fast picks)
+//	middle — the remaining fast game + 2–3 weighted scales, shuffled so no two
 //	         same-type fragments sit adjacent (including against the opener)
 //	closer — the prediction duel when patterns exist (the stakes beat stays last)
 //
 // Variety comes from composition and content sampling; the arc itself is constant.
-func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, excludePairs map[string]bool) []dynamo.Fragment {
-	opener := g.buildReactionTest(profile)
-	second := g.buildReactionTestExplore(profile)
-	if rand.Intn(2) == 0 {
-		opener, second = second, opener
-	}
+//
+// Adding a game: put its tagged content in internal/signal, write a build
+// function here, slot it into pickFastGames (fast games) or the middle/closer
+// assembly below, register its renderer in the frontend fragment registry, and
+// teach computeDimensionSignals (internal/services/ai/context.go) its
+// response_data shape.
+func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions) []dynamo.Fragment {
+	fast := g.pickFastGames(profile, exclude)
+	opener, second := fast[0], fast[1]
 
 	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1)
 	middle := []dynamo.Fragment{second}
-	for _, pair := range pickScalePairs(nScales, profile.CompileCount, excludePairs) {
+	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
 	}
-	middle = shuffleNoAdjacent(middle, opener.Type)
+	middle = arrangeNoAdjacent(middle, opener.Type)
 
 	deck := append([]dynamo.Fragment{opener}, middle...)
 	if len(patterns) > 0 {
@@ -115,23 +126,72 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	return deck
 }
 
-// shuffleNoAdjacent shuffles fragments, retrying up to middleOrderAttempts times
-// for an order where no two consecutive fragments share a type (treating prevType
-// as sitting immediately before the slice). Some compositions have no valid order
-// (e.g. 3 scales against 1 reaction test), so it keeps the least-violating attempt.
-func shuffleNoAdjacent(fragments []dynamo.Fragment, prevType string) []dynamo.Fragment {
-	best := make([]dynamo.Fragment, len(fragments))
-	copy(best, fragments)
-	bestViolations := adjacencyViolations(best, prevType)
+// pickFastGames selects tonight's two fast fragments. One reaction test always
+// plays (its taps drive the word-based dimension signals and session-quality
+// timing, so no night goes without them); the second slot is a coin flip
+// between the other reaction word set and a speed round once the user has
+// enough compiles. Which of the two opens is also random.
+func (g *Generator) pickFastGames(profile db.ShadowProfile, exclude exclusions) [2]dynamo.Fragment {
+	reaction := g.buildReactionTest(profile)
+	other := g.buildReactionTestExplore(profile)
+	if rand.Intn(2) == 0 {
+		reaction, other = other, reaction
+	}
 
-	for attempt := 0; attempt < middleOrderAttempts && bestViolations > 0; attempt++ {
-		rand.Shuffle(len(fragments), func(i, j int) { fragments[i], fragments[j] = fragments[j], fragments[i] })
-		if v := adjacencyViolations(fragments, prevType); v < bestViolations {
-			copy(best, fragments)
-			bestViolations = v
+	second := other
+	if int(profile.CompileCount) >= speedRoundMinCompiles && rand.Intn(2) == 0 {
+		if sr, ok := buildSpeedRound(profile.CompileCount, exclude.speedPromptIDs); ok {
+			second = sr
 		}
 	}
-	return best
+
+	if rand.Intn(2) == 0 {
+		return [2]dynamo.Fragment{reaction, second}
+	}
+	return [2]dynamo.Fragment{second, reaction}
+}
+
+// arrangeNoAdjacent orders fragments randomly so that no two consecutive
+// fragments share a type, treating prevType as sitting immediately before the
+// slice. Greedy most-remaining-type-first (the reorganize-string algorithm)
+// guarantees a violation-free order whenever one exists; randomized tie-breaks
+// and per-type shuffles keep the order varied night to night. When no valid
+// order exists (e.g. 3 scales against 1 fast game) violations are minimal.
+func arrangeNoAdjacent(fragments []dynamo.Fragment, prevType string) []dynamo.Fragment {
+	byType := make(map[string][]dynamo.Fragment)
+	for _, f := range fragments {
+		byType[f.Type] = append(byType[f.Type], f)
+	}
+	for _, group := range byType {
+		rand.Shuffle(len(group), func(i, j int) { group[i], group[j] = group[j], group[i] })
+	}
+
+	out := make([]dynamo.Fragment, 0, len(fragments))
+	last := prevType
+	for len(out) < len(fragments) {
+		pick, pickCount := "", -1
+		for t, group := range byType {
+			if t == last || len(group) == 0 {
+				continue
+			}
+			if len(group) > pickCount || (len(group) == pickCount && rand.Intn(2) == 0) {
+				pick, pickCount = t, len(group)
+			}
+		}
+		if pick == "" {
+			// Only the previous type remains — adjacency is unavoidable here.
+			for t, group := range byType {
+				if len(group) > 0 {
+					pick = t
+					break
+				}
+			}
+		}
+		out = append(out, byType[pick][0])
+		byType[pick] = byType[pick][1:]
+		last = pick
+	}
+	return out
 }
 
 func adjacencyViolations(fragments []dynamo.Fragment, prevType string) int {
@@ -146,26 +206,88 @@ func adjacencyViolations(fragments []dynamo.Fragment, prevType string) int {
 	return violations
 }
 
-// usedPairIDs collects the weighted-scale pair IDs served by the previous deck
-// so pickScalePairs can exclude them. Payloads written before pair IDs were
-// stamped simply contribute nothing.
-func usedPairIDs(prev *dynamo.DailyDeck) map[string]bool {
-	ids := make(map[string]bool)
+// usedContentIDs collects the content IDs served by the previous deck so
+// sampling can exclude them. Payloads written before IDs were stamped simply
+// contribute nothing.
+func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
+	ex := exclusions{pairIDs: make(map[string]bool), speedPromptIDs: make(map[string]bool)}
 	if prev == nil {
-		return ids
+		return ex
 	}
 	for _, f := range prev.Fragments {
-		if f.Type != "weighted_scale" {
-			continue
-		}
-		var p struct {
-			PairID string `json:"pair_id"`
-		}
-		if json.Unmarshal([]byte(f.Payload), &p) == nil && p.PairID != "" {
-			ids[p.PairID] = true
+		switch f.Type {
+		case "weighted_scale":
+			var p struct {
+				PairID string `json:"pair_id"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.PairID != "" {
+				ex.pairIDs[p.PairID] = true
+			}
+		case "speed_round":
+			var p struct {
+				PromptIDs []string `json:"prompt_ids"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil {
+				for _, id := range p.PromptIDs {
+					ex.speedPromptIDs[id] = true
+				}
+			}
 		}
 	}
-	return ids
+	return ex
+}
+
+// buildSpeedRound samples speedPromptsPerRound prompts eligible for this user's
+// compile count, holding back prompts served yesterday unless the pool runs
+// short. Returns ok=false when no prompts are eligible at all.
+// The payload's prompts array matches the frontend SpeedRoundPrompt shape;
+// prompt_ids is read back tomorrow night for anti-repeat.
+func buildSpeedRound(compileCount int32, exclude map[string]bool) (dynamo.Fragment, bool) {
+	var pool, served []signal.SpeedPrompt
+	for _, p := range signal.SpeedPrompts {
+		switch {
+		case p.IntroducedAfterDay > int(compileCount):
+		case exclude[p.PromptID]:
+			served = append(served, p)
+		default:
+			pool = append(pool, p)
+		}
+	}
+	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	if len(pool) < speedPromptsPerRound {
+		rand.Shuffle(len(served), func(i, j int) { served[i], served[j] = served[j], served[i] })
+		pool = append(pool, served...)
+	}
+	if len(pool) == 0 {
+		return dynamo.Fragment{}, false
+	}
+	n := speedPromptsPerRound
+	if n > len(pool) {
+		n = len(pool)
+	}
+
+	prompts := make([]map[string]interface{}, 0, n)
+	promptIDs := make([]string, 0, n)
+	for _, p := range pool[:n] {
+		options := make([]string, len(p.Options))
+		for i, o := range p.Options {
+			options[i] = o.Text
+		}
+		prompts = append(prompts, map[string]interface{}{"starter": p.Starter, "options": options})
+		promptIDs = append(promptIDs, p.PromptID)
+	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"prompts":    prompts,
+		"prompt_ids": promptIDs,
+	})
+
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "speed_round",
+		Payload:    string(payload),
+		DaemonNote: "First answers carry the least editing.",
+	}, true
 }
 
 func (g *Generator) buildReactionTest(profile db.ShadowProfile) dynamo.Fragment {

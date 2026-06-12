@@ -25,7 +25,7 @@ import (
 const analystSystemPromptTmpl = `You are ShadowAnalyst, an AI that builds psychological profiles from behavioral patterns.
 
 You receive a JSON context object containing:
-- card_responses: today's reaction test taps, weighted scale choices, prediction duel answers
+- card_responses: today's reaction test taps, weighted scale choices, speed round sentence completions, prediction duel answers
 - mood_log: today's mood score (1–5) and optional note
 - current_profile: the existing shadow profile, including daemon_accuracy (previous value)
 - profile_dimensions: current Bayesian dimension model (absent or null on Day 0 / first compile)

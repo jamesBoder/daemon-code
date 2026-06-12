@@ -194,6 +194,7 @@ export const copy = {
     reaction_test:   'tap the word if it stays with you.',
     weighted_scale:  'position yourself between the two.',
     prediction_duel: "what do you think you'll do?",
+    speed_round:     'finish the sentence. first instinct.',
     trap:            'one option is better. choose.',
   } as Record<string, string>,
 

@@ -43,6 +43,10 @@ type compileStat struct {
 	Value string `json:"value"`
 }
 
+// audioPresignExpiry is how long daemon-voice audio links stay valid — also
+// used by the chronicle handler so home and chronicle audio behave the same.
+const audioPresignExpiry = 24 * time.Hour
+
 // snapshotThreshold is the minimum compile count before score deltas are shown.
 // Must equal snapshotInterval in internal/services/ai/analyst.go — deltas are
 // meaningless before the first snapshot is taken.
@@ -116,7 +120,7 @@ func (h *handler) GetHome(w http.ResponseWriter, r *http.Request) {
 		req, err := h.s3presign.PresignGetObject(r.Context(), &s3.GetObjectInput{
 			Bucket: aws.String(h.cfg.AudioBucket),
 			Key:    aws.String(state.AudioURL),
-		}, s3.WithPresignExpires(24*time.Hour))
+		}, s3.WithPresignExpires(audioPresignExpiry))
 		if err == nil {
 			audioURL = req.URL
 		}

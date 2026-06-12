@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { PlayPauseIcon } from '../ui/PlayPauseIcon'
 import { springs } from '../../lib/springs'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { LETTER_SPACING_TIGHT, REDUCED_MOTION_DURATION } from '../../lib/constants'
@@ -67,11 +68,10 @@ export function DaemonProse({
             cursor: 'pointer',
             color: audioPlaying ? 'var(--accent)' : 'var(--text-muted)',
             lineHeight: 1,
-            fontSize: MIC.iconSize,
             transition: 'color 0.2s',
           }}
         >
-          {audioPlaying ? '⏸' : '⏵'}
+          <PlayPauseIcon playing={audioPlaying} size={MIC.iconSize} />
         </button>
       )}
     </div>

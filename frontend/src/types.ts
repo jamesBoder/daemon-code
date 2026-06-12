@@ -146,6 +146,7 @@ export interface ChronicleEntry {
   shadowPrompt?: string
   signalQuote?: string
   signalAuthor?: string
+  audioUrl?: string
 }
 
 // Process change recorded by the Analyst after a nightly run

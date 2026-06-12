@@ -7,13 +7,15 @@ export const MG = {
   // ── Responsive breakpoint ──────────────────────────────────────────────────
   desktopBreakpoint: 768,
 
-  // ── Shared drag track (WeightedScale + any future draggable game) ─────────
+  // ── Shared drag track (WeightedScale, MoodCheck + any future draggable game) ──
   track: {
     height:          52,    // px — total row height
     handleSize:      28,    // px — diameter of the draggable circle
     handleScale:     1.2,   // whileDrag scale multiplier
+    handleBorderW:   1.5,   // px — handle circle border width
     dragElastic:     0.05,  // Framer Motion dragElastic
     edgeInset:       16,    // px — gap between handle edge and track end
+    confirmMaxW:     200,   // px — confirm button max width below the track
   },
 
   // ── Spring physics — tap-to-jump and future snapping ──────────────────────

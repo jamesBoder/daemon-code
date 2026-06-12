@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { DaemonOrb } from '../daemon/DaemonOrb'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
@@ -36,8 +36,14 @@ export function MoodCheck({ onSelect }: Props) {
   const [prompt] = useState(() => pick(copy.mood.prompts))
   const [ack, setAck] = useState('')
   const trackRef  = useRef<HTMLDivElement>(null)
+  const ackTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+
+  // If the user exits the session during the ack beat, the pending onSelect
+  // would post the mood and navigate to /session/complete from wherever they
+  // landed — clear it on unmount.
+  useEffect(() => () => clearTimeout(ackTimer.current), [])
 
   useLayoutEffect(() => {
     if (!trackRef.current) return
@@ -69,7 +75,7 @@ export function MoodCheck({ onSelect }: Props) {
     if (phase !== 'pick') return
     setAck(pick(copy.mood.acks[MOOD.ackBucket(score)]))
     setPhase('ack')
-    setTimeout(() => onSelectRef.current(score), M.ackHoldMs)
+    ackTimer.current = setTimeout(() => onSelectRef.current(score), M.ackHoldMs)
   }
 
   return (
@@ -108,7 +114,7 @@ export function MoodCheck({ onSelect }: Props) {
                   x: dragX,
                   position: 'absolute', top: '50%', left: `calc(50% - ${T.handleSize / 2}px)`, marginTop: -(T.handleSize / 2),
                   width: T.handleSize, height: T.handleSize,
-                  borderRadius: '50%', border: '1.5px solid var(--text-primary)',
+                  borderRadius: '50%', border: `${T.handleBorderW}px solid var(--text-primary)`,
                   background: 'var(--surface-elevated)', cursor: 'ew-resize', touchAction: 'none',
                 }}
               />
@@ -126,7 +132,7 @@ export function MoodCheck({ onSelect }: Props) {
           <button
             onClick={handleConfirm}
             className="daemon-btn daemon-btn-primary"
-            style={{ width: '100%', maxWidth: 200 }}
+            style={{ width: '100%', maxWidth: T.confirmMaxW }}
           >
             {copy.mood.confirm}
           </button>

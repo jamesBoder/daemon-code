@@ -81,11 +81,13 @@ export const MG = {
 
   // ── MoodCheck (end-of-session spectrum) ────────────────────────────────────
   mood: {
-    orbSize:    140,  // px — DaemonOrb diameter above the spectrum
-    trackMaxW:  360,  // px — spectrum track max width
-    ackHoldMs: 1400,  // how long the acknowledgement line shows before navigating
-    scoreMin:     1,  // mood score domain — matches /session/mood contract
-    scoreMax:     5,
+    orbSize:        140,  // px — DaemonOrb diameter above the spectrum
+    trackMaxW:      360,  // px — spectrum track max width
+    ackMaxW:        300,  // px — acknowledgement line text column width
+    dragMaxFallback: 120, // px — half-track guess before useLayoutEffect measures
+    ackHoldMs:     1400,  // how long the acknowledgement line shows before navigating
+    scoreMin:         1,  // mood score domain — matches /session/mood contract
+    scoreMax:         5,
   },
 
   // ── Onboarding compile animation ──────────────────────────────────────────

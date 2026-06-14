@@ -32,7 +32,7 @@ export function MoodCheck({ onSelect }: Props) {
 
   const [phase, setPhase] = useState<Phase>('pick')
   const [score, setScore] = useState(Math.ceil((M.scoreMin + M.scoreMax) / 2))
-  const [dragMax, setDragMax] = useState(120)
+  const [dragMax, setDragMax] = useState(M.dragMaxFallback)
   const [prompt] = useState(() => pick(copy.mood.prompts))
   const [ack, setAck] = useState('')
   const trackRef  = useRef<HTMLDivElement>(null)
@@ -152,7 +152,7 @@ export function MoodCheck({ onSelect }: Props) {
             color:         'var(--compile-green)',
             letterSpacing: LETTER_SPACING_WIDE,
             textAlign:     'center',
-            maxWidth:      300,
+            maxWidth:      M.ackMaxW,
           }}
         >
           {ack}

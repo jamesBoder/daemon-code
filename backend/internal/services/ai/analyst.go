@@ -346,11 +346,32 @@ type patternUpdate struct {
 	DaemonNote    string  `json:"daemon_note"`
 }
 
+// processDiffEntry summarizes what happened to one pattern this compile. It is
+// marshaled into ShadowState.RecentDiff and served verbatim by
+// GET /session/recent-diff — the JSON shape mirrors handlers.processDiff, which
+// drives the naming ceremony, the session-complete diff cards, and the
+// process-log change chips.
+type processDiffEntry struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Change   string  `json:"change"` // "named" | "strength_up" | "strength_down" | "new"
+	FromName *string `json:"from_name,omitempty"`
+	Delta    *int    `json:"delta,omitempty"`
+}
+
+// CompileResult is the Analyst's per-user output, handed to the Narrator via the
+// ShadowAnalystComplete event so it can render prose, terminal lines, and the
+// process diff (including the named-process moment) into one ShadowState item.
+type CompileResult struct {
+	CompileLines   []string
+	RecentDiffJSON string // marshaled []processDiffEntry, or "" when nothing changed
+}
+
 // RunForUserOnDate executes the full analyst pipeline for a given date.
 // Exposed so devrun can drive it directly without SQS/Lambda — pass userID and a
-// "2006-01-02" date string. Returns compile_lines from the Analyst output so the
-// caller can chain to the Narrator if needed.
-func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date string) ([]string, error) {
+// "2006-01-02" date string. Returns a CompileResult (compile lines + process
+// diff) so the caller can chain to the Narrator if needed.
+func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date string) (*CompileResult, error) {
 	// 1. Load card responses for the given date
 	responses, err := a.q.GetResponsesForDate(ctx, db.GetResponsesForDateParams{
 		UserID:      userID,
@@ -466,7 +487,7 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 	// 8. Apply pattern updates — non-fatal: returning an error here causes SQS to retry,
 	// which re-runs SnapshotDaemonAccuracy against the post-Analyst daemon_accuracy already
 	// committed by UpdateShadowProfile, corrupting the grim trigger baseline.
-	_ = a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
+	recentDiff, _ := a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
 
 	// 8b. Persist tomorrow's duel prediction — non-fatal for the same retry reason.
 	// Written every compile: an empty text clears the previous night's prediction
@@ -478,7 +499,13 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 	}
 	_ = a.q.SetTomorrowPrediction(ctx, userID, pred.Text, pred.Pattern)
 
-	return output.CompileLines, nil
+	var recentDiffJSON string
+	if len(recentDiff) > 0 {
+		b, _ := json.Marshal(recentDiff)
+		recentDiffJSON = string(b)
+	}
+
+	return &CompileResult{CompileLines: output.CompileLines, RecentDiffJSON: recentDiffJSON}, nil
 }
 
 // RunForUser is the SQS Lambda entry point. It parses the message body, calls
@@ -496,15 +523,22 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	}
 
 	today := time.Now().UTC().Format("2006-01-02")
-	compileLines, err := a.RunForUserOnDate(ctx, userID, today)
+	result, err := a.RunForUserOnDate(ctx, userID, today)
 	if err != nil {
 		return err
 	}
 
 	// 9. Emit ShadowAnalystComplete to custom EventBridge bus — non-fatal.
+	// recent_diff is forwarded as raw JSON so the Narrator — the only writer of
+	// the ShadowState item — can persist it and voice any named-process moment.
+	var recentDiffRaw json.RawMessage
+	if result.RecentDiffJSON != "" {
+		recentDiffRaw = json.RawMessage(result.RecentDiffJSON)
+	}
 	detail, _ := json.Marshal(map[string]interface{}{
 		"user_id":       userID.String(),
-		"compile_lines": compileLines,
+		"compile_lines": result.CompileLines,
+		"recent_diff":   recentDiffRaw,
 		"change_flags":  []changeFlag{},
 	})
 	_, _ = a.eb.PutEvents(ctx, &eventbridge.PutEventsInput{
@@ -520,27 +554,34 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	return nil
 }
 
-func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, updates []patternUpdate) error {
+// applyPatternUpdates writes the Analyst's pattern changes to Postgres and
+// returns a per-pattern diff describing what changed — the source of the naming
+// ceremony and the session-complete change cards. A returned error is non-fatal
+// to the caller (see the call site), so the partial diff built before the error
+// is still returned for best-effort display.
+func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, updates []patternUpdate) ([]processDiffEntry, error) {
 	existing, err := a.q.GetPatternLibrary(ctx, userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	strengthMap := make(map[uuid.UUID]int32)
+	byID := make(map[uuid.UUID]db.PatternLibrary, len(existing))
 	for _, p := range existing {
-		strengthMap[p.ID] = p.Strength
+		byID[p.ID] = p
 	}
 
+	var diff []processDiffEntry
 	for _, u := range updates {
+		nowName := ""
+		if u.Name != nil {
+			nowName = *u.Name
+		}
+
 		if u.PatternID == nil || *u.PatternID == "" {
-			// New pattern
-			unnamed := u.Name == nil
-			var name *string
-			if !unnamed {
-				name = u.Name
-			}
-			_, err := a.q.InsertPattern(ctx, db.InsertPatternParams{
+			// New pattern.
+			unnamed := nowName == ""
+			inserted, err := a.q.InsertPattern(ctx, db.InsertPatternParams{
 				UserID:        userID,
-				Name:          pgTextPtr(name),
+				Name:          pgTextPtr(u.Name),
 				State:         u.State,
 				Strength:      10,
 				Unnamed:       unnamed,
@@ -548,37 +589,72 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 				DaemonNote:    pgTextPtr(&u.DaemonNote),
 			})
 			if err != nil {
-				return err
+				return diff, err
 			}
-		} else {
-			patternID, err := uuid.Parse(*u.PatternID)
-			if err != nil {
-				continue
+			// Only named patterns surface in the diff — an unnamed new pattern has
+			// no name for the user to recognize, so it stays quiet until it earns
+			// one. A pattern that arrives already named is a naming moment.
+			if !unnamed {
+				diff = append(diff, processDiffEntry{ID: inserted.ID.String(), Name: nowName, Change: "named"})
 			}
-			newStrength := strengthMap[patternID] + int32(u.StrengthDelta) // #nosec G115 — delta is bounded [-100,100] by Analyst prompt
-			if newStrength < 0 {
-				newStrength = 0
-			}
-			if newStrength > 100 {
-				newStrength = 100
-			}
-			unnamed := u.Name == nil
-			today := pgDateToday()
-			_, err = a.q.UpdatePattern(ctx, db.UpdatePatternParams{
-				ID:         patternID,
-				Name:       pgTextPtr(u.Name),
-				State:      u.State,
-				Strength:   newStrength,
-				Unnamed:    unnamed,
-				LastSeen:   today,
-				DaemonNote: pgTextPtr(&u.DaemonNote),
-			})
-			if err != nil {
-				return err
-			}
+			continue
+		}
+
+		patternID, err := uuid.Parse(*u.PatternID)
+		if err != nil {
+			continue
+		}
+		prev := byID[patternID]
+		oldName := ""
+		if prev.Name.Valid {
+			oldName = prev.Name.String
+		}
+		oldNamed := !prev.Unnamed && oldName != ""
+
+		newStrength := prev.Strength + int32(u.StrengthDelta) // #nosec G115 — delta is bounded [-100,100] by Analyst prompt
+		if newStrength < 0 {
+			newStrength = 0
+		}
+		if newStrength > 100 {
+			newStrength = 100
+		}
+		today := pgDateToday()
+		_, err = a.q.UpdatePattern(ctx, db.UpdatePatternParams{
+			ID:         patternID,
+			Name:       pgTextPtr(u.Name),
+			State:      u.State,
+			Strength:   newStrength,
+			Unnamed:    nowName == "",
+			LastSeen:   today,
+			DaemonNote: pgTextPtr(&u.DaemonNote),
+		})
+		if err != nil {
+			return diff, err
+		}
+
+		// Diff classification — naming takes priority over strength so a pattern
+		// that gets named the same night it strengthens reads as the naming. Only
+		// named patterns surface; an unnamed pattern's strength drift stays quiet
+		// until it earns a name (no blank-name cards).
+		displayName := oldName
+		if nowName != "" {
+			displayName = nowName
+		}
+		switch {
+		case nowName != "" && !oldNamed:
+			diff = append(diff, processDiffEntry{ID: patternID.String(), Name: nowName, Change: "named"})
+		case nowName != "" && oldNamed && nowName != oldName:
+			from := oldName
+			diff = append(diff, processDiffEntry{ID: patternID.String(), Name: nowName, Change: "named", FromName: &from})
+		case displayName != "" && u.StrengthDelta > 0:
+			d := u.StrengthDelta
+			diff = append(diff, processDiffEntry{ID: patternID.String(), Name: displayName, Change: "strength_up", Delta: &d})
+		case displayName != "" && u.StrengthDelta < 0:
+			d := u.StrengthDelta
+			diff = append(diff, processDiffEntry{ID: patternID.String(), Name: displayName, Change: "strength_down", Delta: &d})
 		}
 	}
-	return nil
+	return diff, nil
 }
 
 // callAnthropic calls the Anthropic messages API with prompt caching on the system prompt.

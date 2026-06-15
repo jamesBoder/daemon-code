@@ -303,21 +303,21 @@ const recentSessionWindow = 7
 const analystMaxTokens = 2048
 
 type analystOutput struct {
-	PrimaryArchetype      string          `json:"primary_archetype"`
-	SignalConfidence      float64         `json:"signal_confidence"`
-	KernelAccess          int32           `json:"kernel_access"`
-	DaemonAccuracy        int32           `json:"daemon_accuracy"`
-	Stage                 string          `json:"stage"`
-	Posture               float64         `json:"posture"`
-	Environment           string          `json:"environment"`
-	Texture               string          `json:"texture"`
-	FragmentsDecodedDelta int             `json:"fragments_decoded_delta"`
-	AnalystNotes          string          `json:"analyst_notes"`
-	CompileLines          []string        `json:"compile_lines"`
-	PatternUpdates        []patternUpdate `json:"pattern_updates"`
+	PrimaryArchetype      string              `json:"primary_archetype"`
+	SignalConfidence      float64             `json:"signal_confidence"`
+	KernelAccess          int32               `json:"kernel_access"`
+	DaemonAccuracy        int32               `json:"daemon_accuracy"`
+	Stage                 string              `json:"stage"`
+	Posture               float64             `json:"posture"`
+	Environment           string              `json:"environment"`
+	Texture               string              `json:"texture"`
+	FragmentsDecodedDelta int                 `json:"fragments_decoded_delta"`
+	AnalystNotes          string              `json:"analyst_notes"`
+	CompileLines          []string            `json:"compile_lines"`
+	PatternUpdates        []patternUpdate     `json:"pattern_updates"`
 	TomorrowPrediction    *tomorrowPrediction `json:"tomorrow_prediction,omitempty"`
-	ProfileDimensions     json.RawMessage `json:"profile_dimensions,omitempty"`
-	ChangeFlags           []changeFlag    `json:"change_flags,omitempty"`
+	ProfileDimensions     json.RawMessage     `json:"profile_dimensions,omitempty"`
+	ChangeFlags           []changeFlag        `json:"change_flags,omitempty"`
 }
 
 type tomorrowPrediction struct {

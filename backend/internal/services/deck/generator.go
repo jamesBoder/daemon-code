@@ -118,7 +118,7 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	fast := g.pickFastGames(profile, exclude)
 	opener, second := fast[0], fast[1]
 
-	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1)
+	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1) // #nosec G404 — non-crypto deck composition
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -144,18 +144,18 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 func (g *Generator) pickFastGames(profile db.ShadowProfile, exclude exclusions) [2]dynamo.Fragment {
 	reaction := g.buildReactionTest(profile, exclude)
 	other := g.buildReactionTestExplore(profile, exclude)
-	if rand.Intn(2) == 0 {
+	if rand.Intn(2) == 0 { // #nosec G404 — non-crypto fragment ordering
 		reaction, other = other, reaction
 	}
 
 	second := other
-	if int(profile.CompileCount) >= speedRoundMinCompiles && rand.Intn(2) == 0 {
+	if int(profile.CompileCount) >= speedRoundMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
 		if sr, ok := buildSpeedRound(profile.CompileCount, exclude.speedPromptIDs); ok {
 			second = sr
 		}
 	}
 
-	if rand.Intn(2) == 0 {
+	if rand.Intn(2) == 0 { // #nosec G404 — non-crypto fragment ordering
 		return [2]dynamo.Fragment{reaction, second}
 	}
 	return [2]dynamo.Fragment{second, reaction}
@@ -184,7 +184,7 @@ func arrangeNoAdjacent(fragments []dynamo.Fragment, prevType string) []dynamo.Fr
 			if t == last || len(group) == 0 {
 				continue
 			}
-			if len(group) > pickCount || (len(group) == pickCount && rand.Intn(2) == 0) {
+			if len(group) > pickCount || (len(group) == pickCount && rand.Intn(2) == 0) { // #nosec G404 — non-crypto tie-break
 				pick, pickCount = t, len(group)
 			}
 		}
@@ -467,7 +467,7 @@ func pickPatternWeighted(patterns []db.PatternLibrary) db.PatternLibrary {
 	if len(named) == 0 {
 		return db.PatternLibrary{}
 	}
-	roll := rand.Intn(total)
+	roll := rand.Intn(total) // #nosec G404 — non-crypto weighted pattern pick
 	for _, p := range named {
 		roll -= int(p.Strength)
 		if roll < 0 {

@@ -55,6 +55,10 @@ export const SESSION_RETRY_DELAY_MS = 2000  // ms — POST retry on first networ
 // Haptics
 export const HAPTICS_KEY   = 'haptics_enabled'    // localStorage boolean; default true (opt-out)
 
+// Daemon voice (8e) — global on/off for every tap-to-listen mic affordance
+export const DAEMON_VOICE_KEY   = 'daemon_voice_enabled' // localStorage boolean; default true (opt-out)
+export const DAEMON_VOICE_EVENT = 'daemon-voice-change'  // window event: same-tab notify when the toggle flips
+
 // localStorage keys
 export const COMPILE_PLAYED_KEY = 'compile_played_day'  // sessionStorage — prevents re-playing compile animation same day
 

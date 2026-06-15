@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/middleware"
@@ -18,22 +21,42 @@ type processDiff struct {
 	Delta    *int    `json:"delta,omitempty"`     // strength delta for strength changes
 }
 
+// recentDiffResponse carries the per-pattern diff plus the presigned naming
+// ceremony voice clip (8c), served only on nights a process earned a name.
+type recentDiffResponse struct {
+	Diff           []processDiff `json:"diff"`
+	NamingAudioURL string        `json:"namingAudioUrl,omitempty"`
+}
+
 func (h *handler) GetSessionRecentDiff(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
 	state, err := h.ddb.GetLatestShadowState(r.Context(), userID.String())
 	if err != nil || state == nil || state.RecentDiff == "" {
-		respondWithJSON(w, http.StatusOK, []processDiff{})
+		respondWithJSON(w, http.StatusOK, recentDiffResponse{Diff: []processDiff{}})
 		return
 	}
 
 	var diff []processDiff
 	if err := json.Unmarshal([]byte(state.RecentDiff), &diff); err != nil {
-		respondWithJSON(w, http.StatusOK, []processDiff{})
+		respondWithJSON(w, http.StatusOK, recentDiffResponse{Diff: []processDiff{}})
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, diff)
+	resp := recentDiffResponse{Diff: diff}
+	// Presign the naming-ceremony clip when one was synthesized tonight. Skip
+	// legacy full-URL values (pre-key storage), mirroring chronicle.go.
+	if state.NamingAudioURL != "" && !strings.HasPrefix(state.NamingAudioURL, "https://") {
+		req, err := h.s3presign.PresignGetObject(r.Context(), &s3.GetObjectInput{
+			Bucket: aws.String(h.cfg.AudioBucket),
+			Key:    aws.String(state.NamingAudioURL),
+		}, s3.WithPresignExpires(audioPresignExpiry))
+		if err == nil {
+			resp.NamingAudioURL = req.URL
+		}
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
 }
 
 func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {

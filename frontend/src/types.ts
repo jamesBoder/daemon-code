@@ -160,3 +160,10 @@ export interface ProcessDiff {
   from_name?: string  // previous name for 'named' changes
   delta?:    number   // strength delta for 'strength_up' / 'strength_down'
 }
+
+// GET /session/recent-diff — the diff plus the naming-ceremony voice clip (8c),
+// present only on nights a process earned a name.
+export interface RecentDiffResponse {
+  diff:            ProcessDiff[]
+  namingAudioUrl?: string
+}

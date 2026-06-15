@@ -7,7 +7,7 @@ import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
 import { haptic } from '../lib/haptics'
 import { LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
-import type { ShadowProfile, OrbState, ProcessDiff } from '../types'
+import type { ShadowProfile, OrbState, ProcessDiff, RecentDiffResponse } from '../types'
 
 // named first (most dramatic), then new processes, then strength changes
 const DIFF_CHANGE_ORDER: Record<string, number> = {
@@ -38,13 +38,13 @@ export function SessionComplete() {
     staleTime: Infinity,
   })
 
-  const { data: rawDiff = [], isLoading: diffLoading } = useQuery({
+  const { data: diffResponse, isLoading: diffLoading } = useQuery({
     queryKey: ['session-diff'],
-    queryFn:  () => apiFetchJson<ProcessDiff[]>('/session/recent-diff'),
+    queryFn:  () => apiFetchJson<RecentDiffResponse>('/session/recent-diff'),
     staleTime: Infinity,  // point-in-time — never refetch
   })
 
-  const diff = [...rawDiff].sort(
+  const diff = [...(diffResponse?.diff ?? [])].sort(
     (a, b) => (DIFF_CHANGE_ORDER[a.change] ?? 9) - (DIFF_CHANGE_ORDER[b.change] ?? 9)
   )
 
@@ -69,6 +69,7 @@ export function SessionComplete() {
       <NamingCeremony
         names={namedDiffs.map(d => d.name)}
         orbState={orbState}
+        audioUrl={diffResponse?.namingAudioUrl}
         onComplete={() => setCeremonyDone(true)}
       />
     )

@@ -15,12 +15,13 @@ const pulseSortKey = "pulse"
 
 // PulseScenario is the daily Map scenario with its pre-generated daemon text.
 type PulseScenario struct {
-	ScenarioID       string `dynamodbav:"scenario_id"`
-	Type             string `dynamodbav:"type"`
-	Tier             string `dynamodbav:"tier"`
-	Text             string `dynamodbav:"text"`
-	DaemonObs        string `dynamodbav:"daemon_observation"`
-	DaemonPrediction string `dynamodbav:"daemon_prediction"`
+	ScenarioID          string `dynamodbav:"scenario_id"`
+	Type                string `dynamodbav:"type"`
+	Tier                string `dynamodbav:"tier"`
+	Text                string `dynamodbav:"text"`
+	DaemonObs           string `dynamodbav:"daemon_observation"`
+	DaemonPrediction    string `dynamodbav:"daemon_prediction"`
+	ObservationAudioURL string `dynamodbav:"observation_audio_url"` // S3 key for the spoken observation (8b); empty when synthesis was skipped
 }
 
 // PulseNodeSignal is one directional dimension tag on a node.

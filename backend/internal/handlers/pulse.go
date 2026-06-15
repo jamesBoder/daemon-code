@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
@@ -22,11 +25,12 @@ const (
 )
 
 type pulseScenarioResponse struct {
-	ScenarioID       string `json:"scenario_id"`
-	Type             string `json:"type"`
-	Text             string `json:"text"`
-	DaemonObs        string `json:"daemon_observation"`
-	DaemonPrediction string `json:"daemon_prediction"`
+	ScenarioID          string `json:"scenario_id"`
+	Type                string `json:"type"`
+	Text                string `json:"text"`
+	DaemonObs           string `json:"daemon_observation"`
+	DaemonPrediction    string `json:"daemon_prediction"`
+	ObservationAudioURL string `json:"observation_audio_url,omitempty"`
 }
 
 type pulseNodeResponse struct {
@@ -68,14 +72,28 @@ func (h *handler) GetPulseToday(w http.ResponseWriter, r *http.Request) {
 		nodes = append(nodes, pulseNodeResponse{NodeID: n.NodeID, Text: n.Text})
 	}
 
+	// Presign the spoken observation (8b) when one was synthesized. Skip legacy
+	// full-URL values, mirroring chronicle.go / session.go.
+	obsAudio := ""
+	if k := item.Scenario.ObservationAudioURL; k != "" && !strings.HasPrefix(k, "https://") {
+		req, err := h.s3presign.PresignGetObject(r.Context(), &s3.GetObjectInput{
+			Bucket: aws.String(h.cfg.AudioBucket),
+			Key:    aws.String(k),
+		}, s3.WithPresignExpires(audioPresignExpiry))
+		if err == nil {
+			obsAudio = req.URL
+		}
+	}
+
 	respondWithJSON(w, http.StatusOK, getPulseTodayResponse{
 		Completed: false,
 		Scenario: &pulseScenarioResponse{
-			ScenarioID:       item.Scenario.ScenarioID,
-			Type:             item.Scenario.Type,
-			Text:             item.Scenario.Text,
-			DaemonObs:        item.Scenario.DaemonObs,
-			DaemonPrediction: item.Scenario.DaemonPrediction,
+			ScenarioID:          item.Scenario.ScenarioID,
+			Type:                item.Scenario.Type,
+			Text:                item.Scenario.Text,
+			DaemonObs:           item.Scenario.DaemonObs,
+			DaemonPrediction:    item.Scenario.DaemonPrediction,
+			ObservationAudioURL: obsAudio,
 		},
 		Nodes: nodes,
 	})

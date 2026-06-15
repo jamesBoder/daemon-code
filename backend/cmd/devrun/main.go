@@ -118,11 +118,11 @@ func main() {
 		clearDate(ctx, pool, userID, dateStr)
 		seedDate(ctx, queries, userID, dateStr, i)
 
-		compileLines, err := analyst.RunForUserOnDate(ctx, userID, dateStr)
+		result, err := analyst.RunForUserOnDate(ctx, userID, dateStr)
 		if err != nil {
 			log.Fatalf("analyst failed for %s: %v", dateStr, err)
 		}
-		lastCompileLines = compileLines
+		lastCompileLines = result.CompileLines
 
 		profile, _ := queries.GetShadowProfile(ctx, userID)
 		fmt.Printf("  %s  compile #%-3d  archetype=%-22s  acc=%d\n",

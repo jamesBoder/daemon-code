@@ -35,6 +35,7 @@ export interface PulseScenario {
   text: string
   daemon_observation: string
   daemon_prediction: string
+  observation_audio_url?: string  // presigned; present only when the observation was voiced (8b)
 }
 
 export interface PulseNode {

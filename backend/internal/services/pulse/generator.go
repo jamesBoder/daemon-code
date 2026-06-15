@@ -16,6 +16,7 @@ import (
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
+	"github.com/jamesboder/daemon-code/internal/services/voice"
 	"github.com/jamesboder/daemon-code/internal/signal"
 )
 
@@ -55,11 +56,12 @@ type Generator struct {
 	cfg    *appconfig.Config
 	q      *db.Queries
 	ddb    *dynamo.Client
+	synth  *voice.Synthesizer
 	httpCl *http.Client
 }
 
 func NewGenerator(cfg *appconfig.Config, q *db.Queries, ddb *dynamo.Client) *Generator {
-	return &Generator{cfg: cfg, q: q, ddb: ddb, httpCl: &http.Client{}}
+	return &Generator{cfg: cfg, q: q, ddb: ddb, synth: voice.NewSynthesizer(cfg), httpCl: &http.Client{}}
 }
 
 // RunForUser runs the full PulseGenerator pipeline for one user.
@@ -123,7 +125,8 @@ func (g *Generator) RunForUser(ctx context.Context, userID string) error {
 	for _, dim := range allDimensions {
 		confidences[dim] = dims[dim].Confidence // confidence levels only — never raw scores
 	}
-	obs, pred, err := g.generateDaemonText(ctx, scenario, nodes, archetype, profileStage(dims), confidences)
+	stage := profileStage(dims)
+	obs, pred, err := g.generateDaemonText(ctx, scenario, nodes, archetype, stage, confidences)
 	if err != nil {
 		// Failure fallback: a hedged Map beats no Map.
 		obs = signal.FallbackObservation
@@ -154,6 +157,20 @@ func (g *Generator) RunForUser(ctx context.Context, userID string) error {
 			DimensionSignals: sigs,
 		})
 	}
+
+	// 8b — voice the observation so the Map can speak it. Best-effort and at
+	// compile time only: a failed synthesis leaves the observation as text
+	// rather than failing the night. The prediction stays text by design.
+	preferred := ""
+	if profile.PollyVoice.Valid {
+		preferred = profile.PollyVoice.String
+	}
+	voiceID := voice.ResolveVoice(preferred, archetype)
+	key := fmt.Sprintf("pulse-audio/%s/%s.mp3", userID, dynamo.ServiceDate(time.Now()))
+	if audioKey, serr := g.synth.Synthesize(ctx, obs, stage, voiceID, key); serr == nil {
+		item.Scenario.ObservationAudioURL = audioKey
+	}
+
 	return g.ddb.PutPulse(ctx, item)
 }
 

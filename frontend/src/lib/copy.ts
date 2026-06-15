@@ -20,6 +20,51 @@ export const copy = {
     exitConfirm:  'Leave',
     exitCancel:   'Stay',
   },
+  mood: {
+    // One prompt is drawn at random per session so the closing beat varies.
+    prompts: [
+      'How do you feel right now?',
+      'Where is the signal today?',
+      'How clear are you, right now?',
+    ],
+    lowLabel:  'static',
+    highLabel: 'clear',
+    confirm:   'Log it →',
+    hint:      'drag to answer',
+    // Acknowledgement line buckets by score; one line drawn at random.
+    acks: {
+      low: [
+        'logged. the daemon adjusts for interference.',
+        'noted. heavy-signal days still count.',
+      ],
+      mid: [
+        'logged. baseline holds.',
+        'noted. steady state read.',
+      ],
+      high: [
+        'logged. clear signal improves the read.',
+        'noted. the daemon works best in this range.',
+      ],
+    },
+  },
+  duel: {
+    recordLabel: 'daemon record',
+    // One reveal line is drawn at random per duel.
+    correctReveals: [
+      'Predicted correctly. The daemon notes the confirmation.',
+      'Expected. The model holds.',
+      'Consistent. Logged.',
+      'The daemon anticipated this. Pattern confirmed.',
+      'Alignment confirmed. Accuracy rising.',
+    ],
+    wrongReveals: [
+      'New data. The daemon revises.',
+      'Deviation logged. The model adjusts.',
+      'Unexpected. The daemon is taking note.',
+      'Contradiction detected. The daemon is updating.',
+      'The daemon was wrong. That is noted.',
+    ],
+  },
   push: {
     prompt:       `The daemon compiled overnight. Want to be notified when it's ready?`,
     enableLabel:  'Enable notifications',
@@ -87,6 +132,7 @@ export const copy = {
   processLog: {
     unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
     stillForming:     'still forming',
+    chipNamed:        'named',
     description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
     stateDescriptions: {
       running:   'active in recent sessions',
@@ -129,7 +175,10 @@ export const copy = {
       { left: 'speaking',    right: 'listening'    },
       { left: 'change',      right: 'consistency'  },
     ],
-    // 8 prompts for the Speed Round (onboarding-only)
+    // 8 prompts for the Speed Round (onboarding-only).
+    // Starter and option text must stay in sync with the tagged copies in
+    // backend/internal/signal/speedprompts.go — the Analyst scores onboarding
+    // speed_round responses by exact text match; a drift silently stops scoring.
     speedRoundPrompts: [
       { starter: 'When things go wrong, I usually...',    options: ['look inward',       'look outward',             'go quiet']              },
       { starter: 'I feel most like myself when I\'m...', options: ['alone',             'with people I trust',      'doing something']       },
@@ -193,6 +242,7 @@ export const copy = {
     reaction_test:   'tap the word if it stays with you.',
     weighted_scale:  'position yourself between the two.',
     prediction_duel: "what do you think you'll do?",
+    speed_round:     'finish the sentence. first instinct.',
     trap:            'one option is better. choose.',
   } as Record<string, string>,
 

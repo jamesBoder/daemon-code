@@ -54,6 +54,9 @@ export interface ProcessEntryData {
   firstDetected?: string
   lastSeen?: string
   daemonNote?: string
+  // What happened to this process in the latest compile, from /session/recent-diff
+  diffChange?: ProcessDiff['change']
+  diffDelta?: number
 }
 
 // Auth — matches authResponse JSON from /auth/register and /auth/login
@@ -146,6 +149,7 @@ export interface ChronicleEntry {
   shadowPrompt?: string
   signalQuote?: string
   signalAuthor?: string
+  audioUrl?: string
 }
 
 // Process change recorded by the Analyst after a nightly run

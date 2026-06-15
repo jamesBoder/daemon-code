@@ -85,6 +85,14 @@ type wsResultItem struct {
 	DeliberationTimeMs int     `json:"deliberationTimeMs"`
 }
 
+// SpeedRound returns an array of results (one per prompt in the fragment).
+// Both deck speed rounds and the onboarding speed round produce this shape.
+type srResultItem struct {
+	Starter        string `json:"starter"`
+	Chosen         string `json:"chosen"`
+	ResponseTimeMs int    `json:"responseTimeMs"`
+}
+
 type duelResponseData struct {
 	Matched            bool `json:"matched"`
 	DuelResponseTimeMs int  `json:"duelResponseTimeMs"`
@@ -252,6 +260,27 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 			}
 			for dim, sig := range pair.DimensionSignals {
 				dimSums[dim] += scaleScore(res.Value, sig.LeftHigh)
+				dimCounts[dim]++
+			}
+		}
+	}
+
+	// --- Speed-round-based dimensions (tagged options feed the same sums) ---
+	for _, r := range responses {
+		if r.FragmentType != "speed_round" {
+			continue
+		}
+		var results []srResultItem
+		if json.Unmarshal(r.ResponseData, &results) != nil {
+			continue
+		}
+		for _, res := range results {
+			opt, ok := signal.LookupSpeedOption(res.Starter, res.Chosen)
+			if !ok {
+				continue
+			}
+			for dim, sig := range opt.DimensionSignals {
+				dimSums[dim] += sig
 				dimCounts[dim]++
 			}
 		}

@@ -2,6 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/jamesboder/daemon-code/internal/middleware"
 )
@@ -16,6 +20,7 @@ type chronicleEntry struct {
 	ShadowPrompt string `json:"shadowPrompt,omitempty"`
 	SignalQuote  string `json:"signalQuote,omitempty"`
 	SignalAuthor string `json:"signalAuthor,omitempty"`
+	AudioURL     string `json:"audioUrl,omitempty"`
 }
 
 func (h *handler) GetChronicle(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +37,18 @@ func (h *handler) GetChronicle(w http.ResponseWriter, r *http.Request) {
 		if s.DaemonProse == "" {
 			continue
 		}
+		// Legacy records stored a full presigned URL (now expired) instead of
+		// an S3 key — skip those; entries without audio just omit the field.
+		var audioURL string
+		if s.AudioURL != "" && !strings.HasPrefix(s.AudioURL, "https://") {
+			req, err := h.s3presign.PresignGetObject(r.Context(), &s3.GetObjectInput{
+				Bucket: aws.String(h.cfg.AudioBucket),
+				Key:    aws.String(s.AudioURL),
+			}, s3.WithPresignExpires(audioPresignExpiry))
+			if err == nil {
+				audioURL = req.URL
+			}
+		}
 		entries = append(entries, chronicleEntry{
 			Date:         s.Date,
 			Day:          s.DayNumber,
@@ -40,6 +57,7 @@ func (h *handler) GetChronicle(w http.ResponseWriter, r *http.Request) {
 			ShadowPrompt: s.ShadowPrompt,
 			SignalQuote:  s.SignalQuote,
 			SignalAuthor: s.SignalAuthor,
+			AudioURL:     audioURL,
 		})
 	}
 

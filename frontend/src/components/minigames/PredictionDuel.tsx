@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { copy } from '../../lib/copy'
+import { LETTER_SPACING_WIDE } from '../../lib/constants'
 import { MG } from '../../lib/minigame'
 
 export interface PredictionDuelResult {
@@ -11,6 +13,8 @@ export interface PredictionDuelResult {
 interface Props {
   pattern:    string
   prediction: string
+  /** daemon_accuracy stamped into the deck payload; absent in pre-stakes decks. */
+  record?:    number
   onComplete: (result: PredictionDuelResult) => void
 }
 
@@ -18,23 +22,7 @@ type Phase = 'idle' | 'waiting' | 'reveal'
 
 const { duel: D, type: TY } = MG
 
-const CORRECT_REVEALS = [
-  'Predicted correctly. The daemon notes the confirmation.',
-  'Expected. The model holds.',
-  'Consistent. Logged.',
-  'The daemon anticipated this. Pattern confirmed.',
-  'Alignment confirmed. Accuracy rising.',
-] as const
-
-const WRONG_REVEALS = [
-  'New data. The daemon revises.',
-  'Deviation logged. The model adjusts.',
-  'Unexpected. The daemon is taking note.',
-  'Contradiction detected. The daemon is updating.',
-  'The daemon was wrong. That is noted.',
-] as const
-
-export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Props) {
+export function PredictionDuel({ pattern: _pattern, prediction, record, onComplete }: Props) {
   const reduced = useReducedMotion()
 
   const [phase,   setPhase]   = useState<Phase>('idle')
@@ -50,7 +38,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
   function handleChoice(choice: boolean) {
     if (phase !== 'idle') return
     const duelResponseTimeMs = Date.now() - mountTimeRef.current
-    const pool = choice ? CORRECT_REVEALS : WRONG_REVEALS
+    const pool = choice ? copy.duel.correctReveals : copy.duel.wrongReveals
     revealRef.current = pool[Math.floor(Math.random() * pool.length)]
     setMatched(choice)
     setPhase('waiting')
@@ -65,6 +53,13 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
 
   const accentColor = matched === true ? 'var(--compile-green)' : 'var(--warning)'
 
+  // The stakes line: the daemon's running accuracy, ticking on reveal so the
+  // user watches their answer move the score.
+  const revealed = phase === 'reveal'
+  const displayRecord = typeof record === 'number' && revealed && matched !== null
+    ? Math.min(D.recordMax, Math.max(D.recordMin, record + (matched ? D.recordTick : -D.recordTick)))
+    : record
+
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -73,6 +68,19 @@ export function PredictionDuel({ pattern: _pattern, prediction, onComplete }: Pr
       padding: 'var(--space-8)',
       gap: 'var(--space-8)',
     }}>
+      {/* Stakes — the daemon puts its record on the line */}
+      {typeof displayRecord === 'number' && (
+        <p style={{
+          fontFamily:    'var(--font-mono)',
+          fontSize:      'var(--text-xs)',
+          color:         revealed ? accentColor : 'var(--text-muted)',
+          letterSpacing: LETTER_SPACING_WIDE,
+          transition:    `color ${D.cardTransition}`,
+        }}>
+          {copy.duel.recordLabel}: {displayRecord}
+        </p>
+      )}
+
       {/* Prediction statement */}
       <p style={{
         fontFamily: TY.prompt.family,

@@ -4,9 +4,8 @@ import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { SignalWhisper } from '../daemon/SignalWhisper'
-import { ReactionTest } from './ReactionTest'
-import { WeightedScale } from './WeightedScale'
-import { PredictionDuel } from './PredictionDuel'
+import { fragmentRegistry } from './registry'
+import { MoodCheck } from './MoodCheck'
 import { ConfirmModal } from '../ui/ConfirmModal'
 import { apiFetch } from '../../lib/api'
 import { copy } from '../../lib/copy'
@@ -21,15 +20,17 @@ interface Props {
 
 type Phase = 'game' | 'mood'
 
-const MOOD_SCORES = [1, 2, 3, 4, 5]
-const transMs     = MG.transition.fragmentMs
+const transMs = MG.transition.fragmentMs
 
 export function SessionContainer({ fragments, onComplete }: Props) {
   const navigate  = useNavigate()
   const reduced   = useReducedMotion()
   const transTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // Forward-compat: a deck from a newer backend may carry fragment types this
+  // client can't render yet — drop them instead of blanking mid-session.
+  const playable  = fragments.filter(f => f.type in fragmentRegistry)
   const [idx, setIdx]     = useState(0)
-  const [phase, setPhase] = useState<Phase>('game')
+  const [phase, setPhase] = useState<Phase>(playable.length > 0 ? 'game' : 'mood')
   const [visible, setVisible] = useState(true)
 
   // Layer 4 — Fragment Context Lines: show a mono context line for FRAGMENT_CONTEXT_MS
@@ -46,7 +47,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
   }
 
   const [contextShowing, setContextShowing] = useState(() =>
-    fragments[0] ? checkAndMarkFragmentType(fragments[0].type) : false
+    playable[0] ? checkAndMarkFragmentType(playable[0].type) : false
   )
 
   useEffect(() => {
@@ -72,8 +73,8 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  const fragment = fragments[idx]
-  const progress = phase === 'mood' ? 1 : idx / fragments.length
+  const fragment = playable[idx]
+  const progress = phase === 'mood' ? 1 : idx / playable.length
 
   function postResponse(frag: Fragment, responseData: unknown) {
     const body = JSON.stringify({ fragment_id: frag.id, fragment_type: frag.type, response_data: responseData })
@@ -82,10 +83,10 @@ export function SessionContainer({ fragments, onComplete }: Props) {
   }
 
   function advance(currentIdx: number) {
-    if (currentIdx + 1 >= fragments.length) {
+    if (currentIdx + 1 >= playable.length) {
       setPhase('mood')
     } else {
-      const needsContext = checkAndMarkFragmentType(fragments[currentIdx + 1].type)
+      const needsContext = checkAndMarkFragmentType(playable[currentIdx + 1].type)
       setContextShowing(needsContext)
       setIdx(currentIdx + 1)
     }
@@ -104,22 +105,12 @@ export function SessionContainer({ fragments, onComplete }: Props) {
 
   function handleMoodSelect(score: number) {
     apiFetch('/session/mood', { method: 'POST', body: JSON.stringify({ score }) }).catch(() => {})
-    onComplete(fragments.length)
+    onComplete(playable.length)
   }
 
-  function renderFragment() {
-    const raw = JSON.parse(fragment.payload) as Record<string, unknown>
-    switch (fragment.type) {
-      case 'reaction_test':
-        return <ReactionTest key={fragment.id} words={raw.words as string[]} durationMs={raw.duration_ms as number} onComplete={(r) => handleFragmentComplete(r)} />
-      case 'weighted_scale':
-        return <WeightedScale key={fragment.id} pairs={[{ left: raw.left as string, right: raw.right as string }]} onComplete={(r) => handleFragmentComplete(r)} />
-      case 'prediction_duel':
-        return <PredictionDuel key={fragment.id} pattern={raw.pattern as string} prediction={raw.prediction as string} onComplete={(r) => handleFragmentComplete(r)} />
-      default:
-        return null
-    }
-  }
+  // Playable fragments always have a registry entry; rendered as a keyed JSX
+  // component so each fragment mounts fresh.
+  const Renderer = phase === 'game' && fragment ? fragmentRegistry[fragment.type] : null
 
   return (
     <>
@@ -175,7 +166,14 @@ export function SessionContainer({ fragments, onComplete }: Props) {
                 hintKey="session_fragment"
                 text={copy.signalHints.session_fragment}
               />
-              {renderFragment()}
+              {Renderer && (
+                <Renderer
+                  key={fragment.id}
+                  fragment={fragment}
+                  raw={JSON.parse(fragment.payload) as Record<string, unknown>}
+                  onComplete={handleFragmentComplete}
+                />
+              )}
               {fragment.daemon_note && (
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: `var(--space-4) var(--space-6)`, paddingBottom: `calc(var(--space-4) + env(safe-area-inset-bottom))`, zIndex: SESSION_PROGRESS_Z_INDEX, textAlign: 'center', pointerEvents: 'none' }}>
                   <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
@@ -186,24 +184,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
             </>
           )
         ) : (
-          <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-8)', padding: 'var(--space-8)' }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)', textAlign: 'center' }}>
-              How do you feel right now?
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-              {MOOD_SCORES.map(score => (
-                <motion.button
-                  key={score}
-                  onClick={() => handleMoodSelect(score)}
-                  whileTap={{ scale: MG.session.moodTapScale }}
-                  className="glass-card"
-                  style={{ width: MG.session.moodSize, height: MG.session.moodSize, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)', background: 'transparent' }}
-                >
-                  {score}
-                </motion.button>
-              ))}
-            </div>
-          </div>
+          <MoodCheck onSelect={handleMoodSelect} />
         )}
       </motion.div>
 

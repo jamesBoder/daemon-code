@@ -121,7 +121,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
           x: dragX,
           position: 'absolute', top: '50%', left: `calc(50% - ${T.handleSize / 2}px)`, marginTop: -(T.handleSize / 2),
           width: T.handleSize, height: T.handleSize,
-          borderRadius: '50%', border: '1.5px solid var(--text-primary)',
+          borderRadius: '50%', border: `${T.handleBorderW}px solid var(--text-primary)`,
           background: 'var(--surface-elevated)', cursor: 'ew-resize', touchAction: 'none',
         }}
       />
@@ -136,7 +136,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
       transition={{ duration: reduced ? 0 : MG.transition.revealS }}
       disabled={!showNext || committed}
       className="daemon-btn daemon-btn-primary"
-      style={{ width: '100%', maxWidth: 200, pointerEvents: showNext ? 'auto' : 'none', flexShrink: 0 }}
+      style={{ width: '100%', maxWidth: T.confirmMaxW, pointerEvents: showNext ? 'auto' : 'none', flexShrink: 0 }}
     >
       {idx + 1 < pairs.length ? 'Next →' : 'Done →'}
     </motion.button>

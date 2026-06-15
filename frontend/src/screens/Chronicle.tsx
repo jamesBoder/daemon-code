@@ -1,12 +1,15 @@
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { SignalWhisper } from '../components/daemon/SignalWhisper'
 import { BottomNav } from '../components/ui/BottomNav'
+import { PlayPauseIcon } from '../components/ui/PlayPauseIcon'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, HAIRLINE, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, PROSE_MAX_WIDTH, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
+import { formatDateLong } from '../lib/dates'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { ChronicleEntry, OrbState } from '../types'
 
@@ -25,18 +28,35 @@ const STAGE_COLORS: Record<OrbState, string> = {
   deep:    'var(--text-daemon)',
 }
 
-function formatDate(iso: string): string {
-  const [year, month, day] = iso.split('-')
-  const d = new Date(Number(year), Number(month) - 1, Number(day))
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-}
-
 export function Chronicle() {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [playingDate, setPlayingDate] = useState<string | null>(null)
+  const [audioError, setAudioError]   = useState(false)
+
   const { data: entries = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['chronicle'],
     queryFn: () => apiFetchJson<ChronicleEntry[]>('/chronicle'),
     staleTime: Infinity,
   })
+
+  // One shared audio element — starting an entry stops whichever was playing
+  function handlePlayClick(entry: ChronicleEntry) {
+    const audio = audioRef.current
+    if (!audio || !entry.audioUrl) return
+    if (playingDate === entry.date) {
+      audio.pause()
+      setPlayingDate(null)
+      return
+    }
+    audio.src = entry.audioUrl
+    audio.play().then(() => {
+      setPlayingDate(entry.date)
+    }).catch(() => {
+      setPlayingDate(null)
+      setAudioError(true)
+      setTimeout(() => setAudioError(false), TOAST_DISMISS_MS)
+    })
+  }
 
   return (
     <>
@@ -81,19 +101,54 @@ export function Chronicle() {
                 condition={entries.length > 0}
               />
               {entries.map((entry, i) => (
-                <ChronicleCard key={entry.date} entry={entry} index={i} />
+                <ChronicleCard
+                  key={entry.date}
+                  entry={entry}
+                  index={i}
+                  playing={playingDate === entry.date}
+                  onPlayClick={handlePlayClick}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
 
+      {/* Audio — src is set per entry on play; rendered once for the screen */}
+      <audio
+        ref={audioRef}
+        onEnded={() => setPlayingDate(null)}
+        style={{ display: 'none' }}
+      />
+
+      {/* Inline toast — auto-dismisses after TOAST_DISMISS_MS */}
+      {audioError && (
+        <div style={{
+          position: 'fixed', bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom) + var(--space-4))`,
+          left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--surface)', border: `${HAIRLINE} solid var(--border)`,
+          borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-5)',
+          fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)',
+          whiteSpace: 'nowrap', zIndex: TOAST_Z_INDEX,
+        }}>
+          Audio unavailable
+        </div>
+      )}
+
       <BottomNav />
     </>
   )
 }
 
-function ChronicleCard({ entry, index }: { entry: ChronicleEntry; index: number }) {
+// pad expands the tap target to 14+30=44px; negative margin keeps the header row compact
+const AUDIO_BTN = { iconSize: 14, pad: 15 } as const
+
+function ChronicleCard({ entry, index, playing, onPlayClick }: {
+  entry: ChronicleEntry
+  index: number
+  playing: boolean
+  onPlayClick: (entry: ChronicleEntry) => void
+}) {
   const reduced = useReducedMotion()
   return (
     <motion.div
@@ -106,7 +161,7 @@ function ChronicleCard({ entry, index }: { entry: ChronicleEntry; index: number 
       {/* Date + day + stage */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
-          {formatDate(entry.date)}
+          {formatDateLong(entry.date)}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {entry.day > 0 && (
@@ -121,6 +176,26 @@ function ChronicleCard({ entry, index }: { entry: ChronicleEntry; index: number 
                 {entry.orbState}
               </span>
             </>
+          )}
+          {entry.audioUrl && (
+            <button
+              type="button"
+              onClick={() => onPlayClick(entry)}
+              aria-label={playing ? 'Stop daemon voice' : 'Listen to daemon voice'}
+              style={{
+                padding: AUDIO_BTN.pad,
+                margin: -AUDIO_BTN.pad,
+                marginLeft: 0,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: playing ? 'var(--accent)' : 'var(--text-muted)',
+                lineHeight: 1,
+                transition: 'color 0.2s',
+              }}
+            >
+              <PlayPauseIcon playing={playing} size={AUDIO_BTN.iconSize} />
+            </button>
           )}
         </div>
       </div>

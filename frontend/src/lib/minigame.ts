@@ -7,13 +7,15 @@ export const MG = {
   // ── Responsive breakpoint ──────────────────────────────────────────────────
   desktopBreakpoint: 768,
 
-  // ── Shared drag track (WeightedScale + any future draggable game) ─────────
+  // ── Shared drag track (WeightedScale, MoodCheck + any future draggable game) ──
   track: {
     height:          52,    // px — total row height
     handleSize:      28,    // px — diameter of the draggable circle
     handleScale:     1.2,   // whileDrag scale multiplier
+    handleBorderW:   1.5,   // px — handle circle border width
     dragElastic:     0.05,  // Framer Motion dragElastic
     edgeInset:       16,    // px — gap between handle edge and track end
+    confirmMaxW:     200,   // px — confirm button max width below the track
   },
 
   // ── Spring physics — tap-to-jump and future snapping ──────────────────────
@@ -55,6 +57,9 @@ export const MG = {
     revealMs:      1500, // how long reveal text shows before onComplete fires
     revealFadeS:   0.3,  // reveal text fade-in duration
     cardTransition: '0.15s', // card border/color CSS transition
+    recordMin:     1,    // daemon record domain bounds — mirror analyst 1-100 rule
+    recordMax:     100,
+    recordTick:    1,    // visual record movement on reveal
   },
 
   // ── Transitions — component-to-component and state-to-state ───────────────
@@ -66,14 +71,23 @@ export const MG = {
     revealS:    0.25, // generic reveal fade (confirm buttons, etc.)
   },
 
-  // ── Session chrome (progress bar + exit button + mood) ────────────────────
+  // ── Session chrome (progress bar + exit button) ────────────────────────────
   session: {
     closeW:        52,   // px — wider than 44 to clear safe-area edge
     closeH:        44,   // px — = MIN_TOUCH_TARGET
     closeIconSize: 18,
     closeStroke:   1.5,
-    moodSize:      56,   // px — mood tile width and height
-    moodTapScale:  0.92, // mild tap (larger target — softer than BUTTON_TAP_SCALE)
+  },
+
+  // ── MoodCheck (end-of-session spectrum) ────────────────────────────────────
+  mood: {
+    orbSize:        140,  // px — DaemonOrb diameter above the spectrum
+    trackMaxW:      360,  // px — spectrum track max width
+    ackMaxW:        300,  // px — acknowledgement line text column width
+    dragMaxFallback: 120, // px — half-track guess before useLayoutEffect measures
+    ackHoldMs:     1400,  // how long the acknowledgement line shows before navigating
+    scoreMin:         1,  // mood score domain — matches /session/mood contract
+    scoreMax:         5,
   },
 
   // ── Onboarding compile animation ──────────────────────────────────────────

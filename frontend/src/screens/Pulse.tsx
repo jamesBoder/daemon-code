@@ -46,14 +46,23 @@ const MAP = {
   dragThresholdPx:    8,
   nodeMaxWidthPx:     128,
   centerNodeScale:    1.15,   // center anchor is slightly larger
-  jitterPct:          5,      // ± jitter applied to slot positions, seeded from scenario_id
-  // Slot positions — percentages are node centers
+  jitterPct:          4,      // ± jitter applied to slot positions, seeded from scenario_id
+  // Slot positions — percentages are node centers. Kept inside the nodeSafe*
+  // band so a full-width (nodeMaxWidthPx) node never clips the canvas edge.
   slots: [
-    { x: 18, y: 13 }, { x: 76, y: 9 },
-    { x: 9,  y: 50 }, { x: 84, y: 46 },
-    { x: 23, y: 84 }, { x: 70, y: 80 },
+    { x: 24, y: 17 }, { x: 76, y: 15 },
+    { x: 21, y: 50 }, { x: 79, y: 48 },
+    { x: 27, y: 83 }, { x: 71, y: 81 },
   ],
   centerSlot:         { x: 50, y: 50 },
+  // Clamp band (percent of canvas) for node centers after jitter. Half a
+  // 128px node is ~20% of a 320px viewport — the narrowest we target — so
+  // these insets keep the whole node on-canvas. Vertical leaves room for the
+  // label above the box and multi-line wrapping below.
+  nodeSafeMinXPct:    20,
+  nodeSafeMaxXPct:    80,
+  nodeSafeMinYPct:    14,
+  nodeSafeMaxYPct:    86,
   // Wires
   wireStrokeWidth:    1.5,
   wireDash:           '6 3',
@@ -97,6 +106,8 @@ function mulberry32(seed: number): () => number {
 
 interface NodePosition { x: number; y: number }
 
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+
 function computePositions(scenarioId: string, nodes: PulseNode[]): Record<string, NodePosition> {
   const rng = mulberry32(seedFromString(scenarioId))
   const jitter = () => (rng() * 2 - 1) * MAP.jitterPct
@@ -105,7 +116,10 @@ function computePositions(scenarioId: string, nodes: PulseNode[]): Record<string
   }
   nodes.forEach((n, i) => {
     const slot = MAP.slots[i % MAP.slots.length]
-    out[n.node_id] = { x: slot.x + jitter(), y: slot.y + jitter() }
+    out[n.node_id] = {
+      x: clamp(slot.x + jitter(), MAP.nodeSafeMinXPct, MAP.nodeSafeMaxXPct),
+      y: clamp(slot.y + jitter(), MAP.nodeSafeMinYPct, MAP.nodeSafeMaxYPct),
+    }
   })
   return out
 }

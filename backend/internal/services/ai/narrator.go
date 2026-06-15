@@ -11,16 +11,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/polly"
-	pollytypes "github.com/aws/aws-sdk-go-v2/service/polly/types"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	appconfig "github.com/jamesboder/daemon-code/internal/config"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/dynamo"
+	"github.com/jamesboder/daemon-code/internal/services/voice"
 )
 
 const narratorSystemPrompt = `You are ShadowNarrator, the daemon's voice.
@@ -56,22 +51,16 @@ type Narrator struct {
 	cfg    *appconfig.Config
 	q      *db.Queries
 	ddb    *dynamo.Client
-	polly  *polly.Client
-	s3     *s3.Client
+	synth  *voice.Synthesizer
 	httpCl *http.Client
 }
 
 func NewNarrator(cfg *appconfig.Config, q *db.Queries, ddb *dynamo.Client) *Narrator {
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWSRegion))
-	if err != nil {
-		panic("narrator: failed to load AWS config: " + err.Error())
-	}
 	return &Narrator{
 		cfg:    cfg,
 		q:      q,
 		ddb:    ddb,
-		polly:  polly.NewFromConfig(awsCfg),
-		s3:     s3.NewFromConfig(awsCfg),
+		synth:  voice.NewSynthesizer(cfg),
 		httpCl: &http.Client{Timeout: 60 * time.Second},
 	}
 }
@@ -114,8 +103,12 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 	// Stamp with the date this compile serves (the following UTC day for the
 	// 23:00 UTC nightly run) so Home/Session lookups match all next day.
 	date := dynamo.ServiceDate(time.Now())
-	voice := resolveVoice(profile.PollyVoice, profile.PrimaryArchetype)
-	audioURL, err := n.synthesizeVoice(ctx, output.Prose, profile.Stage, voice, userID.String(), date)
+	preferred := ""
+	if profile.PollyVoice.Valid {
+		preferred = profile.PollyVoice.String
+	}
+	voiceID := voice.ResolveVoice(preferred, profile.PrimaryArchetype)
+	audioURL, err := n.synth.Synthesize(ctx, output.Prose, profile.Stage, voiceID, fmt.Sprintf("daemon-audio/%s/%s.mp3", userID.String(), date))
 	if err != nil {
 		return fmt.Errorf("synthesize voice: %w", err)
 	}
@@ -126,7 +119,7 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 	recentDiffStr := normalizeRecentDiff(detail.RecentDiff)
 	var namingAudioURL string
 	if name := firstNamedProcess(detail.RecentDiff); name != "" {
-		namingAudioURL, _ = n.synthesizeNaming(ctx, name, profile.Stage, voice, userID.String(), date)
+		namingAudioURL, _ = n.synth.Synthesize(ctx, namingLine(name), profile.Stage, voiceID, fmt.Sprintf("naming-audio/%s/%s.mp3", userID.String(), date))
 	}
 
 	var compileLinesStr string
@@ -237,101 +230,10 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 	return &output, nil
 }
 
-// archetypeVoice maps each archetype to its default Polly Neural voice.
-var archetypeVoice = map[string]pollytypes.VoiceId{
-	"grief_carrier":   pollytypes.VoiceIdMatthew,
-	"abandoned_child": pollytypes.VoiceIdRuth,
-	"caged_rage":      pollytypes.VoiceIdStephen,
-	"unworthy_self":   pollytypes.VoiceIdKendra,
-}
-
-// resolveVoice returns the user's preferred voice, falling back to the
-// archetype default and then to Matthew as the universal fallback.
-func resolveVoice(pollyVoice pgtype.Text, archetype string) pollytypes.VoiceId {
-	if pollyVoice.Valid && pollyVoice.String != "" {
-		return pollytypes.VoiceId(pollyVoice.String)
-	}
-	if v, ok := archetypeVoice[archetype]; ok {
-		return v
-	}
-	return pollytypes.VoiceIdMatthew
-}
-
-// stageRates and stagePauses tune Polly Neural delivery to the daemon's stage —
-// slower and more spaced when the model is young, tighter as it gains certainty.
-var (
-	stageRates  = map[string]string{"cold": "72%", "warming": "80%", "running": "85%", "deep": "88%"}
-	stagePauses = map[string]string{"cold": "600ms", "warming": "400ms", "running": "300ms", "deep": "200ms"}
-)
-
-// synthesizeVoice voices the nightly prose to daemon-audio/{userID}/{date}.mp3.
-func (n *Narrator) synthesizeVoice(ctx context.Context, prose, stage string, voiceID pollytypes.VoiceId, userID, date string) (string, error) {
-	ssml := buildSSML(prose, stageRates[stage], stagePauses[stage])
-	return n.putSpeech(ctx, ssml, voiceID, fmt.Sprintf("daemon-audio/%s/%s.mp3", userID, date))
-}
-
-// synthesizeNaming voices the daemon naming a process at the ceremony — one
-// short line, only on the rare nights a process earns a name.
-func (n *Narrator) synthesizeNaming(ctx context.Context, processName, stage string, voiceID pollytypes.VoiceId, userID, date string) (string, error) {
-	ssml := buildSSML(namingLine(processName), stageRates[stage], stagePauses[stage])
-	return n.putSpeech(ctx, ssml, voiceID, fmt.Sprintf("naming-audio/%s/%s.mp3", userID, date))
-}
-
 // namingLine is the daemon's spoken sentence when it names a process. The raw
 // internal name ("the_yes_that_costs.process") is humanized for speech so Polly
 // doesn't read the underscores or the .process suffix aloud.
 func namingLine(processName string) string {
 	human := strings.ReplaceAll(strings.TrimSuffix(processName, ".process"), "_", " ")
 	return fmt.Sprintf("I have a name for it now. %s. You've been running it for a while.", human)
-}
-
-// putSpeech calls Polly Neural for the given SSML and uploads the MP3 to S3 at
-// key, returning the key.
-func (n *Narrator) putSpeech(ctx context.Context, ssml string, voiceID pollytypes.VoiceId, key string) (string, error) {
-	out, err := n.polly.SynthesizeSpeech(ctx, &polly.SynthesizeSpeechInput{
-		Engine:       pollytypes.EngineNeural,
-		VoiceId:      voiceID,
-		OutputFormat: pollytypes.OutputFormatMp3,
-		TextType:     pollytypes.TextTypeSsml,
-		Text:         aws.String(ssml),
-	})
-	if err != nil {
-		return "", fmt.Errorf("polly: %w", err)
-	}
-	defer out.AudioStream.Close()
-	audio, err := io.ReadAll(out.AudioStream)
-	if err != nil {
-		return "", fmt.Errorf("read polly stream: %w", err)
-	}
-
-	sz := int64(len(audio))
-	_, err = n.s3.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        aws.String(n.cfg.AudioBucket),
-		Key:           aws.String(key),
-		Body:          bytes.NewReader(audio),
-		ContentLength: &sz,
-		ContentType:   aws.String("audio/mpeg"),
-		CacheControl:  aws.String("max-age=86400, immutable"),
-	})
-	if err != nil {
-		return "", fmt.Errorf("s3 put: %w", err)
-	}
-
-	return key, nil
-}
-
-// buildSSML wraps daemon prose in stage-aware SSML for Polly Neural.
-// Neural engine does not support <amazon:auto-breaths/> or prosody pitch —
-// only rate, volume, and <break> are supported.
-func buildSSML(prose, rate, pause string) string {
-	sentences := strings.Split(prose, ". ")
-	var parts []string
-	for i, s := range sentences {
-		parts = append(parts, strings.TrimSpace(s))
-		if i < len(sentences)-1 {
-			parts = append(parts, fmt.Sprintf(`<break time="%s"/>`, pause))
-		}
-	}
-	inner := strings.Join(parts, " ")
-	return fmt.Sprintf(`<speak><prosody rate="%s">%s</prosody></speak>`, rate, inner)
 }

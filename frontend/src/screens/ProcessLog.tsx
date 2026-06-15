@@ -8,7 +8,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
 import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, SCREEN_HEADER_HEIGHT } from '../lib/constants'
 import { copy } from '../lib/copy'
-import type { Process, ProcessDiff, ProcessEntryData, ProcessState } from '../types'
+import type { Process, ProcessDiff, ProcessEntryData, ProcessState, RecentDiffResponse } from '../types'
 
 const PROCESS_LOG = {
   stateMaxW: 280,  // px — narrower than PROSE_MAX_WIDTH; fits two-line messages without excess line length
@@ -39,11 +39,11 @@ export function ProcessLog() {
   // Latest compile's changes — same cache entry SessionComplete populates
   const { data: recentDiff } = useQuery({
     queryKey: ['session-diff'],
-    queryFn: () => apiFetchJson<ProcessDiff[]>('/session/recent-diff'),
+    queryFn: () => apiFetchJson<RecentDiffResponse>('/session/recent-diff'),
     staleTime: 5 * 60 * 1000,
   })
 
-  const diffById = new Map((recentDiff ?? []).map(d => [d.id, d]))
+  const diffById = new Map((recentDiff?.diff ?? []).map(d => [d.id, d]))
   const entries = (processes ?? []).map((p, i) => toProcessEntryData(p, i, diffById.get(p.id)))
 
   return (

@@ -150,7 +150,8 @@ export function NamingCeremony({ names, orbState, audioUrl, onComplete }: Naming
         </motion.p>
       </AnimatePresence>
 
-      {audioUrl && !exiting && (
+      {/* The clip voices the first named process, so the mic only rides its card. */}
+      {audioUrl && !exiting && idx === 0 && (
         <button
           type="button"
           onClick={toggleVoice}

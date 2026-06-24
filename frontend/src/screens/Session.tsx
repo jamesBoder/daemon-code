@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
-import { apiFetchJson } from '../lib/api'
-import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID } from '../lib/constants'
+import { apiFetchJson, postSessionComplete } from '../lib/api'
+import { DAY_QUERY_STALE_MS, LIVE_MOVES_QUERY_KEY, ORB_LAYOUT_ID } from '../lib/constants'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
@@ -20,9 +20,25 @@ export function Session() {
     staleTime: query => (query.state.data?.ready ? DAY_QUERY_STALE_MS : 0),
   })
 
-  function handleComplete(fragmentCount: number) {
+  async function handleComplete(fragmentCount: number) {
     queryClient.invalidateQueries({ queryKey: ['session-today'] })
-    navigate('/session/complete', { state: { fragmentCount } })
+
+    // Run the cheap deterministic scorer: real process movement + an immediate
+    // daemon line, no AI. Best-effort — a failure must never block the completion
+    // screen, so fall through to navigate either way.
+    let daemonLine: string | undefined
+    try {
+      const live = await postSessionComplete()
+      daemonLine = live.daemonLine
+      // Stash this session's per-process moves so the process tab can show the
+      // ephemeral "+N" and sweep once, then reflect the new strengths.
+      queryClient.setQueryData([LIVE_MOVES_QUERY_KEY], live.diff)
+      queryClient.invalidateQueries({ queryKey: ['processes'] })
+    } catch {
+      // Live scoring is non-essential; ignore and continue.
+    }
+
+    navigate('/session/complete', { state: { fragmentCount, daemonLine } })
   }
 
   if (isLoading) {

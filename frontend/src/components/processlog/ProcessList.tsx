@@ -21,9 +21,10 @@ const STATE_ORDER: ProcessState[] = ['running', 'new', 'weakening', 'sleeping']
 
 interface ProcessListProps {
   entries: ProcessEntryData[]
+  justMoved?: Record<string, number>  // process id → strength delta moved this session
 }
 
-export function ProcessList({ entries }: ProcessListProps) {
+export function ProcessList({ entries, justMoved }: ProcessListProps) {
   const reduced = useReducedMotion()
 
   const groups = STATE_ORDER
@@ -135,6 +136,7 @@ export function ProcessList({ entries }: ProcessListProps) {
               return (
                 <motion.div
                   key={entry.id}
+                  layout={reduced ? false : 'position'}
                   initial={{ opacity: 0, y: reduced ? 0 : LIST.slideUpY }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
@@ -143,7 +145,7 @@ export function ProcessList({ entries }: ProcessListProps) {
                     ease: 'easeOut',
                   }}
                 >
-                  <ProcessEntry entry={entry} />
+                  <ProcessEntry entry={entry} justMovedDelta={justMoved?.[entry.id]} />
                 </motion.div>
               )
             })}

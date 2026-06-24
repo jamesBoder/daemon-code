@@ -1,12 +1,14 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ProcessList } from '../components/processlog/ProcessList'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { SignalWhisper } from '../components/daemon/SignalWhisper'
 import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson } from '../lib/api'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import { pulseGrain } from '../lib/grain'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, LETTER_SPACING_WIDE, LIVE_MOVES_QUERY_KEY, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, SCREEN_HEADER_HEIGHT } from '../lib/constants'
 import { copy } from '../lib/copy'
 import type { Process, ProcessDiff, ProcessEntryData, ProcessState, RecentDiffResponse } from '../types'
 
@@ -30,6 +32,26 @@ function toProcessEntryData(p: Process, index: number, diff?: ProcessDiff): Proc
 }
 
 export function ProcessLog() {
+  const queryClient = useQueryClient()
+
+  // This session's per-process moves, stashed by Session on completion. Read once
+  // so the "+N" float and bar sweep play a single time, then cleared.
+  const [justMoved] = useState<Record<string, number>>(() => {
+    const moves = queryClient.getQueryData<ProcessDiff[]>([LIVE_MOVES_QUERY_KEY])
+    const map: Record<string, number> = {}
+    for (const m of moves ?? []) if (m.delta !== undefined) map[m.id] = m.delta
+    return map
+  })
+
+  useEffect(() => {
+    if (Object.keys(justMoved).length > 0) {
+      pulseGrain()
+      queryClient.removeQueries({ queryKey: [LIVE_MOVES_QUERY_KEY] })
+    }
+    // Read-once on mount; justMoved is frozen for this screen instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const { data: processes, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['processes'],
     queryFn: () => apiFetchJson<Process[]>('/processes'),
@@ -76,8 +98,8 @@ export function ProcessLog() {
           ) : entries.length === 0 ? (
             <div style={{ paddingTop: 'var(--space-16)', textAlign: 'center' }}>
               <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', maxWidth: PROCESS_LOG.stateMaxW, margin: '0 auto' }}>
-                The daemon is building its first picture.<br />
-                Check back tomorrow.
+                {copy.processLog.emptyTitle}<br />
+                {copy.processLog.emptyBody}
               </p>
             </div>
           ) : (
@@ -87,7 +109,7 @@ export function ProcessLog() {
                 text={copy.signalHints.process_first}
                 condition={entries.length > 0}
               />
-              <ProcessList entries={entries} />
+              <ProcessList entries={entries} justMoved={justMoved} />
             </>
           )}
         </div>

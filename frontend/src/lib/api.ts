@@ -1,4 +1,4 @@
-import type { CompileData, HomeData, OrbState } from '../types'
+import type { CompileData, HomeData, OrbState, SessionCompleteResult } from '../types'
 import { useAuthStore } from '../stores/authStore'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
@@ -72,6 +72,12 @@ export async function postPulseResponse(body: PostPulseResponseBody): Promise<vo
     body: JSON.stringify(body),
   })
   if (!r.ok) throw new Error(`POST /pulse/response ${r.status}`)
+}
+
+// Finalize a session: triggers the cheap deterministic scorer (no AI) and returns
+// live process movement + an immediate daemon line.
+export async function postSessionComplete(): Promise<SessionCompleteResult> {
+  return apiFetchJson<SessionCompleteResult>('/session/complete', { method: 'POST' })
 }
 
 export async function patchProfile(polly_voice: string | null): Promise<void> {

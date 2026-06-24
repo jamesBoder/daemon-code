@@ -128,6 +128,18 @@ body::after {
   z-index: 9999;
 }
 
+/* Grain pulse — the overlay briefly swells when the daemon notices, then settles
+   back to its resting opacity. Triggered via pulseGrain() (src/lib/grain.ts).
+   Opacity flicker only (no motion), so it is not reduced-motion gated. */
+@keyframes grain-pulse {
+  0%   { opacity: 0.14; }
+  100% { opacity: 0.025; }
+}
+
+body.grain-pulse::after {
+  animation: grain-pulse 600ms ease-out;
+}
+
 /* ── Glass card ─────────────────────────────────────────────────────────────── */
 
 .glass-card {

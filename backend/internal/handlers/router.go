@@ -46,6 +46,7 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 	protected.HandleFunc("GET /home", h.GetHome)
 	protected.HandleFunc("GET /session/today", h.GetSessionToday)
 	protected.HandleFunc("POST /session/response", h.PostSessionResponse)
+	protected.HandleFunc("POST /session/complete", h.PostSessionComplete)
 	protected.HandleFunc("POST /session/mood", h.PostMood)
 	protected.HandleFunc("GET /session/recent-diff", h.GetSessionRecentDiff)
 	protected.HandleFunc("GET /chronicle", h.GetChronicle)

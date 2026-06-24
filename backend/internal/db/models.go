@@ -40,6 +40,8 @@ type PatternLibrary struct {
 	DaemonNote    pgtype.Text        `json:"daemon_note"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	SignalKey     string             `json:"signal_key"`
+	LiveDelta     int32              `json:"live_delta"`
 }
 
 type ShadowProfile struct {

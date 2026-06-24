@@ -18,3 +18,12 @@ export function daysSince(iso: string): number {
   const elapsed = Date.now() - parseLocalDate(iso).getTime()
   return Math.max(1, Math.floor(elapsed / MS_PER_DAY) + 1)
 }
+
+// True when the "YYYY-MM-DD" string is today (local). Used for "stirred today".
+export function isToday(iso: string): boolean {
+  const d = parseLocalDate(iso)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate()
+}

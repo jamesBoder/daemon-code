@@ -76,10 +76,22 @@ export function SessionContainer({ fragments, onComplete }: Props) {
   const fragment = playable[idx]
   const progress = phase === 'mood' ? 1 : idx / playable.length
 
+  // In-flight response posts. The session-complete scorer reads today's responses
+  // straight from the DB, so they must be persisted before onComplete fires —
+  // otherwise the live process movement is computed on stale data.
+  const pendingPosts = useRef<Promise<unknown>[]>([])
+
   function postResponse(frag: Fragment, responseData: unknown) {
     const body = JSON.stringify({ fragment_id: frag.id, fragment_type: frag.type, response_data: responseData })
     const post = () => apiFetch('/session/response', { method: 'POST', body })
-    post().catch(() => setTimeout(() => post().catch(() => {}), SESSION_RETRY_DELAY_MS))
+    // Resolve only once the response (or its single retry) has settled, so the
+    // completion handler can await all posts before scoring.
+    const settled = post().catch(
+      () => new Promise<void>(resolve => {
+        setTimeout(() => post().catch(() => {}).finally(() => resolve()), SESSION_RETRY_DELAY_MS)
+      })
+    )
+    pendingPosts.current.push(settled)
   }
 
   function advance(currentIdx: number) {
@@ -103,8 +115,11 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     transTimer.current = setTimeout(() => advance(idx), transMs)
   }
 
-  function handleMoodSelect(score: number) {
+  async function handleMoodSelect(score: number) {
     apiFetch('/session/mood', { method: 'POST', body: JSON.stringify({ score }) }).catch(() => {})
+    // Wait for every card response to land before completing, so the live scorer
+    // sees the full session. Best-effort: allSettled never rejects.
+    await Promise.allSettled(pendingPosts.current)
     onComplete(playable.length)
   }
 

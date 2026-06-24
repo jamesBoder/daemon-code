@@ -167,3 +167,11 @@ export interface RecentDiffResponse {
   diff:            ProcessDiff[]
   namingAudioUrl?: string
 }
+
+// POST /session/complete — the live, deterministic process movement computed at
+// session end (no Anthropic call) plus an immediate daemon line. Diff reuses the
+// ProcessDiff shape so SessionComplete renders it like the nightly diff.
+export interface SessionCompleteResult {
+  diff:       ProcessDiff[]
+  daemonLine: string
+}

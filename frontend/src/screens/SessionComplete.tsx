@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
+import { DecodeText } from '../components/daemon/DecodeText'
 import { NamingCeremony } from '../components/daemon/NamingCeremony'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
 import { haptic } from '../lib/haptics'
-import { LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
+import { pulseGrain } from '../lib/grain'
+import { LETTER_SPACING_PROCESS, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
 import type { ShadowProfile, OrbState, ProcessDiff, RecentDiffResponse } from '../types'
 
 // named first (most dramatic), then new processes, then strength changes
@@ -22,8 +24,9 @@ export function SessionComplete() {
   const queryClient   = useQueryClient()
   const location      = useLocation()
 
-  const state         = location.state as { fragmentCount?: number } | null
+  const state         = location.state as { fragmentCount?: number; daemonLine?: string } | null
   const fragmentCount = state?.fragmentCount ?? 0
+  const daemonLine    = state?.daemonLine
 
   const [ceremonyDone, setCeremonyDone] = useState(false)
 
@@ -31,6 +34,11 @@ export function SessionComplete() {
     haptic('success')
     queryClient.invalidateQueries({ queryKey: ['profile'] })
   }, [])
+
+  // The signature grain swells the moment the daemon speaks, then settles.
+  useEffect(() => {
+    if (daemonLine) pulseGrain()
+  }, [daemonLine])
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile'],
@@ -88,6 +96,24 @@ export function SessionComplete() {
       </p>
 
       <DaemonOrb state={orbState} />
+
+      {/* Immediate, deterministic daemon line from the live scorer (no AI),
+          revealed with a decode effect — the daemon composing what it says. */}
+      {daemonLine && (
+        <div style={{ width: '100%', maxWidth: MODAL_MAX_WIDTH, textAlign: 'center' }}>
+          <DecodeText
+            text={daemonLine}
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'var(--text-xl)',
+              lineHeight: 'var(--leading-xl)',
+              fontWeight: 300,
+              color: 'var(--text-daemon)',
+              letterSpacing: LETTER_SPACING_TIGHT,
+            }}
+          />
+        </div>
+      )}
 
       {/* Diff cards — shown when Analyst has run since last session */}
       {diff.length > 0 && (

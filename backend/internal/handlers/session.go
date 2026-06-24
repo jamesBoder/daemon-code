@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/middleware"
+	"github.com/jamesboder/daemon-code/internal/services/observe"
 )
 
 type processDiff struct {
@@ -114,6 +115,29 @@ func (h *handler) PostSessionResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// sessionCompleteResponse carries the live, deterministic process movement and the
+// immediate daemon line produced at session end (no Anthropic call). Diff reuses
+// the processDiff JSON shape so the frontend renders it like the nightly diff.
+type sessionCompleteResponse struct {
+	Diff       []observe.Move `json:"diff"`
+	DaemonLine string         `json:"daemonLine"`
+}
+
+// PostSessionComplete runs the cheap deterministic scorer when a session's deck
+// finishes: it moves the bars of reinforced processes, may seed one "still
+// forming" process, and returns a varied daemon line. Free and instant.
+func (h *handler) PostSessionComplete(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+
+	result, err := observe.NewScorer(h.q).Score(r.Context(), userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not finalize session")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, sessionCompleteResponse{Diff: result.Diff, DaemonLine: result.DaemonLine})
 }
 
 type moodRequest struct {

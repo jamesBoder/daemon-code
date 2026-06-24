@@ -12,8 +12,53 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const applyLiveDelta = `-- name: ApplyLiveDelta :exec
+UPDATE pattern_library
+SET live_delta = LEAST(live_delta + $2, $3),
+    state      = CASE WHEN state = 'sleeping' THEN 'running' ELSE state END,
+    last_seen  = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type ApplyLiveDeltaParams struct {
+	ID          uuid.UUID   `json:"id"`
+	LiveDelta   int32       `json:"live_delta"`
+	LiveDelta_2 int32       `json:"live_delta_2"`
+	LastSeen    pgtype.Date `json:"last_seen"`
+}
+
+// Live, deterministic in-session accrual. Caps live_delta at the per-window
+// ceiling ($3), wakes a sleeping pattern, and bumps recency so the process tab
+// can show "stirred just now". Never touches base strength.
+func (q *Queries) ApplyLiveDelta(ctx context.Context, arg ApplyLiveDeltaParams) error {
+	_, err := q.db.Exec(ctx, applyLiveDelta,
+		arg.ID,
+		arg.LiveDelta,
+		arg.LiveDelta_2,
+		arg.LastSeen,
+	)
+	return err
+}
+
+const foldLiveDeltaIntoStrength = `-- name: FoldLiveDeltaIntoStrength :exec
+UPDATE pattern_library
+SET strength   = LEAST(strength + live_delta, 100),
+    live_delta = 0
+WHERE user_id = $1 AND live_delta > 0
+`
+
+// Nightly safety net: absorb any remaining provisional live drift into the
+// authoritative strength for patterns the Analyst did not update this compile
+// (UpdatePattern already zeroed the ones it touched). Guarantees live_delta never
+// carries across compiles, even for processes the model left alone.
+func (q *Queries) FoldLiveDeltaIntoStrength(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, foldLiveDeltaIntoStrength, userID)
+	return err
+}
+
 const getPatternLibrary = `-- name: GetPatternLibrary :many
-SELECT id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at FROM pattern_library
+SELECT id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at, signal_key, live_delta FROM pattern_library
 WHERE user_id = $1
 ORDER BY updated_at DESC
 `
@@ -39,6 +84,8 @@ func (q *Queries) GetPatternLibrary(ctx context.Context, userID uuid.UUID) ([]Pa
 			&i.DaemonNote,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SignalKey,
+			&i.LiveDelta,
 		); err != nil {
 			return nil, err
 		}
@@ -51,9 +98,9 @@ func (q *Queries) GetPatternLibrary(ctx context.Context, userID uuid.UUID) ([]Pa
 }
 
 const insertPattern = `-- name: InsertPattern :one
-INSERT INTO pattern_library (user_id, name, state, strength, unnamed, first_detected, daemon_note)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at
+INSERT INTO pattern_library (user_id, name, state, strength, unnamed, first_detected, daemon_note, signal_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at, signal_key, live_delta
 `
 
 type InsertPatternParams struct {
@@ -64,6 +111,7 @@ type InsertPatternParams struct {
 	Unnamed       bool        `json:"unnamed"`
 	FirstDetected pgtype.Date `json:"first_detected"`
 	DaemonNote    pgtype.Text `json:"daemon_note"`
+	SignalKey     string      `json:"signal_key"`
 }
 
 func (q *Queries) InsertPattern(ctx context.Context, arg InsertPatternParams) (PatternLibrary, error) {
@@ -75,6 +123,7 @@ func (q *Queries) InsertPattern(ctx context.Context, arg InsertPatternParams) (P
 		arg.Unnamed,
 		arg.FirstDetected,
 		arg.DaemonNote,
+		arg.SignalKey,
 	)
 	var i PatternLibrary
 	err := row.Scan(
@@ -89,6 +138,50 @@ func (q *Queries) InsertPattern(ctx context.Context, arg InsertPatternParams) (P
 		&i.DaemonNote,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SignalKey,
+		&i.LiveDelta,
+	)
+	return i, err
+}
+
+const insertProvisionalPattern = `-- name: InsertProvisionalPattern :one
+INSERT INTO pattern_library (user_id, name, state, strength, unnamed, first_detected, daemon_note, signal_key)
+VALUES ($1, NULL, 'new', $2, TRUE, $3, '', $4)
+RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at, signal_key, live_delta
+`
+
+type InsertProvisionalPatternParams struct {
+	UserID        uuid.UUID   `json:"user_id"`
+	Strength      int32       `json:"strength"`
+	FirstDetected pgtype.Date `json:"first_detected"`
+	SignalKey     string      `json:"signal_key"`
+}
+
+// Live (non-AI) seeding of an unnamed "still forming" pattern once a dimension
+// has held across enough sessions. Strength is derived from birth-signal
+// confidence by the caller; the nightly Analyst later names or folds it in.
+func (q *Queries) InsertProvisionalPattern(ctx context.Context, arg InsertProvisionalPatternParams) (PatternLibrary, error) {
+	row := q.db.QueryRow(ctx, insertProvisionalPattern,
+		arg.UserID,
+		arg.Strength,
+		arg.FirstDetected,
+		arg.SignalKey,
+	)
+	var i PatternLibrary
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.State,
+		&i.Strength,
+		&i.Unnamed,
+		&i.FirstDetected,
+		&i.LastSeen,
+		&i.DaemonNote,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SignalKey,
+		&i.LiveDelta,
 	)
 	return i, err
 }
@@ -101,9 +194,11 @@ SET name        = $2,
     unnamed     = $5,
     last_seen   = $6,
     daemon_note = $7,
+    signal_key  = $8,
+    live_delta  = 0,
     updated_at  = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at
+RETURNING id, user_id, name, state, strength, unnamed, first_detected, last_seen, daemon_note, created_at, updated_at, signal_key, live_delta
 `
 
 type UpdatePatternParams struct {
@@ -114,8 +209,11 @@ type UpdatePatternParams struct {
 	Unnamed    bool        `json:"unnamed"`
 	LastSeen   pgtype.Date `json:"last_seen"`
 	DaemonNote pgtype.Text `json:"daemon_note"`
+	SignalKey  string      `json:"signal_key"`
 }
 
+// Nightly Analyst is the source of truth: it sets the authoritative strength and
+// resets live_delta to 0, absorbing any in-session drift accrued since last run.
 func (q *Queries) UpdatePattern(ctx context.Context, arg UpdatePatternParams) (PatternLibrary, error) {
 	row := q.db.QueryRow(ctx, updatePattern,
 		arg.ID,
@@ -125,6 +223,7 @@ func (q *Queries) UpdatePattern(ctx context.Context, arg UpdatePatternParams) (P
 		arg.Unnamed,
 		arg.LastSeen,
 		arg.DaemonNote,
+		arg.SignalKey,
 	)
 	var i PatternLibrary
 	err := row.Scan(
@@ -139,6 +238,8 @@ func (q *Queries) UpdatePattern(ctx context.Context, arg UpdatePatternParams) (P
 		&i.DaemonNote,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SignalKey,
+		&i.LiveDelta,
 	)
 	return i, err
 }

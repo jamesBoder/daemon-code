@@ -133,6 +133,9 @@ export const copy = {
     unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
     stillForming:     'still forming',
     chipNamed:        'named',
+    stirredToday:     'stirred today',
+    emptyTitle:       'The daemon is still reading you.',
+    emptyBody:        'A process takes a few sessions to take shape. Keep coming back.',
     description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
     stateDescriptions: {
       running:   'active in recent sessions',

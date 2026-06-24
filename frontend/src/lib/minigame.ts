@@ -90,6 +90,24 @@ export const MG = {
     scoreMax:         5,
   },
 
+  // ── The Trap (the one game with a right answer) ───────────────────────────
+  trap: {
+    maxW:          360,    // px — tableau column max width
+    terminalGap:   'var(--space-3)', // between the two decision terminals
+    terminalMinH:  132,    // px — tall tap target, well above MIN_TOUCH_TARGET
+    oddsBarH:      6,      // px — probability split bar height
+    oddsBarFillS:  0.5,    // s  — left-to-right fill (motion only)
+    meterH:        8,      // px — locked "sunk" meter height
+    meterOpacity:  0.4,    // the sunk meter reads inert — it's already spent
+    commitFlashMs: 150,    // chosen terminal amber flash-in
+    loggedHoldMs:  900,    // "logged." dwell before advancing
+    loggedFadeS:   0.3,    // logged-beat fade timing
+    dimAlpha:      0.35,   // opacity of the unchosen terminal after commit
+    frame:        'var(--warning)',       // the Trap's identity color (amber)
+    oddsGain:     'var(--compile-green)', // upside slice of the odds bar
+    oddsLoss:     'var(--warning)',       // downside slice of the odds bar
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

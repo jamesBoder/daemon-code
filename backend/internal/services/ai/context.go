@@ -47,6 +47,7 @@ type analystContext struct {
 	PulseSignalsToday     map[string]interface{} `json:"pulse_signals_today,omitempty"`
 	GrimTriggerSignal     grimTriggerCtx         `json:"grim_trigger_signal"`
 	KLevelSignal          kLevelCtx              `json:"k_level_signal"`
+	TrapSignals           map[string]interface{} `json:"trap_signals,omitempty"`
 	ExistingPatterns      []existingPattern      `json:"existing_patterns"`
 }
 
@@ -133,6 +134,20 @@ type duelResponseData struct {
 	DuelResponseTimeMs int  `json:"duelResponseTimeMs"`
 }
 
+// Trap returns a single object (one dilemma per fragment). The chosen option id
+// is recovered against the static library server-side — bias alignment is never
+// trusted from the client.
+type trapResultData struct {
+	TrapID         string `json:"trap_id"`
+	Choice         string `json:"choice"`
+	ResponseTimeMs int    `json:"response_time_ms"`
+}
+
+// trapBiasMinSamples is the minimum trap responses (per bias, and overall) before
+// the aggregate is surfaced to the Analyst at all — defence-in-depth so the model
+// never sees a high alignment rate backed by one or two choices.
+const trapBiasMinSamples = 3
+
 // assembleContext builds the full Analyst context object from today's data and the user's profile.
 // recentResponses should be card_responses from the last 7 session dates for cross-session signals.
 // lastCompile is the timestamp of the previous compile (profile.UpdatedAt); zero value skips decay.
@@ -162,6 +177,7 @@ func assembleContext(
 	ac.PulseSignalsToday = computePulseSignals(responses)
 	ac.GrimTriggerSignal = computeGrimTrigger(profile, recentResponses)
 	ac.KLevelSignal = computeKLevel(recentResponses)
+	ac.TrapSignals = computeTrapSignals(recentResponses)
 
 	return ac
 }
@@ -321,6 +337,29 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 		}
 	}
 
+	// --- Trap-based dimensions (the chosen option's tags fold into the sums) ---
+	for _, r := range responses {
+		if r.FragmentType != "trap" {
+			continue
+		}
+		var res trapResultData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		tr, ok := signal.LookupTrap(res.TrapID)
+		if !ok {
+			continue
+		}
+		choice, _, ok := tr.TrapChoiceByID(res.Choice)
+		if !ok {
+			continue
+		}
+		for dim, sig := range choice.DimensionSignals {
+			dimSums[dim] += sig
+			dimCounts[dim]++
+		}
+	}
+
 	avgDelibMs := 0.0
 	if len(deliberationMs) > 0 {
 		avgDelibMs = math.Round(floatMean(deliberationMs))
@@ -411,6 +450,71 @@ func scaleScore(value float64, leftHigh bool) float64 {
 		return (-value + 1) / 2
 	}
 	return (value + 1) / 2
+}
+
+// computeTrapSignals aggregates how often the user takes the bait in The Trap,
+// per bias and overall, across recent sessions. The Analyst names a standalone
+// bias process from a consistently-caught bias, or a cross-bias "clear eye"
+// process from consistent rationality — modelled on grim_trigger_signal, which
+// also feeds a dimension while being able to produce a standalone process.
+// Bias alignment is recovered from the static library, never from the client.
+// Returns nil when there is too little trap data to say anything (the field is
+// omitempty, so it simply disappears from the context).
+func computeTrapSignals(recentResponses []db.CardResponse) map[string]interface{} {
+	type bucket struct{ aligned, total int }
+	byBias := map[string]*bucket{}
+	var allAligned, allTotal int
+
+	for _, r := range recentResponses {
+		if r.FragmentType != "trap" {
+			continue
+		}
+		var res trapResultData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		tr, ok := signal.LookupTrap(res.TrapID)
+		if !ok {
+			continue
+		}
+		_, aligned, ok := tr.TrapChoiceByID(res.Choice)
+		if !ok {
+			continue
+		}
+		b := byBias[tr.Bias]
+		if b == nil {
+			b = &bucket{}
+			byBias[tr.Bias] = b
+		}
+		b.total++
+		allTotal++
+		if aligned {
+			b.aligned++
+			allAligned++
+		}
+	}
+
+	if allTotal < trapBiasMinSamples {
+		return nil
+	}
+
+	out := map[string]interface{}{}
+	for bias, b := range byBias {
+		if b.total < trapBiasMinSamples {
+			continue // not enough of this bias yet to read a rate
+		}
+		out[bias] = map[string]interface{}{
+			"alignment_rate": round2(float64(b.aligned) / float64(b.total)),
+			"n":              b.total,
+		}
+	}
+	// rational_rate is the share of rational (non-bait) choices across all biases
+	// — the signal behind a cross-bias "clear eye" process.
+	out["composite"] = map[string]interface{}{
+		"rational_rate": round2(float64(allTotal-allAligned) / float64(allTotal)),
+		"n":             allTotal,
+	}
+	return out
 }
 
 // computeGrimTrigger detects whether the last compile produced a significant accuracy drop.

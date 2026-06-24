@@ -249,6 +249,13 @@ export const copy = {
     trap:            'one option is better. choose.',
   } as Record<string, string>,
 
+  // ── The Trap ──────────────────────────────────────────────────────────────
+  trap: {
+    onTable:  'ON THE TABLE',  // odds: stake ledger label
+    sunk:     'SUNK',          // sunk: locked-meter label
+    logged:   'logged.',       // the silent commit beat — never a verdict
+  },
+
   // ── Layer 3 — daemon.log Codex ────────────────────────────────────────────
   // Terminal-styled reference entries. Accessible via Settings → daemon.log.
   codex: [

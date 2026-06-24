@@ -23,6 +23,10 @@ const (
 	speedPromptsPerRound   = 4   // prompts sampled into one speed_round fragment
 	speedRoundMinCompiles  = 1   // compiles before speed rounds enter the deck rotation
 	wordsPerTest           = 6   // words sampled into one reaction_test fragment
+
+	trapMinCompiles = 14 // compiles before The Trap can enter the deck (enough baseline)
+	trapStakeMin    = 8  // floor for the personalized stake pot (so a loss still bites)
+	trapStakeMax    = 24 // ceiling (so the numbers stay legible for veteran users)
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -31,6 +35,7 @@ type exclusions struct {
 	pairIDs        map[string]bool
 	speedPromptIDs map[string]bool
 	reactionWords  map[string]bool
+	trapIDs        map[string]bool
 }
 
 type Generator struct {
@@ -119,9 +124,28 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	opener, second := fast[0], fast[1]
 
 	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1) // #nosec G404 — non-crypto deck composition
+
+	// The Trap — the one fragment with a right answer. Included probabilistically
+	// past the unlock so it isn't every night (and never stacks two stakes beats
+	// against the closing duel); when present it replaces one scale so deck length
+	// holds at 5–6. It sits in the middle as its own decision beat; the duel stays
+	// the closer.
+	var trap *dynamo.Fragment
+	if int(profile.CompileCount) >= trapMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
+		if tf, ok := buildTrap(profile, exclude.trapIDs); ok {
+			trap = &tf
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
+	}
+	if trap != nil {
+		middle = append(middle, *trap)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -224,6 +248,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		pairIDs:        make(map[string]bool),
 		speedPromptIDs: make(map[string]bool),
 		reactionWords:  make(map[string]bool),
+		trapIDs:        make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -254,6 +279,13 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 				for _, id := range p.PromptIDs {
 					ex.speedPromptIDs[id] = true
 				}
+			}
+		case "trap":
+			var p struct {
+				TrapID string `json:"trap_id"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.TrapID != "" {
+				ex.trapIDs[p.TrapID] = true
 			}
 		}
 	}
@@ -311,6 +343,102 @@ func buildSpeedRound(compileCount int32, exclude map[string]bool) (dynamo.Fragme
 		Payload:    string(payload),
 		DaemonNote: "First answers carry the least editing.",
 	}, true
+}
+
+// buildTrap selects one eligible trap (held back from yesterday's unless it's
+// the only one left), personalizes the stake from the user's decoded count, and
+// stamps a render-ready payload. The dimension tags and which option is the bait
+// stay server-side — the client gets only labels and numbers, and the "right"
+// answer is computable from those numbers by design. Returns ok=false when no
+// trap is eligible for this compile count.
+func buildTrap(profile db.ShadowProfile, exclude map[string]bool) (dynamo.Fragment, bool) {
+	var fresh, served []signal.Trap
+	for _, t := range signal.Traps {
+		switch {
+		case t.IntroducedAfterDay > int(profile.CompileCount):
+		case exclude[t.TrapID]:
+			served = append(served, t)
+		default:
+			fresh = append(fresh, t)
+		}
+	}
+	pool := fresh
+	if len(pool) == 0 {
+		pool = served // every eligible trap played yesterday — repeat rather than skip
+	}
+	if len(pool) == 0 {
+		return dynamo.Fragment{}, false
+	}
+	t := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto content selection
+
+	base := clampStake(profile.FragmentsDecoded)
+	payload := buildTrapPayload(t, base)
+
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "trap",
+		Payload:    payload,
+		DaemonNote: "One move is better than the other. The daemon already knows which.",
+	}, true
+}
+
+// clampStake bounds the decoded count into the legible, still-biting stake band.
+func clampStake(decoded int32) int {
+	s := int(decoded)
+	if s < trapStakeMin {
+		return trapStakeMin
+	}
+	if s > trapStakeMax {
+		return trapStakeMax
+	}
+	return s
+}
+
+// pctOf rounds base*pct/100 to the nearest whole, floored at 1 so no displayed
+// amount is ever zero.
+func pctOf(base, pct int) int {
+	v := (base*pct + 50) / 100
+	if v < 1 {
+		return 1
+	}
+	return v
+}
+
+// buildTrapPayload resolves the trap's percentages against the personalized base
+// into concrete amounts and labels. Convention: choice_a is the bait (Hold /
+// Continue), choice_b is the rational move (Risk / Abandon). For odds traps,
+// choice_b is the gamble the odds bar describes; for sunk traps, "sunk" is the
+// locked, already-spent amount and both choices show forward returns only.
+func buildTrapPayload(t signal.Trap, base int) string {
+	// bias is deliberately not exposed — the client never needs the taxonomy, and
+	// withholding it keeps the mechanic opaque. trap_id is enough to recover
+	// everything server-side at scoring time.
+	out := map[string]interface{}{
+		"type":     "trap",
+		"trap_id":  t.TrapID,
+		"kind":     t.Stake.Kind,
+		"scenario": t.Scenario,
+	}
+
+	switch t.Stake.Kind {
+	case signal.StakeOdds:
+		out["scenario"] = fmt.Sprintf(t.Scenario, base)
+		gain := pctOf(base, t.Stake.GainPct)
+		loss := pctOf(base, t.Stake.LossPct)
+		out["stake"] = base
+		out["win_prob"] = t.Stake.WinProb
+		out["choice_a"] = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Hold", "sub": fmt.Sprintf("keep %d", base)}
+		out["choice_b"] = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Risk", "sub": fmt.Sprintf("+%d / −%d", gain, loss)}
+	case signal.StakeSunk:
+		cont := pctOf(base, t.Stake.ContinuePct)
+		aband := pctOf(base, t.Stake.AbandonPct)
+		out["sunk"] = base
+		out["choice_a"] = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Continue", "sub": fmt.Sprintf("returns ~%d", cont)}
+		out["choice_b"] = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Abandon", "sub": fmt.Sprintf("returns ~%d", aband)}
+	}
+
+	payload, _ := json.Marshal(out)
+	return string(payload)
 }
 
 // buildReactionTest samples the primary nightly word set from the archetype's

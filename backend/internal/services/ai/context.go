@@ -47,6 +47,41 @@ type analystContext struct {
 	PulseSignalsToday     map[string]interface{} `json:"pulse_signals_today,omitempty"`
 	GrimTriggerSignal     grimTriggerCtx         `json:"grim_trigger_signal"`
 	KLevelSignal          kLevelCtx              `json:"k_level_signal"`
+	ExistingPatterns      []existingPattern      `json:"existing_patterns"`
+}
+
+// existingPattern is the compact view of a current process the Analyst needs in
+// order to reference it by id — to strengthen, rename, change state, or fold a
+// provisionally-seeded one. Without this the model can only ever create new
+// patterns, never update them.
+type existingPattern struct {
+	PatternID string `json:"pattern_id"`
+	Name      string `json:"name,omitempty"`
+	State     string `json:"state"`
+	Strength  int32  `json:"strength"`
+	Unnamed   bool   `json:"unnamed"`
+	SignalKey string `json:"signal_key,omitempty"`
+}
+
+// toExistingPatterns projects the pattern library into the compact context view.
+// Strength is the authoritative base (live drift is reset this compile anyway).
+func toExistingPatterns(patterns []db.PatternLibrary) []existingPattern {
+	out := make([]existingPattern, 0, len(patterns))
+	for _, p := range patterns {
+		name := ""
+		if p.Name.Valid {
+			name = p.Name.String
+		}
+		out = append(out, existingPattern{
+			PatternID: p.ID.String(),
+			Name:      name,
+			State:     p.State,
+			Strength:  p.Strength,
+			Unnamed:   p.Unnamed,
+			SignalKey: p.SignalKey,
+		})
+	}
+	return out
 }
 
 type sessionQualityCtx struct {
@@ -328,6 +363,43 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 		}
 	}
 
+	return out
+}
+
+// SessionSignal is one dimension's deterministic read from a single session:
+// a 0.0–1.0 (k_level 0.0–4.0) value and the number of observations backing it.
+type SessionSignal struct {
+	Dimension string
+	Signal    float64
+	N         int
+}
+
+// SessionDimensionSignals runs the deterministic dimension engine on one
+// session's responses and returns typed per-dimension signals. Exported so the
+// live, non-AI session-complete path (services/observe) can reuse the exact
+// engine the nightly Analyst uses — no duplicated parsing, no model call.
+func SessionDimensionSignals(responses []db.CardResponse) []SessionSignal {
+	session := filterNonPulse(responses)
+	raw := computeDimensionSignals(session, collectReactionTimes(session))
+
+	out := make([]SessionSignal, 0, len(raw))
+	for dim, v := range raw {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		sig, _ := m["signal"].(float64)
+		n := 0
+		// computeDimensionSignals tags counts as n_words (reaction tests) or
+		// n_pairs (scales/speed); variance-only neuroticism carries neither.
+		if nw, ok := m["n_words"].(int); ok {
+			n = nw
+		}
+		if np, ok := m["n_pairs"].(int); ok {
+			n = np
+		}
+		out = append(out, SessionSignal{Dimension: dim, Signal: sig, N: n})
+	}
 	return out
 }
 

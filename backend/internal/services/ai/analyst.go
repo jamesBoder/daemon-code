@@ -35,6 +35,7 @@ You receive a JSON context object containing:
 - pulse_signals_today: dimension signals derived from The Map, the daily between-session behavioral game (may be absent). Same format as dimension_signals_today, but each entry carries "confidence_modifier": 0.75. When updating dimensions from pulse_signals_today: apply score updates at full weight, but multiply all confidence gains by 0.75, and do NOT increment n. Pulse signals do not count as session evidence — they refine without deepening the evidence base. Two entries are context, not dimension signals: "center_isolated" (true when the user wired nothing to the scenario anchor — read as distance from the scenario itself) and "deliberation" (first_wire_delay_ms / duration_ms; a long first-wire delay suggests conscientious deliberation, an immediate first wire suggests strong approach activation).
 - grim_trigger_signal: detected=true if daemon_accuracy dropped ≥5 points since last compile. When detected, consider elevated neuroticism and behavioral instability.
 - k_level_signal: avg_deliberation_ratio (duel response time / reaction time) across recent sessions. ~1.0 = Level 1 (reactive), 2.0–3.5 = Level 2 (modeling), >3.5 = Level 3 or analysis paralysis.
+- existing_patterns: the user's current processes, each {pattern_id, name, state, strength, unnamed, signal_key}. To strengthen, rename, change state, or fold a process, return its pattern_id in pattern_updates with a strength_delta — only omit pattern_id (use null) for a genuinely NEW process not already listed here. Never emit a new pattern that duplicates one of these. Unnamed entries carry a signal_key but no name: they were provisionally seeded by the live session layer between compiles — name them when the data is clear, or fold their signal into a related pattern, always reusing their pattern_id.
 
 --- BAYESIAN DIMENSION MODEL ---
 
@@ -129,7 +130,7 @@ Confidence thresholds:
   Below threshold: detect and note in analyst_notes, do not assign a name.
     Unnameable pattern language: "The daemon sees something forming here. It doesn't have a name for it yet."
 
-Active process cap: 8 maximum. If the user already has 8 active processes, strengthen or update existing ones — do not create new names.
+Active process cap: 8 maximum. If the user already has 8 active processes, strengthen or update existing ones (by pattern_id) — do not create new names.
 
 Intersection library (15 patterns — select most specific candidate for this user's session data):
 
@@ -227,7 +228,8 @@ Never produce prose — only structured JSON.
       "name": "the_approval_loop.process or null if unnamed",
       "state": "running|sleeping|weakening|new",
       "strength_delta": integer,
-      "daemon_note": "one line, what the daemon observes about this pattern — about the person, never about game actions or timing"
+      "daemon_note": "one line, what the daemon observes about this pattern — about the person, never about game actions or timing",
+      "signal_key": "the single dominant behavioral dimension driving this pattern, as dimension:high or dimension:low (e.g. approach_avoidance:high, conscientiousness:low). One of the ten dimensions. Used to attribute live in-session strength changes to this pattern — pick the dimension whose movement most defines it."
     }
   ],
   "tomorrow_prediction": {
@@ -290,6 +292,27 @@ func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 // recorded a valid value (schema default is 0) — even odds until duels say otherwise.
 const baselineDaemonAccuracy = 50
 
+// New-pattern starting strength is derived from the Analyst's first strength_delta
+// for that pattern (a strongly-signalled pattern is born higher than a faint one),
+// clamped to this band rather than a flat constant for every process.
+const (
+	newPatternStrengthMin = 5  // floor — a faint first signal still registers
+	newPatternStrengthMax = 35 // ceiling — a brand-new pattern can't outrank an established one
+)
+
+// deriveNewPatternStrength maps an Analyst strength_delta to a starting strength
+// within [newPatternStrengthMin, newPatternStrengthMax].
+func deriveNewPatternStrength(strengthDelta int) int32 {
+	s := strengthDelta
+	if s < newPatternStrengthMin {
+		s = newPatternStrengthMin
+	}
+	if s > newPatternStrengthMax {
+		s = newPatternStrengthMax
+	}
+	return int32(s) // #nosec G115 — clamped to [newPatternStrengthMin, newPatternStrengthMax]
+}
+
 // snapshotInterval is the number of compiles between score baseline snapshots.
 // At each multiple of this count, the Analyst persists current scores as *_prev
 // so the Home screen can show a month-over-month trend line.
@@ -344,6 +367,7 @@ type patternUpdate struct {
 	State         string  `json:"state"`
 	StrengthDelta int     `json:"strength_delta"`
 	DaemonNote    string  `json:"daemon_note"`
+	SignalKey     string  `json:"signal_key"`
 }
 
 // processDiffEntry summarizes what happened to one pattern this compile. It is
@@ -420,6 +444,15 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 		lastCompile = profile.UpdatedAt.Time
 	}
 	ac := assembleContext(responses, moods, profile, recentResponses, lastCompile)
+
+	// The model needs the current processes to reference them by id — without this
+	// it can only ever create new patterns, never strengthen, rename, or fold an
+	// existing one (and live_delta would never reset). Best-effort: a load failure
+	// degrades to new-only behaviour rather than failing the night.
+	if patterns, perr := a.q.GetPatternLibrary(ctx, userID); perr == nil {
+		ac.ExistingPatterns = toExistingPatterns(patterns)
+	}
+
 	output, err := a.callAnthropic(ctx, ac)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic call: %w", err)
@@ -489,6 +522,11 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 	// committed by UpdateShadowProfile, corrupting the grim trigger baseline.
 	recentDiff, _ := a.applyPatternUpdates(ctx, userID, output.PatternUpdates)
 
+	// 8a-bis. Fold any remaining provisional live drift into authoritative strength
+	// for patterns the Analyst left untouched this compile (UpdatePattern already
+	// zeroed the ones it changed). Non-fatal — never carry live_delta across compiles.
+	_ = a.q.FoldLiveDeltaIntoStrength(ctx, userID)
+
 	// 8b. Persist tomorrow's duel prediction — non-fatal for the same retry reason.
 	// Written every compile: an empty text clears the previous night's prediction
 	// so the deck generator falls back to its template rather than serving a
@@ -554,6 +592,17 @@ func (a *Analyst) RunForUser(ctx context.Context, sqsBody string) error {
 	return nil
 }
 
+// findProvisionalBySignalKey returns an existing unnamed (provisionally-seeded)
+// pattern carrying signalKey, if one exists.
+func findProvisionalBySignalKey(patterns []db.PatternLibrary, signalKey string) (db.PatternLibrary, bool) {
+	for _, p := range patterns {
+		if p.Unnamed && p.SignalKey != "" && p.SignalKey == signalKey {
+			return p, true
+		}
+	}
+	return db.PatternLibrary{}, false
+}
+
 // applyPatternUpdates writes the Analyst's pattern changes to Postgres and
 // returns a per-pattern diff describing what changed — the source of the naming
 // ceremony and the session-complete change cards. A returned error is non-fatal
@@ -576,6 +625,17 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 			nowName = *u.Name
 		}
 
+		// Safety net: if the model emits a "new" named pattern whose signal_key matches
+		// an existing unnamed (provisionally-seeded) one, retarget it to that row so the
+		// update branch promotes it in place instead of duplicating — keeps the seed→name
+		// path correct even when the model forgets to reuse the pattern_id.
+		if (u.PatternID == nil || *u.PatternID == "") && nowName != "" && u.SignalKey != "" {
+			if prov, ok := findProvisionalBySignalKey(existing, u.SignalKey); ok {
+				id := prov.ID.String()
+				u.PatternID = &id
+			}
+		}
+
 		if u.PatternID == nil || *u.PatternID == "" {
 			// New pattern.
 			unnamed := nowName == ""
@@ -583,10 +643,11 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 				UserID:        userID,
 				Name:          pgTextPtr(u.Name),
 				State:         u.State,
-				Strength:      10,
+				Strength:      deriveNewPatternStrength(u.StrengthDelta),
 				Unnamed:       unnamed,
 				FirstDetected: pgDateToday(),
 				DaemonNote:    pgTextPtr(&u.DaemonNote),
+				SignalKey:     u.SignalKey,
 			})
 			if err != nil {
 				return diff, err
@@ -619,6 +680,14 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 			newStrength = 100
 		}
 		today := pgDateToday()
+		// Preserve the existing fingerprint when the Analyst omits one this run, so
+		// a live-seeded signal_key survives until the model deliberately re-keys it.
+		signalKey := u.SignalKey
+		if signalKey == "" {
+			signalKey = prev.SignalKey
+		}
+		// UpdatePattern resets live_delta to 0: this authoritative strength already
+		// absorbs whatever the live layer accrued since the last compile.
 		_, err = a.q.UpdatePattern(ctx, db.UpdatePatternParams{
 			ID:         patternID,
 			Name:       pgTextPtr(u.Name),
@@ -627,6 +696,7 @@ func (a *Analyst) applyPatternUpdates(ctx context.Context, userID uuid.UUID, upd
 			Unnamed:    nowName == "",
 			LastSeen:   today,
 			DaemonNote: pgTextPtr(&u.DaemonNote),
+			SignalKey:  signalKey,
 		})
 		if err != nil {
 			return diff, err

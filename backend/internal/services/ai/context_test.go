@@ -3,7 +3,9 @@ package ai
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 )
 
@@ -108,6 +110,55 @@ func TestComputeTrapSignals(t *testing.T) {
 	comp, ok := out["composite"].(map[string]interface{})
 	if !ok || comp["n"] != 6 || comp["rational_rate"] != round2(4.0/6.0) {
 		t.Fatalf("composite = %v, want n=6 rational=%v", out["composite"], round2(4.0/6.0))
+	}
+}
+
+func dated(t *testing.T, date string, frags ...db.CardResponse) []db.CardResponse {
+	t.Helper()
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range frags {
+		frags[i].SessionDate = pgtype.Date{Time: d, Valid: true}
+	}
+	return frags
+}
+
+func estimateResponse(t *testing.T, predicted int) db.CardResponse {
+	t.Helper()
+	rd, err := json.Marshal(trapResultData{TrapID: "overconfidence_estimate", Predicted: &predicted})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db.CardResponse{FragmentType: "trap", ResponseData: rd}
+}
+
+func gameRow() db.CardResponse { return db.CardResponse{FragmentType: "reaction_test", ResponseData: []byte(`[]`)} }
+
+func TestComputeOverconfidenceSignal(t *testing.T) {
+	var recent []db.CardResponse
+	// 3 sessions: each predicts 10, completes 5 game fragments (+ the estimate row).
+	// actual = nonPulse(6) - 1 = 5; error = +5 each → lean "over".
+	for _, date := range []string{"2026-06-21", "2026-06-22", "2026-06-23"} {
+		rows := []db.CardResponse{estimateResponse(t, 10), gameRow(), gameRow(), gameRow(), gameRow(), gameRow()}
+		recent = append(recent, dated(t, date, rows...)...)
+	}
+	out := computeOverconfidenceSignal(recent)
+	if out == nil {
+		t.Fatal("expected overconfidence_signal, got nil")
+	}
+	if out["n"] != 3 || out["mean_error"] != 5.0 || out["lean"] != "over" {
+		t.Fatalf("got %v, want n=3 mean_error=5 lean=over", out)
+	}
+
+	// Below the sample floor → nil. Also: a pulse row must not count toward actual.
+	one := dated(t, "2026-06-24",
+		estimateResponse(t, 6), gameRow(), gameRow(),
+		db.CardResponse{FragmentType: "pulse", ResponseData: []byte(`{}`)},
+	)
+	if computeOverconfidenceSignal(one) != nil {
+		t.Fatal("expected nil below sample floor")
 	}
 }
 

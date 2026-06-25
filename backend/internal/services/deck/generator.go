@@ -27,6 +27,13 @@ const (
 	trapMinCompiles = 14 // compiles before The Trap can enter the deck (enough baseline)
 	trapStakeMin    = 8  // floor for the personalized stake pot (so a loss still bites)
 	trapStakeMax    = 24 // ceiling (so the numbers stay legible for veteran users)
+
+	// Overconfidence trap — a pre-session estimate the daemon resolves against
+	// what the user actually completes. Unlocks later than the choice-traps so the
+	// user has a felt sense of session length (otherwise the estimate is ignorance,
+	// not optimism). On a trap night it's chosen 1-in-3 over a choice-trap.
+	trapOverconfidenceMinCompiles = 21
+	overconfidenceSliderMax       = 12 // slider runs 1..max; well above the ~5–6 a deck actually holds
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -130,9 +137,16 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	// against the closing duel); when present it replaces one scale so deck length
 	// holds at 5–6. It sits in the middle as its own decision beat; the duel stays
 	// the closer.
-	var trap *dynamo.Fragment
+	// On a trap night, run exactly one trap: usually a choice-trap in the middle,
+	// occasionally (once the user knows session length) an overconfidence estimate
+	// up front. The two are mutually exclusive — never two stakes/meta beats a night.
+	var trap *dynamo.Fragment      // choice-trap (odds/sunk), goes in the middle
+	var overconf *dynamo.Fragment  // overconfidence estimate, goes first
 	if int(profile.CompileCount) >= trapMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
-		if tf, ok := buildTrap(profile, exclude.trapIDs); ok {
+		if int(profile.CompileCount) >= trapOverconfidenceMinCompiles && rand.Intn(3) == 0 { // #nosec G404 — non-crypto game selection
+			oc := buildOverconfidenceTrap()
+			overconf = &oc
+		} else if tf, ok := buildTrap(profile, exclude.trapIDs); ok {
 			trap = &tf
 			if nScales > 1 {
 				nScales--
@@ -149,7 +163,14 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
-	deck := append([]dynamo.Fragment{opener}, middle...)
+	// The overconfidence estimate must precede every game so the prediction is made
+	// uninformed by this session's play.
+	deck := []dynamo.Fragment{}
+	if overconf != nil {
+		deck = append(deck, *overconf)
+	}
+	deck = append(deck, opener)
+	deck = append(deck, middle...)
 	if len(patterns) > 0 {
 		deck = append(deck, g.buildPredictionDuel(profile, patterns, pred))
 	}
@@ -382,6 +403,28 @@ func buildTrap(profile db.ShadowProfile, exclude map[string]bool) (dynamo.Fragme
 	}, true
 }
 
+// buildOverconfidenceTrap generates the pre-session estimate fragment. It carries
+// no content library — it's a single recurring mechanic. The daemon resolves the
+// estimate nightly against how many fragments the user actually completed; chronic
+// over-estimation earns a process. trap_id "overconfidence_estimate" is not in the
+// Traps library on purpose, so LookupTrap misses it and the bias-alignment and
+// dimension-fold paths skip it — it is scored only by computeOverconfidenceSignal.
+func buildOverconfidenceTrap() dynamo.Fragment {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":     "trap",
+		"trap_id":  "overconfidence_estimate",
+		"kind":     "overconfidence",
+		"scenario": "Before you begin — how far will you get today?",
+		"max":      overconfidenceSliderMax,
+	})
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "trap",
+		Payload:    string(payload),
+		DaemonNote: "The daemon will compare this to what you actually do.",
+	}
+}
+
 // clampStake bounds the decoded count into the legible, still-biting stake band.
 func clampStake(decoded int32) int {
 	s := int(decoded)
@@ -405,14 +448,14 @@ func pctOf(base, pct int) int {
 }
 
 // buildTrapPayload resolves the trap's percentages against the personalized base
-// into concrete amounts and labels. Convention: choice_a is the bait (Hold /
-// Continue), choice_b is the rational move (Risk / Abandon). For odds traps,
-// choice_b is the gamble the odds bar describes; for sunk traps, "sunk" is the
-// locked, already-spent amount and both choices show forward returns only.
+// into concrete amounts and labels, then randomizes which terminal (a/b) holds the
+// bait vs the rational move so position can't be gamed. The bait is always labelled
+// Hold/Continue and the rational move Risk/Abandon — the label follows the choice,
+// not the side. "risk_side" tells the client which terminal carries the odds bar;
+// for sunk traps "sunk" is the locked, already-spent amount and both choices show
+// forward returns only. Scoring keys on the choice id, so position is irrelevant
+// server-side. bias taxonomy and dimension tags are never exposed.
 func buildTrapPayload(t signal.Trap, base int) string {
-	// bias is deliberately not exposed — the client never needs the taxonomy, and
-	// withholding it keeps the mechanic opaque. trap_id is enough to recover
-	// everything server-side at scoring time.
 	out := map[string]interface{}{
 		"type":     "trap",
 		"trap_id":  t.TrapID,
@@ -420,6 +463,7 @@ func buildTrapPayload(t signal.Trap, base int) string {
 		"scenario": t.Scenario,
 	}
 
+	var bias, rational map[string]interface{}
 	switch t.Stake.Kind {
 	case signal.StakeOdds:
 		out["scenario"] = fmt.Sprintf(t.Scenario, base)
@@ -427,14 +471,20 @@ func buildTrapPayload(t signal.Trap, base int) string {
 		loss := pctOf(base, t.Stake.LossPct)
 		out["stake"] = base
 		out["win_prob"] = t.Stake.WinProb
-		out["choice_a"] = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Hold", "sub": fmt.Sprintf("keep %d", base)}
-		out["choice_b"] = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Risk", "sub": fmt.Sprintf("+%d / −%d", gain, loss)}
+		bias = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Hold", "sub": fmt.Sprintf("keep %d", base)}
+		rational = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Risk", "sub": fmt.Sprintf("+%d / −%d", gain, loss)}
 	case signal.StakeSunk:
 		cont := pctOf(base, t.Stake.ContinuePct)
 		aband := pctOf(base, t.Stake.AbandonPct)
 		out["sunk"] = base
-		out["choice_a"] = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Continue", "sub": fmt.Sprintf("returns ~%d", cont)}
-		out["choice_b"] = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Abandon", "sub": fmt.Sprintf("returns ~%d", aband)}
+		bias = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Continue", "sub": fmt.Sprintf("returns ~%d", cont)}
+		rational = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Abandon", "sub": fmt.Sprintf("returns ~%d", aband)}
+	}
+
+	if rand.Intn(2) == 0 { // #nosec G404 — non-crypto position shuffle
+		out["choice_a"], out["choice_b"], out["risk_side"] = bias, rational, "b"
+	} else {
+		out["choice_a"], out["choice_b"], out["risk_side"] = rational, bias, "a"
 	}
 
 	payload, _ := json.Marshal(out)

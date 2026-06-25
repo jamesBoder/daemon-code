@@ -254,6 +254,11 @@ export const copy = {
     onTable:  'ON THE TABLE',  // odds: stake ledger label
     sunk:     'SUNK',          // sunk: locked-meter label
     logged:   'logged.',       // the silent commit beat — never a verdict
+    // overconfidence: the pre-session estimate slider
+    estimateUnit:    'fragments',
+    estimateLow:     'a few',
+    estimateHigh:    'all of it',
+    estimateConfirm: 'lock it in',
   },
 
   // ── Layer 3 — daemon.log Codex ────────────────────────────────────────────

@@ -48,6 +48,7 @@ type analystContext struct {
 	GrimTriggerSignal     grimTriggerCtx         `json:"grim_trigger_signal"`
 	KLevelSignal          kLevelCtx              `json:"k_level_signal"`
 	TrapSignals           map[string]interface{} `json:"trap_signals,omitempty"`
+	OverconfidenceSignal  map[string]interface{} `json:"overconfidence_signal,omitempty"`
 	ExistingPatterns      []existingPattern      `json:"existing_patterns"`
 }
 
@@ -136,17 +137,23 @@ type duelResponseData struct {
 
 // Trap returns a single object (one dilemma per fragment). The chosen option id
 // is recovered against the static library server-side — bias alignment is never
-// trusted from the client.
+// trusted from the client. Predicted is set only by the overconfidence estimate
+// (no choice); its presence is how that fragment is distinguished from a choice-trap.
 type trapResultData struct {
 	TrapID         string `json:"trap_id"`
 	Choice         string `json:"choice"`
 	ResponseTimeMs int    `json:"response_time_ms"`
+	Predicted      *int   `json:"predicted,omitempty"`
 }
 
 // trapBiasMinSamples is the minimum trap responses (per bias, and overall) before
 // the aggregate is surfaced to the Analyst at all — defence-in-depth so the model
 // never sees a high alignment rate backed by one or two choices.
 const trapBiasMinSamples = 3
+
+// overconfidenceLeanThreshold is the mean (predicted − actual) error past which a
+// user reads as consistently over- or under-estimating their own output.
+const overconfidenceLeanThreshold = 2.0
 
 // assembleContext builds the full Analyst context object from today's data and the user's profile.
 // recentResponses should be card_responses from the last 7 session dates for cross-session signals.
@@ -178,6 +185,7 @@ func assembleContext(
 	ac.GrimTriggerSignal = computeGrimTrigger(profile, recentResponses)
 	ac.KLevelSignal = computeKLevel(recentResponses)
 	ac.TrapSignals = computeTrapSignals(recentResponses)
+	ac.OverconfidenceSignal = computeOverconfidenceSignal(recentResponses)
 
 	return ac
 }
@@ -515,6 +523,55 @@ func computeTrapSignals(recentResponses []db.CardResponse) map[string]interface{
 		"n":             allTotal,
 	}
 	return out
+}
+
+// computeOverconfidenceSignal resolves the pre-session estimate from The Trap
+// against what the user actually completed, across recent sessions. For each
+// session with an estimate: actual = scoreable fragments that day (all non-pulse
+// rows minus the estimate fragment itself). mean_error = mean(predicted − actual);
+// a user who chronically predicts more than they finish (including by quitting
+// early) leans "over". Returns nil below the sample floor (field is omitempty).
+func computeOverconfidenceSignal(recentResponses []db.CardResponse) map[string]interface{} {
+	byDate := groupResponsesByDate(recentResponses)
+	var errs []float64
+
+	for _, rows := range byDate {
+		predicted := -1
+		nonPulse := 0
+		for _, r := range rows {
+			if r.FragmentType == "pulse" {
+				continue
+			}
+			nonPulse++
+			if r.FragmentType == "trap" {
+				var res trapResultData
+				if json.Unmarshal(r.ResponseData, &res) == nil && res.Predicted != nil {
+					predicted = *res.Predicted
+				}
+			}
+		}
+		if predicted < 0 {
+			continue // no estimate this session
+		}
+		actual := nonPulse - 1 // exclude the estimate fragment itself
+		if actual < 0 {
+			actual = 0
+		}
+		errs = append(errs, float64(predicted-actual))
+	}
+
+	if len(errs) < trapBiasMinSamples {
+		return nil
+	}
+	mean := round2(floatMean(errs))
+	lean := "calibrated"
+	switch {
+	case mean >= overconfidenceLeanThreshold:
+		lean = "over"
+	case mean <= -overconfidenceLeanThreshold:
+		lean = "under"
+	}
+	return map[string]interface{}{"mean_error": mean, "n": len(errs), "lean": lean}
 }
 
 // computeGrimTrigger detects whether the last compile produced a significant accuracy drop.

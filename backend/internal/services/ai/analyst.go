@@ -41,7 +41,12 @@ You receive a JSON context object containing:
         sunk_cost     → the_exit_that_never_comes.process / the_path_already_paid.process / the_cost_already_spent.process
     - composite.rational_rate ≥ 0.75 at n ≥ 6 MAY earn one cross-bias process: the_clear_eye.process / the_steady_hand.process / the_unbaited.process
     - If such a process already exists in existing_patterns, reuse its pattern_id (strengthen) — never duplicate. Below these thresholds, do not name a trap process.
-    - GUARDRAIL: never grade or reference a SINGLE trap choice ("you fell for it", "you held when you should have risked"). The Trap is silent in-game; only a sustained pattern is nameable, and even then daemon_note describes the person, never the game action.
+    - DELIBERATION: each trap card_response carries response_time_ms. Soft context, not a rule: long deliberation before a rational choice suggests the user saw the trap; a fast bait-aligned choice suggests they were caught. Never state timing to the user.
+- overconfidence_signal (may be absent): from The Trap's pre-session estimate — the user predicts how far they'll get before playing; the daemon compares it to what they actually complete. "mean_error" = mean(predicted − actual) across sessions (positive = chronic over-estimate, including by quitting early), with "n" and "lean" (over | under | calibrated). Naming:
+    - lean "over" at n ≥ 3 MAY earn a standalone process: the_high_estimate.process / the_reach_exceeds.process / the_eyes_bigger.process
+    - lean "under" at n ≥ 3 MAY earn: the_quiet_estimate.process / the_low_bar.process
+    - "calibrated" earns no name (accurate self-measure is not a pattern to surface).
+    - If such a process exists in existing_patterns, reuse its pattern_id. Same guardrail: never grade a single estimate; daemon_note describes the person, never the game.
 - existing_patterns: the user's current processes, each {pattern_id, name, state, strength, unnamed, signal_key}. To strengthen, rename, change state, or fold a process, return its pattern_id in pattern_updates with a strength_delta — only omit pattern_id (use null) for a genuinely NEW process not already listed here. Never emit a new pattern that duplicates one of these. Unnamed entries carry a signal_key but no name: they were provisionally seeded by the live session layer between compiles — name them when the data is clear, or fold their signal into a related pattern, always reusing their pattern_id.
 
 --- BAYESIAN DIMENSION MODEL ---

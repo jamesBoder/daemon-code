@@ -9,8 +9,8 @@ import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson, patchProfile, getVoiceSampleUrl } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, SOUND_KEY, SOUND_EVENT } from '../lib/constants'
-import { stopAmbient, playSound } from '../lib/sound'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, SOUND_KEY } from '../lib/constants'
+import { playSound } from '../lib/sound'
 import type { ShadowProfile } from '../types'
 
 const TOGGLE = {
@@ -118,9 +118,7 @@ export function Settings() {
     const next = !soundEnabled
     localStorage.setItem(SOUND_KEY, String(next))
     setSoundEnabled(next)
-    window.dispatchEvent(new Event(SOUND_EVENT))
     if (next) playSound('click')    // confirm it works + unlock the context within this gesture
-    else stopAmbient()              // silence the bed immediately on opt-out
   }
 
   function handleSignOut() {

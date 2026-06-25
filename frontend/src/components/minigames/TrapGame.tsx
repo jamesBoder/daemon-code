@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { copy } from '../../lib/copy'
-import { LETTER_SPACING_WIDE } from '../../lib/constants'
+import { LETTER_SPACING_WIDE, PROSE_MAX_WIDTH } from '../../lib/constants'
 import { MG } from '../../lib/minigame'
 import { pulseGrain } from '../../lib/grain'
 import { DecodeText } from '../daemon/DecodeText'
@@ -75,7 +75,7 @@ export function TrapGame(props: Props) {
       <p style={{
         fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)',
         lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)',
-        textAlign: 'center', maxWidth: 320,
+        textAlign: 'center', maxWidth: PROSE_MAX_WIDTH,
       }}>
         {scenario}
       </p>
@@ -133,13 +133,16 @@ function ChoiceTerminals({ kind, stake, sunk, winProb, riskSide, choiceA, choice
           const isChosen   = chosenId === c.id
           const isUnchosen = committed && !isChosen
           const isRiskSide = kind === 'odds' && riskSide === (i === 0 ? 'a' : 'b')
+          // The odds live only on the visual bar — fold them into the risk
+          // terminal's accessible name so a screen reader hears the wager.
+          const ariaLabel = isRiskSide ? `${c.label}, ${c.sub}, ${winPct} percent chance` : `${c.label}, ${c.sub}`
           return (
             <motion.button
               key={c.id}
               onClick={() => onPick(c)}
               disabled={committed}
               whileTap={committed ? {} : { scale: 0.97 }}
-              aria-label={`${c.label}, ${c.sub}`}
+              aria-label={ariaLabel}
               style={{
                 flex: 1, minHeight: T.terminalMinH,
                 display: 'flex', flexDirection: 'column',
@@ -206,10 +209,23 @@ function OverconfidenceEstimate({ max, committed, onConfirm }: {
   }
   function sync() { setPredicted(fromValue(value.get())) }
   function handleTrackClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (committed) return
     const rect = e.currentTarget.getBoundingClientRect()
     const clamped = Math.max(-dragMax, Math.min(dragMax, e.clientX - (rect.left + rect.width / 2)))
     animate(dragX, clamped, reduced ? { duration: 0 } : { type: 'spring', ...MG.spring })
     setPredicted(fromValue((clamped + dragMax) / (2 * dragMax)))
+  }
+  // Keyboard a11y: arrows nudge the estimate and move the handle to match.
+  function setTo(n: number) {
+    if (committed) return
+    const clamped = Math.max(1, Math.min(max, n))
+    const target = ((clamped - 1) / (max - 1) * 2 - 1) * dragMax
+    animate(dragX, target, reduced ? { duration: 0 } : { type: 'spring', ...MG.spring })
+    setPredicted(clamped)
+  }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); setTo(predicted + 1) }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); setTo(predicted - 1) }
   }
 
   return (
@@ -223,21 +239,30 @@ function OverconfidenceEstimate({ max, committed, onConfirm }: {
       </div>
 
       <div style={{ width: '100%', maxWidth: T.maxW, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        <div ref={trackRef} onClick={handleTrackClick} style={{ position: 'relative', width: '100%', height: TR.height, cursor: 'ew-resize' }}>
+        <div ref={trackRef} onClick={handleTrackClick} style={{ position: 'relative', width: '100%', height: TR.height, cursor: committed ? 'default' : 'ew-resize' }}>
           <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'var(--border)', transform: 'translateY(-50%)' }} />
           <motion.div
-            drag="x"
+            drag={committed ? false : 'x'}
             dragConstraints={{ left: -dragMax, right: dragMax }}
             dragElastic={TR.dragElastic}
             onDrag={sync}
             onDragEnd={sync}
-            whileDrag={{ scale: TR.handleScale }}
+            whileDrag={committed ? undefined : { scale: TR.handleScale }}
+            role="slider"
+            tabIndex={committed ? -1 : 0}
+            aria-label={copy.trap.estimateAria}
+            aria-valuemin={1}
+            aria-valuemax={max}
+            aria-valuenow={predicted}
+            onKeyDown={onKey}
             style={{
               x: dragX,
               position: 'absolute', top: '50%', left: `calc(50% - ${TR.handleSize / 2}px)`, marginTop: -(TR.handleSize / 2),
               width: TR.handleSize, height: TR.handleSize, borderRadius: '50%',
-              border: `${TR.handleBorderW}px solid ${T.frame}`, background: 'var(--surface-elevated)',
-              cursor: 'ew-resize', touchAction: 'none',
+              border: `${TR.handleBorderW}px solid ${T.frame}`,
+              // Fills amber when locked — the slider's commit feedback.
+              background: committed ? T.frame : 'var(--surface-elevated)',
+              cursor: committed ? 'default' : 'ew-resize', touchAction: 'none',
             }}
           />
         </div>

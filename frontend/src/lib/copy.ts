@@ -259,6 +259,7 @@ export const copy = {
     estimateLow:     'a few',
     estimateHigh:    'all of it',
     estimateConfirm: 'lock it in',
+    estimateAria:    'how far you expect to get',
   },
 
   // ── Layer 3 — daemon.log Codex ────────────────────────────────────────────

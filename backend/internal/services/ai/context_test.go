@@ -87,12 +87,12 @@ func TestComputeDimensionSignalsTrap(t *testing.T) {
 func TestComputeTrapSignals(t *testing.T) {
 	// 3 loss_aversion (2 bait, 1 rational) + 3 sunk_cost (all rational).
 	recent := []db.CardResponse{
-		trapResponse(t, "loss_aversion_pot_001", "hold"),  // bait
-		trapResponse(t, "loss_aversion_pot_002", "hold"),  // bait
-		trapResponse(t, "loss_aversion_pot_003", "risk"),  // rational
-		trapResponse(t, "sunk_cost_path_001", "abandon"),  // rational
-		trapResponse(t, "sunk_cost_path_002", "abandon"),  // rational
-		trapResponse(t, "sunk_cost_path_003", "abandon"),  // rational
+		trapResponse(t, "loss_aversion_pot_001", "hold"), // bait
+		trapResponse(t, "loss_aversion_pot_002", "hold"), // bait
+		trapResponse(t, "loss_aversion_pot_003", "risk"), // rational
+		trapResponse(t, "sunk_cost_path_001", "abandon"), // rational
+		trapResponse(t, "sunk_cost_path_002", "abandon"), // rational
+		trapResponse(t, "sunk_cost_path_003", "abandon"), // rational
 	}
 	out := computeTrapSignals(recent)
 	if out == nil {
@@ -134,7 +134,9 @@ func estimateResponse(t *testing.T, predicted int) db.CardResponse {
 	return db.CardResponse{FragmentType: "trap", ResponseData: rd}
 }
 
-func gameRow() db.CardResponse { return db.CardResponse{FragmentType: "reaction_test", ResponseData: []byte(`[]`)} }
+func gameRow() db.CardResponse {
+	return db.CardResponse{FragmentType: "reaction_test", ResponseData: []byte(`[]`)}
+}
 
 func TestComputeOverconfidenceSignal(t *testing.T) {
 	var recent []db.CardResponse

@@ -34,13 +34,13 @@ func TestClampStake(t *testing.T) {
 }
 
 type trapPayload struct {
-	TrapID   string `json:"trap_id"`
-	Kind     string `json:"kind"`
-	Scenario string `json:"scenario"`
-	Stake    int    `json:"stake"`
-	Sunk     int    `json:"sunk"`
-	WinProb  int    `json:"win_prob"`
-	RiskSide string `json:"risk_side"`
+	TrapID   string                   `json:"trap_id"`
+	Kind     string                   `json:"kind"`
+	Scenario string                   `json:"scenario"`
+	Stake    int                      `json:"stake"`
+	Sunk     int                      `json:"sunk"`
+	WinProb  int                      `json:"win_prob"`
+	RiskSide string                   `json:"risk_side"`
 	ChoiceA  struct{ ID, Sub string } `json:"choice_a"`
 	ChoiceB  struct{ ID, Sub string } `json:"choice_b"`
 }

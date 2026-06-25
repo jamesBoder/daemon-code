@@ -16,6 +16,7 @@ export const MG = {
     dragElastic:     0.05,  // Framer Motion dragElastic
     edgeInset:       16,    // px — gap between handle edge and track end
     confirmMaxW:     200,   // px — confirm button max width below the track
+    dragMaxFallback: 120,   // px — half-track guess before useLayoutEffect measures
   },
 
   // ── Spring physics — tap-to-jump and future snapping ──────────────────────

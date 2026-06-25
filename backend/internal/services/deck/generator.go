@@ -133,15 +133,13 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1) // #nosec G404 — non-crypto deck composition
 
 	// The Trap — the one fragment with a right answer. Included probabilistically
-	// past the unlock so it isn't every night (and never stacks two stakes beats
-	// against the closing duel); when present it replaces one scale so deck length
-	// holds at 5–6. It sits in the middle as its own decision beat; the duel stays
-	// the closer.
-	// On a trap night, run exactly one trap: usually a choice-trap in the middle,
-	// occasionally (once the user knows session length) an overconfidence estimate
-	// up front. The two are mutually exclusive — never two stakes/meta beats a night.
-	var trap *dynamo.Fragment      // choice-trap (odds/sunk), goes in the middle
-	var overconf *dynamo.Fragment  // overconfidence estimate, goes first
+	// past the unlock so it isn't every night, and never stacking two stakes beats
+	// against the closing duel. On a trap night run exactly one trap: usually a
+	// choice-trap in the middle (replacing one scale, length holds 5–6, duel stays
+	// the closer), occasionally — once the user knows session length — an
+	// overconfidence estimate up front. The two are mutually exclusive.
+	var trap *dynamo.Fragment                                              // choice-trap (odds/sunk), goes in the middle
+	var overconf *dynamo.Fragment                                          // overconfidence estimate, goes first
 	if int(profile.CompileCount) >= trapMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
 		if int(profile.CompileCount) >= trapOverconfidenceMinCompiles && rand.Intn(3) == 0 { // #nosec G404 — non-crypto game selection
 			oc := buildOverconfidenceTrap()

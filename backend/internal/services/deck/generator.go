@@ -23,6 +23,17 @@ const (
 	speedPromptsPerRound   = 4   // prompts sampled into one speed_round fragment
 	speedRoundMinCompiles  = 1   // compiles before speed rounds enter the deck rotation
 	wordsPerTest           = 6   // words sampled into one reaction_test fragment
+
+	trapMinCompiles = 14 // compiles before The Trap can enter the deck (enough baseline)
+	trapStakeMin    = 8  // floor for the personalized stake pot (so a loss still bites)
+	trapStakeMax    = 24 // ceiling (so the numbers stay legible for veteran users)
+
+	// Overconfidence trap — a pre-session estimate the daemon resolves against
+	// what the user actually completes. Unlocks later than the choice-traps so the
+	// user has a felt sense of session length (otherwise the estimate is ignorance,
+	// not optimism). On a trap night it's chosen 1-in-3 over a choice-trap.
+	trapOverconfidenceMinCompiles = 21
+	overconfidenceSliderMax       = 12 // slider runs 1..max; well above the ~5–6 a deck actually holds
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -31,6 +42,7 @@ type exclusions struct {
 	pairIDs        map[string]bool
 	speedPromptIDs map[string]bool
 	reactionWords  map[string]bool
+	trapIDs        map[string]bool
 }
 
 type Generator struct {
@@ -119,13 +131,44 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	opener, second := fast[0], fast[1]
 
 	nScales := scalesMin + rand.Intn(scalesMax-scalesMin+1) // #nosec G404 — non-crypto deck composition
+
+	// The Trap — the one fragment with a right answer. Included probabilistically
+	// past the unlock so it isn't every night, and never stacking two stakes beats
+	// against the closing duel. On a trap night run exactly one trap: usually a
+	// choice-trap in the middle (replacing one scale, length holds 5–6, duel stays
+	// the closer), occasionally — once the user knows session length — an
+	// overconfidence estimate up front. The two are mutually exclusive.
+	var trap *dynamo.Fragment                                              // choice-trap (odds/sunk), goes in the middle
+	var overconf *dynamo.Fragment                                          // overconfidence estimate, goes first
+	if int(profile.CompileCount) >= trapMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
+		if int(profile.CompileCount) >= trapOverconfidenceMinCompiles && rand.Intn(3) == 0 { // #nosec G404 — non-crypto game selection
+			oc := buildOverconfidenceTrap()
+			overconf = &oc
+		} else if tf, ok := buildTrap(profile, exclude.trapIDs); ok {
+			trap = &tf
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
 	}
+	if trap != nil {
+		middle = append(middle, *trap)
+	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
-	deck := append([]dynamo.Fragment{opener}, middle...)
+	// The overconfidence estimate must precede every game so the prediction is made
+	// uninformed by this session's play.
+	deck := []dynamo.Fragment{}
+	if overconf != nil {
+		deck = append(deck, *overconf)
+	}
+	deck = append(deck, opener)
+	deck = append(deck, middle...)
 	if len(patterns) > 0 {
 		deck = append(deck, g.buildPredictionDuel(profile, patterns, pred))
 	}
@@ -224,6 +267,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		pairIDs:        make(map[string]bool),
 		speedPromptIDs: make(map[string]bool),
 		reactionWords:  make(map[string]bool),
+		trapIDs:        make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -254,6 +298,13 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 				for _, id := range p.PromptIDs {
 					ex.speedPromptIDs[id] = true
 				}
+			}
+		case "trap":
+			var p struct {
+				TrapID string `json:"trap_id"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.TrapID != "" {
+				ex.trapIDs[p.TrapID] = true
 			}
 		}
 	}
@@ -311,6 +362,131 @@ func buildSpeedRound(compileCount int32, exclude map[string]bool) (dynamo.Fragme
 		Payload:    string(payload),
 		DaemonNote: "First answers carry the least editing.",
 	}, true
+}
+
+// buildTrap selects one eligible trap (held back from yesterday's unless it's
+// the only one left), personalizes the stake from the user's decoded count, and
+// stamps a render-ready payload. The dimension tags and which option is the bait
+// stay server-side — the client gets only labels and numbers, and the "right"
+// answer is computable from those numbers by design. Returns ok=false when no
+// trap is eligible for this compile count.
+func buildTrap(profile db.ShadowProfile, exclude map[string]bool) (dynamo.Fragment, bool) {
+	var fresh, served []signal.Trap
+	for _, t := range signal.Traps {
+		switch {
+		case t.IntroducedAfterDay > int(profile.CompileCount):
+		case exclude[t.TrapID]:
+			served = append(served, t)
+		default:
+			fresh = append(fresh, t)
+		}
+	}
+	pool := fresh
+	if len(pool) == 0 {
+		pool = served // every eligible trap played yesterday — repeat rather than skip
+	}
+	if len(pool) == 0 {
+		return dynamo.Fragment{}, false
+	}
+	t := pool[rand.Intn(len(pool))] // #nosec G404 — non-crypto content selection
+
+	base := clampStake(profile.FragmentsDecoded)
+	payload := buildTrapPayload(t, base)
+
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "trap",
+		Payload:    payload,
+		DaemonNote: "One move is better than the other. The daemon already knows which.",
+	}, true
+}
+
+// buildOverconfidenceTrap generates the pre-session estimate fragment. It carries
+// no content library — it's a single recurring mechanic. The daemon resolves the
+// estimate nightly against how many fragments the user actually completed; chronic
+// over-estimation earns a process. trap_id "overconfidence_estimate" is not in the
+// Traps library on purpose, so LookupTrap misses it and the bias-alignment and
+// dimension-fold paths skip it — it is scored only by computeOverconfidenceSignal.
+func buildOverconfidenceTrap() dynamo.Fragment {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":     "trap",
+		"trap_id":  "overconfidence_estimate",
+		"kind":     "overconfidence",
+		"scenario": "Before you begin — how far will you get today?",
+		"max":      overconfidenceSliderMax,
+	})
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "trap",
+		Payload:    string(payload),
+		DaemonNote: "The daemon will compare this to what you actually do.",
+	}
+}
+
+// clampStake bounds the decoded count into the legible, still-biting stake band.
+func clampStake(decoded int32) int {
+	s := int(decoded)
+	if s < trapStakeMin {
+		return trapStakeMin
+	}
+	if s > trapStakeMax {
+		return trapStakeMax
+	}
+	return s
+}
+
+// pctOf rounds base*pct/100 to the nearest whole, floored at 1 so no displayed
+// amount is ever zero.
+func pctOf(base, pct int) int {
+	v := (base*pct + 50) / 100
+	if v < 1 {
+		return 1
+	}
+	return v
+}
+
+// buildTrapPayload resolves the trap's percentages against the personalized base
+// into concrete amounts and labels, then randomizes which terminal (a/b) holds the
+// bait vs the rational move so position can't be gamed. The bait is always labelled
+// Hold/Continue and the rational move Risk/Abandon — the label follows the choice,
+// not the side. "risk_side" tells the client which terminal carries the odds bar;
+// for sunk traps "sunk" is the locked, already-spent amount and both choices show
+// forward returns only. Scoring keys on the choice id, so position is irrelevant
+// server-side. bias taxonomy and dimension tags are never exposed.
+func buildTrapPayload(t signal.Trap, base int) string {
+	out := map[string]interface{}{
+		"type":     "trap",
+		"trap_id":  t.TrapID,
+		"kind":     t.Stake.Kind,
+		"scenario": t.Scenario,
+	}
+
+	var bias, rational map[string]interface{}
+	switch t.Stake.Kind {
+	case signal.StakeOdds:
+		out["scenario"] = fmt.Sprintf(t.Scenario, base)
+		gain := pctOf(base, t.Stake.GainPct)
+		loss := pctOf(base, t.Stake.LossPct)
+		out["stake"] = base
+		out["win_prob"] = t.Stake.WinProb
+		bias = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Hold", "sub": fmt.Sprintf("keep %d", base)}
+		rational = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Risk", "sub": fmt.Sprintf("+%d / −%d", gain, loss)}
+	case signal.StakeSunk:
+		cont := pctOf(base, t.Stake.ContinuePct)
+		aband := pctOf(base, t.Stake.AbandonPct)
+		out["sunk"] = base
+		bias = map[string]interface{}{"id": t.BiasChoice.ID, "label": "Continue", "sub": fmt.Sprintf("returns ~%d", cont)}
+		rational = map[string]interface{}{"id": t.RationalChoice.ID, "label": "Abandon", "sub": fmt.Sprintf("returns ~%d", aband)}
+	}
+
+	if rand.Intn(2) == 0 { // #nosec G404 — non-crypto position shuffle
+		out["choice_a"], out["choice_b"], out["risk_side"] = bias, rational, "b"
+	} else {
+		out["choice_a"], out["choice_b"], out["risk_side"] = rational, bias, "a"
+	}
+
+	payload, _ := json.Marshal(out)
+	return string(payload)
 }
 
 // buildReactionTest samples the primary nightly word set from the archetype's

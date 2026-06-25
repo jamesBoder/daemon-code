@@ -249,6 +249,19 @@ export const copy = {
     trap:            'one option is better. choose.',
   } as Record<string, string>,
 
+  // ── The Trap ──────────────────────────────────────────────────────────────
+  trap: {
+    onTable:  'ON THE TABLE',  // odds: stake ledger label
+    sunk:     'SUNK',          // sunk: locked-meter label
+    logged:   'logged.',       // the silent commit beat — never a verdict
+    // overconfidence: the pre-session estimate slider
+    estimateUnit:    'fragments',
+    estimateLow:     'a few',
+    estimateHigh:    'all of it',
+    estimateConfirm: 'lock it in',
+    estimateAria:    'how far you expect to get',
+  },
+
   // ── Layer 3 — daemon.log Codex ────────────────────────────────────────────
   // Terminal-styled reference entries. Accessible via Settings → daemon.log.
   codex: [

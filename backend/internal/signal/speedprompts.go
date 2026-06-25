@@ -194,6 +194,69 @@ var SpeedPrompts = []SpeedPrompt{
 		},
 		IntroducedAfterDay: 7, Tier: TierEvergreen,
 	},
+	{
+		PromptID: "the_silence", Starter: "Silence usually means...",
+		Options: []SpeedOption{
+			{Text: "something's wrong", DimensionSignals: map[string]float64{"neuroticism": 0.80, "approach_avoidance": 0.30}},
+			{Text: "nothing at all", DimensionSignals: map[string]float64{"neuroticism": 0.20}},
+			{Text: "space to think", DimensionSignals: map[string]float64{"openness": 0.65, "approach_avoidance": 0.35}},
+		},
+		IntroducedAfterDay: 3, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "the_rules", Starter: "Rules are...",
+		Options: []SpeedOption{
+			{Text: "there for a reason", DimensionSignals: map[string]float64{"conscientiousness": 0.80, "agreeableness": 0.60}},
+			{Text: "a starting point", DimensionSignals: map[string]float64{"openness": 0.75, "agreeableness": 0.35}},
+			{Text: "for other people", DimensionSignals: map[string]float64{"agreeableness": 0.15, "locus_of_control": 0.80}},
+		},
+		IntroducedAfterDay: 4, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "i_remember", Starter: "I mostly remember...",
+		Options: []SpeedOption{
+			{Text: "what people did", DimensionSignals: map[string]float64{"grim_trigger": 0.80, "temporal_focus": 0.25}},
+			{Text: "how it felt", DimensionSignals: map[string]float64{"neuroticism": 0.65, "temporal_focus": 0.30}},
+			{Text: "what's next", DimensionSignals: map[string]float64{"temporal_focus": 0.85, "discount_factor": 0.70}},
+		},
+		IntroducedAfterDay: 6, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "asking_for_help", Starter: "Asking for help feels...",
+		Options: []SpeedOption{
+			{Text: "like losing", DimensionSignals: map[string]float64{"locus_of_control": 0.80, "approach_avoidance": 0.30}},
+			{Text: "normal", DimensionSignals: map[string]float64{"agreeableness": 0.70, "neuroticism": 0.25}},
+			{Text: "easier than it should", DimensionSignals: map[string]float64{"approach_avoidance": 0.70, "agreeableness": 0.65}},
+		},
+		IntroducedAfterDay: 5, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "the_unknown", Starter: "Not knowing what's next is...",
+		Options: []SpeedOption{
+			{Text: "exciting", DimensionSignals: map[string]float64{"openness": 0.80, "approach_avoidance": 0.80}},
+			{Text: "unbearable", DimensionSignals: map[string]float64{"neuroticism": 0.85, "conscientiousness": 0.65}},
+			{Text: "just how it is", DimensionSignals: map[string]float64{"neuroticism": 0.25}},
+		},
+		IntroducedAfterDay: 6, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "letting_go", Starter: "I let go of things...",
+		Options: []SpeedOption{
+			{Text: "long after I should", DimensionSignals: map[string]float64{"temporal_focus": 0.15, "discount_factor": 0.25}},
+			{Text: "the moment they end", DimensionSignals: map[string]float64{"temporal_focus": 0.80, "grim_trigger": 0.20}},
+			{Text: "before they're over", DimensionSignals: map[string]float64{"approach_avoidance": 0.30, "discount_factor": 0.60}},
+		},
+		IntroducedAfterDay: 7, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "a_promise", Starter: "A promise is...",
+		Options: []SpeedOption{
+			{Text: "binding", DimensionSignals: map[string]float64{"conscientiousness": 0.85, "grim_trigger": 0.70}},
+			{Text: "an intention", DimensionSignals: map[string]float64{"agreeableness": 0.55, "discount_factor": 0.40}},
+			{Text: "only as good as today", DimensionSignals: map[string]float64{"discount_factor": 0.20, "temporal_focus": 0.45}},
+		},
+		IntroducedAfterDay: 5, Tier: TierEvergreen,
+	},
 }
 
 // LookupSpeedOption returns the tagged option for a starter + chosen text pair,

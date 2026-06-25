@@ -4,6 +4,8 @@ import { WeightedScale } from './WeightedScale'
 import { PredictionDuel } from './PredictionDuel'
 import { SpeedRound } from './SpeedRound'
 import type { SpeedRoundPrompt } from './SpeedRound'
+import { TrapGame } from './TrapGame'
+import type { TrapChoice } from './TrapGame'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -45,6 +47,21 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
   speed_round: ({ raw, onComplete }) => (
     <SpeedRound
       prompts={raw.prompts as SpeedRoundPrompt[]}
+      onComplete={onComplete}
+    />
+  ),
+  trap: ({ raw, onComplete }) => (
+    <TrapGame
+      trapId={raw.trap_id as string}
+      kind={raw.kind as 'odds' | 'sunk' | 'overconfidence'}
+      scenario={raw.scenario as string}
+      stake={raw.stake as number | undefined}
+      sunk={raw.sunk as number | undefined}
+      winProb={raw.win_prob as number | undefined}
+      riskSide={raw.risk_side as 'a' | 'b' | undefined}
+      choiceA={raw.choice_a as TrapChoice | undefined}
+      choiceB={raw.choice_b as TrapChoice | undefined}
+      max={raw.max as number | undefined}
       onComplete={onComplete}
     />
   ),

@@ -66,8 +66,8 @@ var FallbackPredictions = []string{
 }
 
 // Scenarios is the curated Map scenario library.
-// Initial library: 15 scenarios, all universal tier — 2 weeks of daily Maps
-// without repeat. dimensional and personal tiers land in later iterations.
+// Library: 20 scenarios, all universal tier — ~3 weeks of daily Maps without
+// repeat. dimensional and personal tiers land in later iterations.
 // Node texts obey the obliqueness rule: never the obvious reaction.
 var Scenarios = []Scenario{
 	{

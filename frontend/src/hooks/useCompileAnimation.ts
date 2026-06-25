@@ -19,7 +19,7 @@ import {
 
 interface CompileAnimationControls {
   containerRef: RefObject<HTMLDivElement | null>
-  play: (onFadeOut?: () => void) => void
+  play: (onFadeOut?: () => void, onLine?: () => void) => void
   reset: () => void
 }
 
@@ -27,7 +27,7 @@ export function useCompileAnimation(): CompileAnimationControls {
   const containerRef = useRef<HTMLDivElement>(null)
   const tlRef = useRef<gsap.core.Timeline | null>(null)
 
-  const play = useCallback((onFadeOut?: () => void) => {
+  const play = useCallback((onFadeOut?: () => void, onLine?: () => void) => {
     if (!containerRef.current) return
 
     const container = containerRef.current
@@ -41,13 +41,14 @@ export function useCompileAnimation(): CompileAnimationControls {
 
     gsap.set([lines, stats, prose, signal], { opacity: 0, y: 6 })
 
-    // Lines appear one by one
+    // Lines appear one by one — onLine fires a soft click as each one lands
     lines.forEach((line, i) => {
       tl.to(line, {
         opacity: 1,
         y: 0,
         duration: COMPILE_LINE_DURATION,
         ease: 'power2.out',
+        onStart: onLine,
       }, i * COMPILE_LINE_STAGGER)
     })
 

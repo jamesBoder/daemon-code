@@ -7,6 +7,7 @@ import { NamingCeremony } from '../components/daemon/NamingCeremony'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson } from '../lib/api'
 import { haptic } from '../lib/haptics'
+import { playSound } from '../lib/sound'
 import { pulseGrain } from '../lib/grain'
 import { LETTER_SPACING_PROCESS, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
 import type { ShadowProfile, OrbState, ProcessDiff, RecentDiffResponse } from '../types'
@@ -32,6 +33,7 @@ export function SessionComplete() {
 
   useEffect(() => {
     haptic('success')
+    playSound('complete')   // subtle ascending acknowledgment — the session closed
     queryClient.invalidateQueries({ queryKey: ['profile'] })
   }, [])
 

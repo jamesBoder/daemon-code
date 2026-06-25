@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { DaemonOrb } from './DaemonOrb'
 import { PlayPauseIcon } from '../ui/PlayPauseIcon'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { playSound } from '../../lib/sound'
 import {
   LETTER_SPACING_TIGHT,
   NAMING_CEREMONY_EXIT_MS,
@@ -72,6 +73,11 @@ export function NamingCeremony({ names, orbState, audioUrl, onComplete }: Naming
 
   // Stop any in-flight playback when the ceremony unmounts.
   useEffect(() => () => { audioRef.current?.pause() }, [])
+
+  // Resolution chord as each name lands (mount + every advance) — the reward beat.
+  useEffect(() => {
+    if (!exiting) playSound('chord')
+  }, [idx, exiting])
 
   useEffect(() => {
     if (playing) return // hold the name on screen while the daemon speaks it

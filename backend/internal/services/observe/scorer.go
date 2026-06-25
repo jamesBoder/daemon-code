@@ -68,6 +68,17 @@ func NewScorer(q *db.Queries) *Scorer { return &Scorer{q: q} }
 func (s *Scorer) Score(ctx context.Context, userID uuid.UUID) (Result, error) {
 	today := pgtype.Date{Time: time.Now().UTC().Truncate(24 * time.Hour), Valid: true}
 
+	// Idempotency: claim today's scoring slot before mutating anything. A duplicate
+	// POST /session/complete (double-tap, retry) loses the claim and returns an empty
+	// result rather than re-accruing live_delta a second time.
+	claimed, err := s.q.ClaimLiveScore(ctx, userID, today)
+	if err != nil {
+		return Result{}, fmt.Errorf("claim live score: %w", err)
+	}
+	if !claimed {
+		return Result{}, nil
+	}
+
 	responses, err := s.q.GetResponsesForDate(ctx, db.GetResponsesForDateParams{UserID: userID, SessionDate: today})
 	if err != nil {
 		return Result{}, fmt.Errorf("get responses: %w", err)

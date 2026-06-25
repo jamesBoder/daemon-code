@@ -9,7 +9,8 @@ import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson, patchProfile, getVoiceSampleUrl } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, SOUND_KEY, SOUND_EVENT } from '../lib/constants'
+import { stopAmbient, playSound } from '../lib/sound'
 import type { ShadowProfile } from '../types'
 
 const TOGGLE = {
@@ -22,6 +23,44 @@ const TOGGLE = {
   hitPadH:  2,
   get dotOn()  { return this.trackW - this.dotSize - this.dotPad },
   transS: `${ROUTE_TRANSITION_MS / 1000}s`,
+}
+
+function ToggleRow({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0 }}>
+        {label}
+      </p>
+      <button
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={onToggle}
+        style={{
+          padding: `${TOGGLE.hitPadV}px ${TOGGLE.hitPadH}px`,
+          background: 'none', border: 'none', cursor: 'pointer',
+          flexShrink: 0, lineHeight: 0,
+        }}
+      >
+        <span style={{
+          display: 'block',
+          width: TOGGLE.trackW, height: TOGGLE.trackH, borderRadius: TOGGLE.radius,
+          background: checked ? 'var(--accent)' : 'var(--border)',
+          position: 'relative',
+          transition: `background ${TOGGLE.transS}`,
+        }}>
+          <span style={{
+            position: 'absolute',
+            top: TOGGLE.dotPad, left: checked ? TOGGLE.dotOn : TOGGLE.dotPad,
+            width: TOGGLE.dotSize, height: TOGGLE.dotSize, borderRadius: '50%',
+            background: 'var(--text-primary)',
+            display: 'block',
+            transition: `left ${TOGGLE.transS}`,
+          }} />
+        </span>
+      </button>
+    </div>
+  )
 }
 
 const VOICE_ANIM = {
@@ -52,6 +91,9 @@ export function Settings() {
   const [hapticsEnabled, setHapticsEnabled] = useState(
     () => localStorage.getItem(HAPTICS_KEY) !== 'false'
   )
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => localStorage.getItem(SOUND_KEY) === 'true'
+  )
   const [previewPlaying, setPreviewPlaying] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -70,6 +112,15 @@ export function Settings() {
     const next = !hapticsEnabled
     localStorage.setItem(HAPTICS_KEY, String(next))
     setHapticsEnabled(next)
+  }
+
+  function handleSoundToggle() {
+    const next = !soundEnabled
+    localStorage.setItem(SOUND_KEY, String(next))
+    setSoundEnabled(next)
+    window.dispatchEvent(new Event(SOUND_EVENT))
+    if (next) playSound('click')    // confirm it works + unlock the context within this gesture
+    else stopAmbient()              // silence the bed immediately on opt-out
   }
 
   function handleSignOut() {
@@ -260,38 +311,8 @@ export function Settings() {
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, textTransform: 'uppercase' }}>
               Preferences
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0 }}>
-                Haptic feedback
-              </p>
-              <button
-                role="switch"
-                aria-checked={hapticsEnabled}
-                onClick={handleHapticsToggle}
-                style={{
-                  padding: `${TOGGLE.hitPadV}px ${TOGGLE.hitPadH}px`,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  flexShrink: 0, lineHeight: 0,
-                }}
-              >
-                <span style={{
-                  display: 'block',
-                  width: TOGGLE.trackW, height: TOGGLE.trackH, borderRadius: TOGGLE.radius,
-                  background: hapticsEnabled ? 'var(--accent)' : 'var(--border)',
-                  position: 'relative',
-                  transition: `background ${TOGGLE.transS}`,
-                }}>
-                  <span style={{
-                    position: 'absolute',
-                    top: TOGGLE.dotPad, left: hapticsEnabled ? TOGGLE.dotOn : TOGGLE.dotPad,
-                    width: TOGGLE.dotSize, height: TOGGLE.dotSize, borderRadius: '50%',
-                    background: 'var(--text-primary)',
-                    display: 'block',
-                    transition: `left ${TOGGLE.transS}`,
-                  }} />
-                </span>
-              </button>
-            </div>
+            <ToggleRow label="Haptic feedback" checked={hapticsEnabled} onToggle={handleHapticsToggle} />
+            <ToggleRow label="Daemon sounds" checked={soundEnabled} onToggle={handleSoundToggle} />
           </div>
         </div>
       </div>

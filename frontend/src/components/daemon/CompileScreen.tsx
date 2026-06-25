@@ -7,6 +7,7 @@ import { SignalWhisper } from './SignalWhisper'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { BlinkCursor } from '../ui/BlinkCursor'
 import { copy } from '../../lib/copy'
+import { playSound } from '../../lib/sound'
 import { COMPILE_AUTOPLAY_DELAY, HAIRLINE, LETTER_SPACING_COMPILE, LETTER_SPACING_TIGHT, MAX_CONTENT_WIDTH, PROSE_MAX_WIDTH } from '../../lib/constants'
 import type { CompileData } from '../../types'
 
@@ -146,7 +147,10 @@ export function CompileScreen({ data, autoPlay = true, audioUrl, audioPlaying, o
   useEffect(() => {
     if (autoPlay) {
       const delay = reduced ? 0 : COMPILE_AUTOPLAY_DELAY
-      const t = setTimeout(() => play(() => setOrbPulsing(true)), delay)
+      const t = setTimeout(() => play(
+        () => { playSound('pulse'); setOrbPulsing(true) }, // orb compile_pulse — deep resonant pulse
+        () => playSound('click'),                          // each terminal line — soft click
+      ), delay)
       return () => clearTimeout(t)
     }
   }, [autoPlay, play, reduced])

@@ -21,7 +21,10 @@ func namedPattern(name string, strength int32) db.PatternLibrary {
 
 func TestBuildDeckArc(t *testing.T) {
 	g := &Generator{}
-	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 30}
+	// CompileCount 20: choice-traps are eligible (>=14) but the overconfidence
+	// estimate is not (>=21), so the opener is always a fast game and length holds
+	// 5-6. The overconfidence-leading arc has its own test.
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 20}
 	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
 
 	sawSpeedRound := false

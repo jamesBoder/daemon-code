@@ -92,6 +92,33 @@ var Words = []Word{
 	{Text: "rest", Approach: true, Abstract: false},
 	{Text: "stability", Approach: true, Abstract: false},
 	{Text: "success", Approach: true, Abstract: false, CoreFor: []string{"unworthy_self"}},
+
+	// --- expansion batch ---
+	// threat / loss cluster (avoidance, abstract)
+	{Text: "betrayal", Approach: false, Abstract: true, CoreFor: []string{"caged_rage"}},
+	{Text: "regret", Approach: false, Abstract: true, CoreFor: []string{"grief_carrier", "default"}},
+	{Text: "exposure", Approach: false, Abstract: true, CoreFor: []string{"unworthy_self"}},
+	{Text: "dependence", Approach: false, Abstract: true, CoreFor: []string{"abandoned_child"}},
+	{Text: "futility", Approach: false, Abstract: true, CoreFor: []string{"caged_rage"}},
+	{Text: "humiliation", Approach: false, Abstract: true, CoreFor: []string{"unworthy_self"}},
+	{Text: "neglect", Approach: false, Abstract: true, CoreFor: []string{"abandoned_child"}},
+	{Text: "powerlessness", Approach: false, Abstract: true, CoreFor: []string{"caged_rage", "default"}},
+	// threat / loss cluster (avoidance, concrete)
+	{Text: "wound", Approach: false, Abstract: false, CoreFor: []string{"grief_carrier"}},
+	{Text: "debt", Approach: false, Abstract: false, CoreFor: []string{"unworthy_self"}},
+	{Text: "wall", Approach: false, Abstract: false, CoreFor: []string{"caged_rage"}},
+	// reward / connection cluster (approach, abstract)
+	{Text: "recognition", Approach: true, Abstract: true, CoreFor: []string{"unworthy_self"}},
+	{Text: "release", Approach: true, Abstract: true, CoreFor: []string{"caged_rage"}},
+	{Text: "meaning", Approach: true, Abstract: true, CoreFor: []string{"default"}},
+	{Text: "devotion", Approach: true, Abstract: true, CoreFor: []string{"abandoned_child"}},
+	{Text: "vindication", Approach: true, Abstract: true, CoreFor: []string{"caged_rage"}},
+	{Text: "closeness", Approach: true, Abstract: true, CoreFor: []string{"abandoned_child"}},
+	// reward / connection cluster (approach, concrete)
+	{Text: "anchor", Approach: true, Abstract: false, CoreFor: []string{"grief_carrier"}},
+	{Text: "home", Approach: true, Abstract: false, CoreFor: []string{"abandoned_child"}},
+	{Text: "craft", Approach: true, Abstract: false},
+	{Text: "victory", Approach: true, Abstract: false, CoreFor: []string{"caged_rage"}},
 }
 
 // CoreWords returns the words tagged core for the archetype, falling back to

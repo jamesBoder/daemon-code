@@ -1074,6 +1074,173 @@ var Pairs = []Pair{
 		Difficulty:         "easy",
 		Tier:               TierCurrent,
 	},
+
+	// =====================================================================
+	// EXPANSION BATCH — evergreen + cultural
+	// =====================================================================
+	{
+		PairID: "the_call_you_made_vs_the_call_you_avoided",
+		Left:   "the call you made",
+		Right:  "the call you've been avoiding",
+		DimensionSignals: map[string]DimSignal{
+			// Made = approach + internal locus; avoided = avoidance, carried weight
+			"approach_avoidance": {LeftHigh: true},
+			"locus_of_control":   {LeftHigh: true},
+			"neuroticism":        {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "being_understood_vs_being_agreed_with",
+		Left:   "being understood",
+		Right:  "being agreed with",
+		DimensionSignals: map[string]DimSignal{
+			// Understood = openness to being seen; agreed-with = validation-seeking
+			"openness":    {LeftHigh: true},
+			"neuroticism": {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "the_door_you_closed_vs_the_door_left_open",
+		Left:   "the door you closed",
+		Right:  "the door you left open",
+		DimensionSignals: map[string]DimSignal{
+			// Closed = decisive, future-facing; open = keeps the past reachable
+			"temporal_focus":  {LeftHigh: true},
+			"grim_trigger":    {LeftHigh: true},
+			"discount_factor": {LeftHigh: true},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "what_you_can_prove_vs_what_you_know",
+		Left:   "what you can prove",
+		Right:  "what you know",
+		DimensionSignals: map[string]DimSignal{
+			// Prove = conscientious/external validation; know = internal conviction
+			"conscientiousness": {LeftHigh: true},
+			"locus_of_control":  {LeftHigh: false},
+			"openness":          {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "the_room_you_command_vs_the_room_you_disappear_in",
+		Left:   "the room you command",
+		Right:  "the room you can disappear in",
+		DimensionSignals: map[string]DimSignal{
+			"approach_avoidance": {LeftHigh: true},
+			"neuroticism":        {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "forgiving_them_vs_forgiving_yourself",
+		Left:   "forgiving them",
+		Right:  "forgiving yourself",
+		DimensionSignals: map[string]DimSignal{
+			// Them = external attribution released; yourself = internal weight carried
+			"locus_of_control": {LeftHigh: false},
+			"grim_trigger":     {LeftHigh: false},
+			"neuroticism":      {LeftHigh: false},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "the_plan_that_failed_vs_the_plan_you_never_started",
+		Left:   "the plan that failed",
+		Right:  "the plan you never started",
+		DimensionSignals: map[string]DimSignal{
+			// Failed = approached and lost; never started = avoidance
+			"approach_avoidance": {LeftHigh: true},
+			"conscientiousness":  {LeftHigh: true},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "saying_it_first_vs_waiting_to_be_asked",
+		Left:   "saying it first",
+		Right:  "waiting to be asked",
+		DimensionSignals: map[string]DimSignal{
+			"approach_avoidance": {LeftHigh: true},
+			"locus_of_control":   {LeftHigh: true},
+			"agreeableness":      {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "oppenheimer_vs_prometheus",
+		Left:   "building the thing",
+		Right:  "warning against it",
+		DimensionSignals: map[string]DimSignal{
+			// Build = approach + discount the consequence; warn = conscientious restraint
+			"approach_avoidance": {LeftHigh: true},
+			"conscientiousness":  {LeftHigh: false},
+			"discount_factor":    {LeftHigh: false},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "hard",
+		Tier:               TierCultural,
+	},
+	{
+		PairID: "the_artist_who_burned_out_vs_the_one_who_sold_out",
+		Left:   "the artist who burned out",
+		Right:  "the one who sold out",
+		DimensionSignals: map[string]DimSignal{
+			// Burned out = uncompromising/openness; sold out = pragmatic/agreeable
+			"openness":      {LeftHigh: true},
+			"agreeableness": {LeftHigh: false},
+			"grim_trigger":  {LeftHigh: true},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "hard",
+		Tier:               TierCultural,
+	},
+	{
+		PairID: "the_founder_vs_the_operator",
+		Left:   "the one who starts it",
+		Right:  "the one who keeps it running",
+		DimensionSignals: map[string]DimSignal{
+			// Start = openness + approach; keep running = conscientiousness
+			"openness":           {LeftHigh: true},
+			"conscientiousness":  {LeftHigh: false},
+			"approach_avoidance": {LeftHigh: true},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "medium",
+		Tier:               TierCultural,
+	},
+	{
+		PairID: "leaving_at_the_peak_vs_staying_for_the_decline",
+		Left:   "leaving at the peak",
+		Right:  "staying through the decline",
+		DimensionSignals: map[string]DimSignal{
+			// Leave at peak = future-facing, discounts the past; stay = loyal to what was
+			"temporal_focus":  {LeftHigh: true},
+			"discount_factor": {LeftHigh: true},
+			"agreeableness":   {LeftHigh: false},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "hard",
+		Tier:               TierCultural,
+	},
 }
 
 // LookupPair returns the Pair entry matching left+right strings, and whether it was found.

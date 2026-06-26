@@ -6,6 +6,8 @@ import { SpeedRound } from './SpeedRound'
 import type { SpeedRoundPrompt } from './SpeedRound'
 import { TrapGame } from './TrapGame'
 import type { TrapChoice } from './TrapGame'
+import { Stroop } from './Stroop'
+import type { StroopItem } from './Stroop'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -47,6 +49,12 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
   speed_round: ({ raw, onComplete }) => (
     <SpeedRound
       prompts={raw.prompts as SpeedRoundPrompt[]}
+      onComplete={onComplete}
+    />
+  ),
+  stroop: ({ raw, onComplete }) => (
+    <Stroop
+      items={raw.items as StroopItem[]}
       onComplete={onComplete}
     />
   ),

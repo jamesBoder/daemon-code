@@ -17,6 +17,12 @@ const Session        = lazy(() => import('./screens/Session').then(m => ({ defau
 const SessionComplete = lazy(() => import('./screens/SessionComplete').then(m => ({ default: m.SessionComplete })))
 const Codex          = lazy(() => import('./screens/Codex').then(m => ({ default: m.Codex })))
 const Pulse          = lazy(() => import('./screens/Pulse').then(m => ({ default: m.Pulse })))
+// Dev-only fragment playtest harness. The import lives behind a static
+// import.meta.env.DEV check so Rollup dead-code-eliminates the dynamic import
+// (and its chunk) entirely from production builds.
+const DevGames = import.meta.env.DEV
+  ? lazy(() => import('./screens/DevGames').then(m => ({ default: m.DevGames })))
+  : null
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them
 const BOTTOM_NAV_PATHS = new Set(['/home', '/chronicle', '/processes', '/settings'])
@@ -65,6 +71,10 @@ function App() {
             <Route path="/pulse"            element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
             <Route path="/session"          element={<ProtectedRoute><Session /></ProtectedRoute>} />
             <Route path="/session/complete" element={<ProtectedRoute><SessionComplete /></ProtectedRoute>} />
+
+            {import.meta.env.DEV && DevGames && (
+              <Route path="/dev/games" element={<ProtectedRoute><DevGames /></ProtectedRoute>} />
+            )}
 
             <Route path="/" element={<RootRedirect />} />
             <Route path="*" element={<Navigate to="/" replace />} />

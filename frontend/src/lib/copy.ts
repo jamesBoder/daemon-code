@@ -247,6 +247,7 @@ export const copy = {
     prediction_duel: "what do you think you'll do?",
     speed_round:     'finish the sentence. first instinct.',
     trap:            'one option is better. choose.',
+    stroop:          'safe, or dangerous? first instinct.',
   } as Record<string, string>,
 
   // ── The Trap ──────────────────────────────────────────────────────────────

@@ -123,7 +123,10 @@ body::after {
   position: fixed;
   inset: 0;
   background-image: url('/noise.png');
-  opacity: 0.025;
+  /* Resting 0.025; components may raise --grain-opacity to intensify the grain
+     (e.g. Stroop drives it from adaptive pressure). The grain-pulse animation
+     below temporarily overrides this. */
+  opacity: var(--grain-opacity, 0.025);
   pointer-events: none;
   z-index: 9999;
 }

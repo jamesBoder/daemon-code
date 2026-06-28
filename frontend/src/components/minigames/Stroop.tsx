@@ -48,6 +48,13 @@ interface Trial { id: string; axis: string; picked: string; followedMeaning: boo
 
 const S = MG.stroop
 
+// The cue actually delivered this trial, after any counter override: an 'escalate'
+// counter forces the full register; otherwise the item's own cue (default 'all').
+// Single source of truth so the logged cue and the rendered cue can never drift.
+function effectiveCue(item: StroopItem, counterMode: CounterMode): StroopCue {
+  return counterMode === 'escalate' ? 'all' : (item.cue ?? 'all')
+}
+
 export function Stroop({ items, onComplete, forceMotion = false }: Props) {
   const reduced = useReducedMotion() && !forceMotion
   const [idx,      setIdx]      = useState(0)
@@ -113,6 +120,15 @@ export function Stroop({ items, onComplete, forceMotion = false }: Props) {
   }, [pressure])
   useEffect(() => () => { document.documentElement.style.removeProperty('--grain-opacity') }, [])
 
+  // Defensive: an empty/missing payload would crash on the `item` deref below.
+  // Complete immediately with no trials rather than take down the session screen.
+  useEffect(() => {
+    if (items.length === 0 && !done.current) {
+      done.current = true
+      onCompleteRef.current({ v: 1, ms: 0, trials: [] })
+    }
+  }, [items.length])
+
   function answer(chose: Choice) {
     if (answered.current || done.current) return
     answered.current = true
@@ -122,7 +138,7 @@ export function Stroop({ items, onComplete, forceMotion = false }: Props) {
     const it = items[idx]
     const rt = Date.now() - trialStart.current
     const followedMeaning = chose === 'none' ? null : chose === it.meaningPole
-    const cueShown: StroopCue = counterMode === 'escalate' ? 'all' : (it.cue ?? 'all')
+    const cueShown = effectiveCue(it, counterMode)
     trials.current = [...trials.current, {
       id: it.id,
       axis: it.axis,
@@ -164,7 +180,9 @@ export function Stroop({ items, onComplete, forceMotion = false }: Props) {
     }, reduced ? 0 : adv)
   }
 
-  const item     = items[idx]
+  const item = items[idx]
+  if (!item) return null // empty payload (handled by the effect above) or post-complete
+
   const isThreat = item.styling === 'threat'
   const progress = items.length > 0 ? idx / items.length : 0
   const order: (0 | 1)[] = flipped ? [1, 0] : [0, 1] // randomized pole position
@@ -174,7 +192,7 @@ export function Stroop({ items, onComplete, forceMotion = false }: Props) {
   // Which channels carry the styling this trial (§5e #2 — move the distractor),
   // after the counter override (counterMode is set per-trial by the layout effect).
   const neutralize = counterMode === 'defuse'
-  const cue: StroopCue = counterMode === 'escalate' ? 'all' : (item.cue ?? 'all')
+  const cue = effectiveCue(item, counterMode)
   const colorOn  = !neutralize && (cue === 'all' || cue === 'color')
   const typeOn   = !neutralize && (cue === 'all' || cue === 'type')
   const motionOn = !neutralize && (cue === 'all' || cue === 'motion')

@@ -34,6 +34,7 @@ const AXES = {
   pull:    ['toward', 'away'],     // approach / avoidance
   novelty: ['new', 'known'],      // openness
   duty:    ['want', 'should'],    // conscientiousness
+  control: ['steer', 'drift'],    // locus of control
 } as const satisfies Record<string, readonly [string, string]>
 
 // [word, axis, meaningPole index, styling, font?, cue?]. cue moves the distractor
@@ -44,21 +45,30 @@ const SEEDS: Seed[] = [
   // threat — safe / dangerous (neuroticism)
   ['SAFE','threat',0,'threat',undefined,'color'], ['HOME','threat',0,'threat',NOSIFER,'type'], ['REST','threat',0,'calm'], ['SHELTER','threat',0,'threat',MEGRIM],
   ['DANGER','threat',1,'calm'], ['KNIFE','threat',1,'threat',undefined,'motion'], ['EDGE','threat',1,'calm',ABRIL], ['BLADE','threat',1,'threat',CINZELD,'type'],
+  ['HAVEN','threat',0,'threat',undefined,'motion'], ['THREAT','threat',1,'calm',MEGRIM], ['CALM','threat',0,'threat',GLITCH,'type'],
   // attach — keep / let go (temporal / attachment)
   ['HOLD','attach',0,'threat'], ['STAY','attach',0,'threat',EATER,'type'], ['MINE','attach',0,'calm'], ['GRIP','attach',0,'threat',BUNGEE],
   ['GONE','attach',1,'calm',ABRIL], ['LEAVE','attach',1,'threat',undefined,'color'], ['RELEASE','attach',1,'calm'],
+  ['CLING','attach',0,'threat',CINZELD,'type'], ['DROP','attach',1,'threat',undefined,'color'], ['FREE','attach',1,'calm',MONOTON],
   // trust — trust / guard (agreeableness)
   ['OPEN','trust',0,'threat',undefined,'motion'], ['TRUST','trust',0,'calm'], ['WARM','trust',0,'threat',NOSIFER], ['BARE','trust',0,'threat',MEGRIM],
   ['STRANGER','trust',1,'calm'], ['LIE','trust',1,'threat',GLITCH,'type'], ['HIDDEN','trust',1,'calm',CINZEL],
+  ['FAITH','trust',0,'threat',BUNGEE], ['GUARD','trust',1,'threat',undefined,'motion'], ['DOUBT','trust',1,'calm',ABRIL],
   // pull — toward / away (approach / avoidance)
   ['WANT','pull',0,'threat'], ['CLOSER','pull',0,'calm',CINZEL], ['YES','pull',0,'threat',GLITCH], ['REACH','pull',0,'threat',MONOTON],
   ['RUN','pull',1,'calm'], ['NO','pull',1,'threat',undefined,'color'], ['FLINCH','pull',1,'calm'],
+  ['CHASE','pull',0,'threat',EATER,'type'], ['HIDE','pull',1,'threat',NOSIFER], ['AWAY','pull',1,'calm',CINZEL],
   // novelty — new / known (openness)
   ['FRESH','novelty',0,'threat'], ['LEAP','novelty',0,'threat',BUNGEE], ['STRANGE','novelty',0,'calm',MEGRIM],
   ['USUAL','novelty',1,'calm'], ['ROUTINE','novelty',1,'threat',CINZELD,'type'], ['AGAIN','novelty',1,'calm'],
+  ['WILD','novelty',0,'threat',GLITCH], ['SAME','novelty',1,'calm'], ['KNOWN','novelty',1,'threat',CINZELD,'type'],
   // duty — want / should (conscientiousness)
   ['CRAVE','duty',0,'threat',NOSIFER], ['NOW','duty',0,'threat',undefined,'motion'], ['WHIM','duty',0,'calm',ABRIL],
   ['MUST','duty',1,'calm'], ['OWED','duty',1,'threat',CINZELD,'type'], ['OUGHT','duty',1,'calm',CINZEL],
+  ['SKIP','duty',0,'threat',undefined,'color'], ['DUTY','duty',1,'threat',MEGRIM,'type'], ['SHOULD','duty',1,'calm',CINZEL],
+  // control — steer / drift (locus of control)
+  ['STEER','control',0,'threat',BUNGEE], ['OWN','control',0,'calm'], ['GRASP','control',0,'threat',undefined,'motion'],
+  ['DRIFT','control',1,'calm',MEGRIM], ['FATE','control',1,'threat',NOSIFER,'type'], ['SWEPT','control',1,'calm',CINZEL],
 ]
 
 const WORDS: StroopItem[] = SEEDS.map(([word, axis, meaningPole, styling, font, cue]) => ({

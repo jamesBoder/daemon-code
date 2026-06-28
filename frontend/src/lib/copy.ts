@@ -36,14 +36,20 @@ export const copy = {
       low: [
         'logged. the daemon adjusts for interference.',
         'noted. heavy-signal days still count.',
+        'logged. static is data too.',
+        'noted. the read accounts for the noise.',
       ],
       mid: [
         'logged. baseline holds.',
         'noted. steady state read.',
+        'logged. the middle is its own signal.',
+        'noted. nothing the model has to correct for.',
       ],
       high: [
         'logged. clear signal improves the read.',
         'noted. the daemon works best in this range.',
+        'logged. the read sharpens on days like this.',
+        'noted. low interference, high resolution.',
       ],
     },
   },
@@ -56,6 +62,8 @@ export const copy = {
       'Consistent. Logged.',
       'The daemon anticipated this. Pattern confirmed.',
       'Alignment confirmed. Accuracy rising.',
+      'Read confirmed. You moved the way the model said.',
+      'No surprise here. The daemon already had this.',
     ],
     wrongReveals: [
       'New data. The daemon revises.',
@@ -63,6 +71,8 @@ export const copy = {
       'Unexpected. The daemon is taking note.',
       'Contradiction detected. The daemon is updating.',
       'The daemon was wrong. That is noted.',
+      'Off-model. The daemon rewrites the prediction.',
+      'You broke the pattern. The read changes.',
     ],
   },
   push: {
@@ -127,6 +137,12 @@ export const copy = {
       '> fragment history indexed',
       '> response latency: within range',
       '> shadow state reconciled',
+      '> weighing snap-judgment latency...',
+      '> bias alignment recomputed',
+      '> reaction vectors normalized',
+      '> overconfidence delta logged',
+      '> trap response folded into model',
+      '> instinct timing within range',
     ] as readonly string[],
   },
   processLog: {
@@ -296,7 +312,8 @@ export const copy = {
       key: 'fragment',
       lines: [
         'a single behavioral probe within a session.',
-        'types: reaction_test, weighted_scale, prediction_duel.',
+        'types: reaction_test, weighted_scale, prediction_duel,',
+        '       speed_round, trap, stroop.',
         'the daemon reads your response, not your intention.',
       ],
     },

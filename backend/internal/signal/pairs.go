@@ -1241,6 +1241,147 @@ var Pairs = []Pair{
 		Difficulty:         "hard",
 		Tier:               TierCultural,
 	},
+
+	// =====================================================================
+	// CONTENT RUN BATCH — evergreen anchors + 2026 current
+	// =====================================================================
+	{
+		PairID: "apology_you_owe_vs_apology_youre_owed",
+		Left:   "the apology you owe",
+		Right:  "the apology you're owed",
+		DimensionSignals: map[string]DimSignal{
+			// Owe = takes responsibility (internal locus, lets go); owed = keeps the
+			// grievance, scorekeeping
+			"locus_of_control": {LeftHigh: true},
+			"grim_trigger":     {LeftHigh: false},
+			"agreeableness":    {LeftHigh: true},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "saying_it_to_their_face_vs_letting_it_go",
+		Left:   "saying it to their face",
+		Right:  "letting it go",
+		DimensionSignals: map[string]DimSignal{
+			// Face = approach, confrontation; let go = avoidance, lower friction
+			"approach_avoidance": {LeftHigh: true},
+			"agreeableness":      {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "the_promise_you_kept_vs_the_one_you_renegotiated",
+		Left:   "the promise you kept",
+		Right:  "the promise you renegotiated",
+		DimensionSignals: map[string]DimSignal{
+			// Kept = rigid follow-through; renegotiated = adaptive, open to revision
+			"conscientiousness": {LeftHigh: true},
+			"openness":          {LeftHigh: false},
+			"grim_trigger":      {LeftHigh: true},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "being_needed_vs_being_free",
+		Left:   "being needed",
+		Right:  "being free",
+		DimensionSignals: map[string]DimSignal{
+			// Needed = relational anchoring; free = autonomy, internal locus
+			"agreeableness":    {LeftHigh: true},
+			"locus_of_control": {LeftHigh: false},
+			"openness":         {LeftHigh: false},
+		},
+		IntroducedAfterDay: 7,
+		Difficulty:         "medium",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "the_truth_that_helps_vs_the_truth_thats_true",
+		Left:   "the truth that helps",
+		Right:  "the truth that's just true",
+		DimensionSignals: map[string]DimSignal{
+			// Helps = consequence-weighing, kind; just-true = principled, blunt
+			"agreeableness": {LeftHigh: true},
+			"k_level":       {LeftHigh: true},
+		},
+		IntroducedAfterDay: 14,
+		Difficulty:         "hard",
+		Tier:               TierEvergreen,
+	},
+	{
+		PairID: "reading_the_summary_vs_reading_the_whole_thing",
+		Left:   "reading the summary",
+		Right:  "reading the whole thing",
+		DimensionSignals: map[string]DimSignal{
+			// Summary = speed-over-depth, impatient; whole = diligent, patient
+			"discount_factor":   {LeftHigh: false},
+			"conscientiousness": {LeftHigh: false},
+			"openness":          {LeftHigh: false},
+		},
+		IntroducedAfterDay: 0,
+		Difficulty:         "easy",
+		Tier:               TierCurrent,
+	},
+	{
+		PairID: "the_algorithms_pick_vs_what_you_sought_out",
+		Left:   "the algorithm's pick",
+		Right:  "the thing you went looking for",
+		DimensionSignals: map[string]DimSignal{
+			// Algorithm = passive, externally driven; sought = deliberate, internal
+			"locus_of_control":   {LeftHigh: false},
+			"openness":           {LeftHigh: false},
+			"approach_avoidance": {LeftHigh: false},
+		},
+		IntroducedAfterDay: 0,
+		Difficulty:         "easy",
+		Tier:               TierCurrent,
+	},
+	{
+		PairID: "letting_the_model_decide_vs_owning_the_call",
+		Left:   "letting the model decide",
+		Right:  "owning the call yourself",
+		DimensionSignals: map[string]DimSignal{
+			// Model decides = deferring responsibility; own = internal locus, accepts weight
+			"locus_of_control": {LeftHigh: false},
+			"grim_trigger":     {LeftHigh: false},
+		},
+		IntroducedAfterDay: 0,
+		Difficulty:         "medium",
+		Tier:               TierCurrent,
+	},
+	{
+		PairID: "posting_it_vs_keeping_it",
+		Left:   "posting it",
+		Right:  "keeping it to yourself",
+		DimensionSignals: map[string]DimSignal{
+			// Posting = outward, validation-facing; keeping = private, internal
+			"approach_avoidance": {LeftHigh: true},
+			"locus_of_control":   {LeftHigh: false},
+			"neuroticism":        {LeftHigh: true},
+		},
+		IntroducedAfterDay: 0,
+		Difficulty:         "easy",
+		Tier:               TierCurrent,
+	},
+	{
+		PairID: "the_group_chat_vs_the_phone_call",
+		Left:   "the group chat",
+		Right:  "the phone call",
+		DimensionSignals: map[string]DimSignal{
+			// Group chat = diffuse, low-stakes contact; call = direct, higher approach
+			"approach_avoidance": {LeftHigh: false},
+			"agreeableness":      {LeftHigh: true},
+		},
+		IntroducedAfterDay: 0,
+		Difficulty:         "easy",
+		Tier:               TierCurrent,
+	},
 }
 
 // LookupPair returns the Pair entry matching left+right strings, and whether it was found.

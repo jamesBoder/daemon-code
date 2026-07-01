@@ -1,13 +1,14 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, Zap, Scroll, GitBranch, Settings } from 'lucide-react'
+import { Home, Zap, Aperture, Scroll, Settings } from 'lucide-react'
 import { BOTTOM_NAV_BUTTON_HEIGHT } from '../../lib/constants'
 
+// Self absorbs the Portrait and links down to the Process Log (§4.4 IA move).
 const TABS = [
-  { label: 'Home',      path: '/home',      Icon: Home      },
-  { label: 'Session',   path: '/session',   Icon: Zap       },
-  { label: 'Chronicle', path: '/chronicle', Icon: Scroll    },
-  { label: 'Processes', path: '/processes', Icon: GitBranch },
-  { label: 'Settings',  path: '/settings',  Icon: Settings  },
+  { label: 'Home',      path: '/home',      Icon: Home     },
+  { label: 'Session',   path: '/session',   Icon: Zap      },
+  { label: 'Self',      path: '/self',      Icon: Aperture },
+  { label: 'Chronicle', path: '/chronicle', Icon: Scroll   },
+  { label: 'Settings',  path: '/settings',  Icon: Settings },
 ]
 
 export function BottomNav() {

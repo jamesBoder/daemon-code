@@ -11,6 +11,37 @@ export type Archetype =
   | 'grief_carrier'
   | 'default'
 
+// The seven personality dimensions the Portrait renders from. The stored model
+// also carries game-theory metrics (discount_factor, grim_trigger, k_level) that
+// the Portrait does not map — keep this list as the render contract.
+export type PortraitDimension =
+  | 'openness'
+  | 'conscientiousness'
+  | 'agreeableness'
+  | 'neuroticism'
+  | 'locus_of_control'
+  | 'approach_avoidance'
+  | 'temporal_focus'
+
+// One dimension as the Self read exposes it — score and its confidence, both 0..1
+// (k_level can exceed 1, but it is not a PortraitDimension). Raw numbers are never
+// shown to the user; they drive the generative form.
+export interface DimensionValue {
+  score: number
+  confidence: number
+}
+
+// GET /self — the daemon's current read, used to render the Portrait. Dimension
+// maps are keyed by the stored dimension name; the Portrait selects the seven it
+// maps and treats any missing one as zero-confidence.
+export interface SelfRead {
+  dimensions: Partial<Record<string, DimensionValue>>
+  signalConfidence: number
+  archetype: Archetype
+  stage: OrbState
+  compileCount: number
+}
+
 // A single row in the compile card / compile screen stats block
 export interface CompileStat {
   label: string

@@ -44,6 +44,15 @@ const (
 	holdOdds         = 4   // 1-in-this chance on an eligible (non-trap) night
 	holdIntimacyFull = 30  // compiles at which the daemon settles a familiar user fully (intimacy = 1)
 	holdNeutralScore = 0.5 // dimension fallback before the model has a read (Day 0)
+
+	// The Split — a one-shot ultimatum: divide a resource the other side can veto.
+	// It reads fairness vs. strategic self-interest (the game-theory disposition
+	// nothing else touches). No right answer, so it unlocks early, but it stays a
+	// pointed decision beat, so it stays occasional, never shares a night with a
+	// trap or a hold (one special middle beat per session), and replaces one scale
+	// so the deck length holds.
+	splitMinCompiles = 4 // available early — no right answer, just enough loop to read the framing
+	splitOdds        = 4 // 1-in-this chance on an eligible (no trap, no hold) night
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -174,6 +183,18 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 		}
 	}
 
+	// The Split — a one-shot ultimatum. Like the Hold it's a single special middle
+	// beat: only on a night with no trap and no hold (they shouldn't crowd one
+	// session), occasional past its unlock, replacing one scale so length holds.
+	var split *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && int(profile.CompileCount) >= splitMinCompiles && rand.Intn(splitOdds) == 0 { // #nosec G404 — non-crypto game selection
+		sf := buildSplit(profile)
+		split = &sf
+		if nScales > 1 {
+			nScales--
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -183,6 +204,9 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	}
 	if hold != nil {
 		middle = append(middle, *hold)
+	}
+	if split != nil {
+		middle = append(middle, *split)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -470,6 +494,38 @@ func buildHold(profile db.ShadowProfile) dynamo.Fragment {
 	return dynamo.Fragment{
 		ID:      uuid.New().String(),
 		Type:    "hold",
+		Payload: string(payload),
+	}
+}
+
+// splitFramings are the oblique resource framings The Split rotates through. The
+// framing carries no dimension tag — the disposition is in what the user offers
+// under the shadow of a veto, not in the words. Kept server-side so the set can
+// grow without a frontend deploy (the frontend has one fallback for empty decks).
+var splitFramings = []string{
+	"Something worth having.",
+	"The last good thing in the room.",
+	"What you both came for.",
+	"Everything that is left.",
+	"The only one of its kind.",
+}
+
+// buildSplit stamps The Split — a one-shot ultimatum. The payload carries the
+// rotated framing and a per-night seed (the frontend jitters the watching
+// counterpart's presence from it, so the table is never identical). The offer
+// itself (you_keep, deliberation) is captured in response_data for a future
+// computeSplitSignals (Phase 2); nothing here reads the model at build time.
+func buildSplit(profile db.ShadowProfile) dynamo.Fragment {
+	_ = profile                                             // reserved for Phase 2 personalization; the framing is model-agnostic today
+	framing := splitFramings[rand.Intn(len(splitFramings))] // #nosec G404 — non-crypto content pick
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":    "split",
+		"seed":    rand.Int63(), // #nosec G404 — non-crypto visual seed
+		"framing": framing,
+	})
+	return dynamo.Fragment{
+		ID:      uuid.New().String(),
+		Type:    "split",
 		Payload: string(payload),
 	}
 }

@@ -294,7 +294,22 @@ export const copy = {
     trap:            'one option is better. choose.',
     stroop:          'react to the word, not the look. first instinct.',
     hold:            'nothing is asked here. stay, or release when you choose.',
+    split:           'divide it. one offer — they can refuse.',
   } as Record<string, string>,
+
+  // ── The Split ─────────────────────────────────────────────────────────────
+  // The negotiation table. Oblique — never "generous"/"fair"/"selfish" (naming
+  // the axis coaches the answer). The framing itself is stamped by buildSplit;
+  // framingFallback covers the dev harness and any older/empty deck.
+  split: {
+    youKeep:         'you keep',
+    theyGet:         'they get',
+    veto:            'they can refuse. then it is gone.',
+    commit:          'commit',
+    sent:            'offered.',                 // the silent commit beat — no verdict, ever
+    aria:            'how much of it you keep',
+    framingFallback: 'Something worth having.',
+  },
 
   // ── The Trap ──────────────────────────────────────────────────────────────
   trap: {

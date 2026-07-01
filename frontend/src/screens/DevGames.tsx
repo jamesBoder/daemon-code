@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Stroop } from '../components/minigames/Stroop'
 import type { StroopItem, StroopCue } from '../components/minigames/Stroop'
 import { Hold } from '../components/minigames/Hold'
+import { Split } from '../components/minigames/Split'
 import { copy } from '../lib/copy'
 import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
 
@@ -105,11 +106,28 @@ function randomHoldParams() {
   return { seed: Math.floor(Math.random() * 2 ** 31), charge: Math.random(), intimacy: Math.random() }
 }
 
-type GameKey = 'stroop' | 'hold'
+// The Split's per-night payload — a seed plus one rotated resource framing (the
+// real buildSplit picks from a server-side set; this mirrors it for playtesting).
+const SPLIT_FRAMINGS = [
+  'Something worth having.',
+  'The last good thing in the room.',
+  'What you both came for.',
+  'Everything that is left.',
+  'The only one of its kind.',
+]
+function randomSplitParams() {
+  return {
+    seed: Math.floor(Math.random() * 2 ** 31),
+    framing: SPLIT_FRAMINGS[Math.floor(Math.random() * SPLIT_FRAMINGS.length)],
+  }
+}
+
+type GameKey = 'stroop' | 'hold' | 'split'
 
 const GAMES: { key: GameKey; label: string }[] = [
   { key: 'stroop', label: 'The Stroop Variant' },
   { key: 'hold',   label: 'The Hold' },
+  { key: 'split',  label: 'The Split' },
 ]
 
 type Phase = 'menu' | 'context' | 'game'
@@ -123,6 +141,8 @@ export function DevGames() {
   // The Hold's per-night payload, randomized each run so the seed/charge/intimacy
   // personalization can be felt (the real deck-builder stamps these nightly).
   const [holdParams, setHoldParams] = useState<{ seed: number; charge: number; intimacy: number } | null>(null)
+  // The Split's per-run payload — a seed + one rotated framing.
+  const [splitParams, setSplitParams] = useState<{ seed: number; framing: string } | null>(null)
   // Force motion on regardless of the OS prefers-reduced-motion setting, so the
   // full experience can be evaluated even on a reduced-motion dev machine.
   const [forceMotion, setForceMotion] = useState(true)
@@ -138,6 +158,7 @@ export function DevGames() {
     setResult(null)
     setDeck(buildDeck())
     if (key === 'hold') setHoldParams(randomHoldParams())
+    if (key === 'split') setSplitParams(randomSplitParams())
     setRunId(n => n + 1)
     setActive(key)
     setPhase('context')
@@ -186,8 +207,10 @@ export function DevGames() {
     const game =
       active === 'stroop' ? (
         <Stroop key={runId} items={deck} onComplete={handleComplete} forceMotion={forceMotion} />
-      ) : (
+      ) : active === 'hold' ? (
         <Hold key={runId} params={holdParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
+      ) : (
+        <Split key={runId} params={splitParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
       )
     return (
       <>
@@ -198,6 +221,14 @@ export function DevGames() {
             fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
           }}>
             seed {holdParams.seed} · charge {holdParams.charge.toFixed(2)} · intimacy {holdParams.intimacy.toFixed(2)}
+          </div>
+        )}
+        {active === 'split' && splitParams && (
+          <div style={{
+            position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, zIndex: 50,
+            fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+          }}>
+            seed {splitParams.seed} · "{splitParams.framing}"
           </div>
         )}
         <button

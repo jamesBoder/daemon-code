@@ -341,6 +341,49 @@ export const MG = {
     },
   },
 
+  // ── The Split — the negotiation table (features-phase1.md §5) ──────────────
+  // A one-shot ultimatum: divide a resource the other side can veto. MEDIUM
+  // liberty (§5d) — cold, transactional, mono; a single horizontal bar where the
+  // draggable divider is the only warm element, and a faint watching counterpart
+  // on the far side. The offer under the shadow of a veto is the signal, so the
+  // counterpart NEVER reacts to the value (a reaction would teach a threshold and
+  // make the disposition gameable). Commit is one irreversible press.
+  split: {
+    barMaxW:      440,   // px — bar max width on desktop
+    barHeight:    56,    // px — the resource bar height
+    handleW:      3,     // px — the divider's vertical line width
+    handleHitW:   32,    // px — invisible pointer/keyboard target width around the divider
+    keepMin:      0,     // you_keep floor (give it all away)
+    keepMax:      1,     // you_keep ceiling (take it all)
+    keyStep:      0.02,  // keyboard arrow increment (fraction of the bar)
+    startKeep:    0.5,   // divider opens at an even split — the neutral anchor
+    warm:         '234, 179, 100',   // the divider accent (a single warm ember against the cold table), rgb
+    keepFill:     'rgba(255, 255, 255, 0.10)', // your side of the bar (filled, cool)
+    getFill:      'rgba(255, 255, 255, 0.02)', // their side (near-empty)
+    dividerAlpha:     0.75, // the warm divider at rest
+    dividerLockAlpha: 0.95, // the warm divider once committed
+
+    // The watching other — a faint presence on the far side. AMBIENT only; its
+    // slow breath is jittered per night by the seed, never driven by your offer.
+    other: {
+      sizePx:       10,    // px — the presence dot diameter
+      insetPx:      10,    // px — gap from the bar's right (their) edge
+      restAlpha:    0.16,  // its baseline opacity
+      breathAlpha:  0.30,  // opacity at the top of its breath
+      breatheMs:    4200,  // one breath cycle (seed jitters ±jitter)
+      jitter:       0.22,  // seed jitter fraction on the breath period
+    },
+
+    // Commit — a single irreversible lock. The bar snaps still with a hard click;
+    // the offer is sent with no verdict, ever (we never fabricate an acceptance).
+    commit: {
+      lockMs:     140,  // the hard "click" — the divider settles into its locked state
+      sentMs:     900,  // the silent 'offered.' beat before the session advances
+      glowPx:     8,    // px — the locked divider's glow blur radius
+      glowAlpha:  0.5,  // the locked divider's glow opacity
+    },
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

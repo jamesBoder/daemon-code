@@ -510,11 +510,15 @@ var splitFramings = []string{
 	"The only one of its kind.",
 }
 
-// buildSplit stamps The Split — a one-shot ultimatum. The payload carries the
-// rotated framing and a per-night seed (the frontend jitters the watching
-// counterpart's presence from it, so the table is never identical). The offer
-// itself (you_keep, deliberation) is captured in response_data for a future
-// computeSplitSignals (Phase 2); nothing here reads the model at build time.
+// buildSplit stamps The Split — a one-shot ultimatum under a real veto. The
+// payload carries the rotated framing and a per-night seed. The frontend derives
+// two things from that seed: the watching counterpart's breath jitter, and its
+// hidden RESERVATION (the minimum share it will accept tonight) — so on commit the
+// other actually accepts or refuses the offer. The threshold is resolved
+// client-side and never surfaced; the seed lives in the stored deck, so a Phase 2
+// computeSplitSignals can recompute it to read overreach. response_data v:2
+// { you_keep, they_get, accepted, settle_ms, handle_moves } is captured now.
+// Nothing here reads the model at build time.
 func buildSplit(profile db.ShadowProfile) dynamo.Fragment {
 	_ = profile                                             // reserved for Phase 2 personalization; the framing is model-agnostic today
 	framing := splitFramings[rand.Intn(len(splitFramings))] // #nosec G404 — non-crypto content pick

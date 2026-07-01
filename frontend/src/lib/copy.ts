@@ -300,13 +300,17 @@ export const copy = {
   // ── The Split ─────────────────────────────────────────────────────────────
   // The negotiation table. Oblique — never "generous"/"fair"/"selfish" (naming
   // the axis coaches the answer). The framing itself is stamped by buildSplit;
-  // framingFallback covers the dev harness and any older/empty deck.
+  // framingFallback covers the dev harness and any older/empty deck. The veto is
+  // real: on commit the other decides, and the verdict is shown (but the
+  // threshold never is).
   split: {
     youKeep:         'you keep',
     theyGet:         'they get',
     veto:            'they can refuse. then it is gone.',
     commit:          'commit',
-    sent:            'offered.',                 // the silent commit beat — no verdict, ever
+    deciding:        'they decide.',             // the suspense beat after commit
+    accepted:        'accepted.',                // your offer stood
+    refused:         'refused. it is gone.',     // you reached too far; nobody gets it
     aria:            'how much of it you keep',
     framingFallback: 'Something worth having.',
   },

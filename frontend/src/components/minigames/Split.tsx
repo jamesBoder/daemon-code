@@ -8,25 +8,34 @@ import { playSound } from '../../lib/sound'
 import { MIN_TOUCH_TARGET } from '../../lib/constants'
 
 // The Split — a one-shot ultimatum (features-phase1.md §5). A single resource is
-// on the table; the user divides it with one draggable divider and commits once,
-// irreversibly. The other side can refuse — and then no one gets it. The offer
-// itself, made under the shadow of that veto, is the signal: fairness disposition
-// vs. strategic self-interest (agreeableness + locus_of_control), the game-theory
-// dimension nothing else in the deck touches.
+// on the table; the user divides it with one draggable divider and commits once.
+// The other side can refuse — and then no one gets it. The offer, made under that
+// REAL veto, is the signal: fairness disposition vs. strategic self-interest
+// (agreeableness + locus_of_control), the game-theory dimension nothing else in
+// the deck touches.
+//
+// The veto is not decorative: on commit the counterpart accepts iff their share
+// (1 - you_keep) meets a hidden RESERVATION drawn per night from the payload seed.
+// Reach too far and the offer is refused — the resource drains and is gone. The
+// threshold is never shown and varies nightly, and the counterpart is inert while
+// you set the offer (a live meter would leak the line), so the disposition stays
+// unsolvable (§5e). This — a real gamble against a person with a dramatic verdict —
+// is what separates it from WeightedScale's weightless self-positioning.
 //
 // MEDIUM-liberty design (§5d) — the negotiation table. Cold, transactional, mono;
-// the resource is one horizontal bar and the divider is the only warm element. A
-// faint watching counterpart sits on the far side. It is AMBIENT ONLY: it never
-// reacts to the current split, because a reaction would leak a threshold and make
-// the disposition gameable (the §5e "unsolvable game" principle). Deliberation
-// (handle_moves, settle_ms) is captured now for a future computeSplitSignals
-// (Phase 2).
+// the divider is the only warm element until acceptance seeps the daemon's indigo
+// presence in as the reward. Deliberation (handle_moves, settle_ms) and the
+// outcome are captured for a future computeSplitSignals (Phase 2).
 
 const S = MG.split
 const C = S.commit
 const O = S.other
+const V = S.veto
+
+type Verdict = 'accepted' | 'refused' | null
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+const round3 = (v: number) => Math.round(v * 1000) / 1000
 const num = (v: unknown, def: number) => (typeof v === 'number' && Number.isFinite(v) ? v : def)
 
 interface Props {
@@ -45,13 +54,19 @@ export function Split({ params, onComplete, forceMotion }: Props) {
   const framing = typeof params?.framing === 'string' && params.framing
     ? params.framing
     : copy.split.framingFallback
-  // Per-night jitter on the counterpart's breath, so the table is never identical.
-  const breatheMs = useMemo(() => {
+  // Everything the seed decides, drawn once: the counterpart's breath jitter and
+  // its hidden reservation (the minimum share it will accept tonight). Same seed →
+  // same "person," so a night is a fixed table; the seed varies nightly so the
+  // line can't be learned (§5e). Never surfaced to the player.
+  const { breatheMs, reservation } = useMemo(() => {
     const rng = seededRandom(num(params?.seed, 1) >>> 0)
-    return O.breatheMs * (1 + (rng() * 2 - 1) * O.jitter)
+    const breath = O.breatheMs * (1 + (rng() * 2 - 1) * O.jitter)
+    const r = V.rMin + rng() * (V.rMax - V.rMin)
+    return { breatheMs: breath, reservation: r }
   }, [params?.seed])
 
   const [committed, setCommitted] = useState(false)
+  const [verdict,   setVerdict]   = useState<Verdict>(null)
   const [ariaPct,   setAriaPct]   = useState(Math.round(S.startKeep * 100))
   const [dragMax,   setDragMax]   = useState(S.barMaxW / 2)
 
@@ -80,24 +95,29 @@ export function Split({ params, onComplete, forceMotion }: Props) {
     setDragMax(Math.floor(barRef.current.getBoundingClientRect().width / 2))
   }, [])
 
-  // Commit → compute the offer and hand back after the silent 'offered.' beat. In
-  // an effect so the timing read stays out of render (react-hooks/purity); the
+  // Commit → the other decides against its hidden reservation → reveal → hand back.
+  // In an effect so the timing read stays out of render (react-hooks/purity); the
   // clock is read one paint after the click, which is within a frame of it.
   useEffect(() => {
     if (!committed) return
     const now      = Date.now()
     const keep     = clamp01(keepMV.get())
+    const theyGet  = 1 - keep
+    const accepted = theyGet >= reservation // reach too far and it's refused
     const lastMove = lastMoveRef.current || mountRef.current
     const data = {
-      v: 1,
+      v: 2,
       ms: now - (mountRef.current || now),
-      you_keep: Math.round(keep * 1000) / 1000,
+      you_keep: round3(keep),
+      they_get: round3(theyGet),
+      accepted,
       settle_ms: now - lastMove,
       handle_moves: movesRef.current,
     }
-    const t = setTimeout(() => onCompleteRef.current(data), C.sentMs)
-    return () => clearTimeout(t)
-  }, [committed, keepMV])
+    const tReveal = setTimeout(() => setVerdict(accepted ? 'accepted' : 'refused'), C.considerMs)
+    const tDone   = setTimeout(() => onCompleteRef.current(data), C.considerMs + C.revealMs)
+    return () => { clearTimeout(tReveal); clearTimeout(tDone) }
+  }, [committed, keepMV, reservation])
 
   // Record one deliberate adjustment. keepForAria lets a caller pass the settled
   // target directly (a track-click animates the spring, so keepMV.get() would read
@@ -138,8 +158,14 @@ export function Split({ params, onComplete, forceMotion }: Props) {
     setCommitted(true) // the commit effect reads the offer + hands back
   }
 
-  const warm = (a: number) => `rgba(${S.warm}, ${a})`
-  const hitW = Math.max(S.handleHitW, MIN_TOUCH_TARGET)
+  const warm     = (a: number) => `rgba(${S.warm}, ${a})`
+  const presence = (a: number) => `rgba(${S.presence}, ${a})`
+  const hitW     = Math.max(S.handleHitW, MIN_TOUCH_TARGET)
+  const deciding = committed && verdict === null
+  // The divider goes warm-lock on commit, indigo on acceptance, cold on refusal.
+  const dividerBg = verdict === 'refused' ? 'rgba(255, 255, 255, 0.22)'
+    : verdict === 'accepted' ? presence(0.95)
+    : warm(committed ? S.dividerLockAlpha : S.dividerAlpha)
 
   return (
     <div style={{
@@ -164,27 +190,40 @@ export function Split({ params, onComplete, forceMotion }: Props) {
           onClick={handleBarClick}
           style={{
             position: 'relative', width: '100%', height: S.barHeight,
-            border: '1px solid var(--border-active)', borderRadius: 'var(--radius-sm)',
+            border: `1px solid ${verdict === 'accepted' ? presence(0.5) : 'var(--border-active)'}`,
+            borderRadius: 'var(--radius-sm)',
             background: S.getFill, overflow: 'hidden',
             cursor: committed ? 'default' : 'ew-resize',
+            // Acceptance seeps the daemon's presence into the resource (the reward);
+            // refusal leaves it cold as it drains.
+            boxShadow: verdict === 'accepted' ? `inset 0 0 ${C.acceptGlowPx}px ${presence(0.35)}` : 'none',
+            transition: reduced ? undefined : `box-shadow ${C.revealMs / 2}ms ease-out, border-color ${C.revealMs / 2}ms ease-out`,
           }}
         >
-          {/* your side — fills from the left as you keep more */}
+          {/* your side — fills from the left as you keep more; warms on acceptance,
+              drains to nothing on refusal (the resource is gone) */}
           <motion.div style={{
             position: 'absolute', inset: 0, transformOrigin: '0% 50%',
-            scaleX: fillSX, background: S.keepFill, pointerEvents: 'none',
+            scaleX: fillSX, background: verdict === 'accepted' ? presence(0.16) : S.keepFill,
+            opacity: verdict === 'refused' ? 0 : 1, pointerEvents: 'none',
+            transition: reduced ? undefined : `background ${C.revealMs / 2}ms ease-out, opacity ${C.drainMs}ms ease-in`,
           }} />
 
-          {/* the watching other — ambient, on their side; never reacts to the offer */}
+          {/* the watching other — ambient breath while you decide; it leans in to
+              judge on commit (indigo if it accepts, fading out if it refuses) */}
           <motion.div
             aria-hidden="true"
-            animate={reduced ? {} : { opacity: [O.restAlpha, O.breathAlpha, O.restAlpha] }}
-            transition={reduced ? undefined : { duration: breatheMs / 1000, repeat: Infinity, ease: 'easeInOut' }}
+            animate={reduced ? {} : deciding ? { opacity: O.decideAlpha } : committed ? {} : { opacity: [O.restAlpha, O.breathAlpha, O.restAlpha] }}
+            transition={reduced ? undefined : deciding ? { duration: C.considerMs / 1000, ease: 'easeOut' } : { duration: breatheMs / 1000, repeat: Infinity, ease: 'easeInOut' }}
             style={{
               position: 'absolute', top: '50%', right: O.insetPx, marginTop: -O.sizePx / 2,
               width: O.sizePx, height: O.sizePx, borderRadius: '50%',
-              background: 'var(--text-secondary)', pointerEvents: 'none',
-              opacity: reduced ? O.restAlpha : undefined,
+              background: verdict === 'accepted' ? presence(1) : 'var(--text-secondary)',
+              boxShadow: !reduced && (deciding || verdict === 'accepted')
+                ? `0 0 ${O.decidePx}px ${verdict === 'accepted' ? presence(0.7) : 'var(--text-secondary)'}` : 'none',
+              opacity: verdict === 'refused' ? 0 : reduced ? (committed ? O.decideAlpha : O.restAlpha) : undefined,
+              pointerEvents: 'none',
+              transition: reduced ? undefined : `opacity ${C.considerMs}ms ease-out, background ${C.considerMs}ms ease-out`,
             }}
           />
 
@@ -212,13 +251,14 @@ export function Split({ params, onComplete, forceMotion }: Props) {
               background: 'transparent',
             }}
           >
-            {/* the divider line — settles into its locked state on commit (a hard
-                click; the color/glow snap is instant under reduced motion) */}
+            {/* the divider line — locks warm on commit (a hard click), then takes
+                the verdict's colour: indigo on accept, cold on refuse */}
             <div
               style={{
                 width: S.handleW, height: '100%',
-                background: warm(committed ? S.dividerLockAlpha : S.dividerAlpha),
-                boxShadow: committed ? `0 0 ${C.glowPx}px ${warm(C.glowAlpha)}` : 'none',
+                background: dividerBg,
+                boxShadow: verdict === 'accepted' ? `0 0 ${C.glowPx}px ${presence(C.glowAlpha)}`
+                  : committed && verdict === null ? `0 0 ${C.glowPx}px ${warm(C.glowAlpha)}` : 'none',
                 transition: reduced ? undefined : `background ${C.lockMs}ms ease-out, box-shadow ${C.lockMs}ms ease-out`,
               }}
             />
@@ -236,15 +276,19 @@ export function Split({ params, onComplete, forceMotion }: Props) {
         </div>
       </div>
 
-      {/* the veto (or, once locked, the silent 'offered.' beat — never a verdict) */}
+      {/* the veto → the suspense beat → the verdict (the threshold is never shown) */}
       <div style={{ minHeight: 'var(--space-6)', display: 'flex', alignItems: 'center' }} aria-live="polite">
         <p style={{
           fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-          color: committed ? 'var(--text-secondary)' : 'var(--text-muted)',
+          color: verdict === 'accepted' ? presence(0.95)
+            : verdict === 'refused' ? 'var(--text-secondary)'
+            : committed ? 'var(--text-secondary)' : 'var(--text-muted)',
           letterSpacing: '0.06em', textAlign: 'center',
           transition: reduced ? undefined : 'color 0.3s',
         }}>
-          {committed ? copy.split.sent : copy.split.veto}
+          {verdict === 'accepted' ? copy.split.accepted
+            : verdict === 'refused' ? copy.split.refused
+            : committed ? copy.split.deciding : copy.split.veto}
         </p>
       </div>
 

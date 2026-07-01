@@ -226,6 +226,121 @@ export const MG = {
     wordMaxVw:     '94vw', // word never exceeds this width
   },
 
+  // ── The Hold (radical emptiness — wait, no instruction) ───────────────────
+  // The one fragment with no task and no content. The read is how the user
+  // behaves in nothing — patience vs. the compulsion to act. Full-liberty design
+  // (§5d): the emptiness IS the design. Its identity is ACHROMATIC — where every
+  // other game leans on indigo (or Stroop red/blue, Trap amber), the Hold drains
+  // all colour to a cold near-white. Colour is the reward: the daemon's indigo
+  // presence seeps in only as the user remains. Sized in vmin so it scales on any
+  // device.
+  hold: {
+    bg:              'var(--background)', // the void (the app's base)
+    ink:             '226, 232, 240',    // cold desaturated white — the void's colourless light (rgb triplet for rgba())
+    minDwellMs:      4000,   // the release affordance stays hidden until now — the opening is pure stillness
+    maxMs:           30000,  // the daemon lets you go here (auto-complete; never a softlock); also the full-presence horizon
+
+    // Breath ring — a thin pacer, not a glowing blob. The single resting element.
+    ringSize:        'min(34vmin, 280px)', // scales with the device, clamped on tablets
+    ringBorderPx:    1.5,
+    ringRestAlpha:   0.15,   // ring border opacity at the start (barely there)
+    ringFullAlpha:   0.5,    // …once fully held (the reward for remaining)
+    innerFillAlpha:  0.05,   // barely-there inner wash inside the ring
+    breatheScaleMin: 0.8,    // ring contracts to this (exhale)
+    breatheScaleMax: 1.0,    // …and expands to this (inhale)
+    breatheMs:       6000,   // one slow, calm breath at the start
+    breatheMsDeep:   9000,   // …lengthening to this at full dwell (co-regulation — the daemon slows you down)
+
+    // Grain — the signature noise overlay (--grain-opacity) becomes a material.
+    // Stillness CLEARS the void (the inverse of Stroop, which muddies it under
+    // pressure); a restless tap surges it, then it settles again.
+    grainRest:       0.025,  // matches index.css resting grain
+    grainClear:      0.008,  // settled at full dwell (the noise quiets)
+    grainSurge:      0.05,   // added on a restless tap, decays over recoilMs
+    grainEpsilon:    0.001,  // min change before re-writing the global grain var (throttles full-screen repaints)
+
+    // Presence — the daemon's indigo seeps into the colourless void as you remain.
+    presenceSize:    'min(26vmin, 200px)',
+    presenceMaxAlpha: 0.45,  // indigo core opacity at full dwell
+
+    // The void's slow heartbeat — two faint rings emanating outward (motion only).
+    emanateSize:     'min(20vmin, 150px)',
+    emanateDurMs:    6400,   // one emanation's full expand + fade
+    emanateMaxScale: 5,      // final scale before it dissolves
+    emanateAlpha:    0.12,   // peak opacity of an emanating ring
+
+    // A restless tap: the ring recoils inward, then settles (motion only — reduced
+    // motion just counts the tap). The void pulling back from impatience.
+    recoilScale:     0.72,   // ring snaps to this fraction on a restless tap
+    recoilMs:        440,    // …and eases back over this
+
+    // Release — a wide, light, lowercase exhale in the display serif (NOT the mono
+    // chrome every other game uses). It fades in slowly; there is no urgency.
+    releaseAlpha:    0.4,
+    releaseFadeS:    1.4,
+    releaseTracking: '0.5em',
+    fadeS:           0.9,    // s — whole-screen reveal
+
+    // Dynamism — the void is never the same room twice, and it's tuned to the
+    // daemon's read of the user. The backend stamps a per-night `seed` plus
+    // `charge` (neuroticism) and `intimacy` (relationship depth); these ranges
+    // map them onto the void. The within-session reward is STILLNESS-driven (it
+    // climbs while calm, regresses on restless taps) so it can't be rehearsed.
+    dyn: {
+      seedJitter:       0.15,  // ± fraction the seed applies to breath pace + ring size
+      minDwellJitter:   0.25,  // ± fraction on the release-reveal time
+      maxJitter:        0.2,   // ± fraction on the auto-complete time
+      emanationMin:     1,     // fewest sonar rings
+      emanationMax:     3,     // most sonar rings
+      chargeBreathCut:  0.25,  // higher charge shortens the breath by up to this fraction (a more active void)
+      chargeGrainAdd:   0.015, // higher charge raises the resting grain by up to this
+      intimacyDwellCut: 0.4,   // higher intimacy shortens the release-reveal by up to this fraction
+      intimacyClearAdd: 0.004, // higher intimacy deepens the grain clear by up to this (a lower floor)
+      intimacyPresence: 0.2,   // higher intimacy adds up to this to the presence reward
+      restlessRegress:  1.6,   // stillness-progress falls this× as fast as it climbs while a tap settles
+    },
+
+    // The probing void (§5e — the unsolvable game). The void is not passive: at
+    // intervals it OFFERS the exit harder (temptation) and TESTS your stillness
+    // with a faint drifting stimulus (reactivity probe), and it ADAPTS — the more
+    // composed you read, the harder it tempts (is the stillness real?). Resisting
+    // an offered exit takes you deeper. No task, no right answer — the read is what
+    // you do when nothing is asked and the way out keeps presenting itself.
+    probe: {
+      temptFirstMs:      7000,  // first event after the pure-stillness opening
+      gapMs:             9000,  // base gap between events (seed-jittered)
+      gapJitter:         0.3,   // ± fraction on the gap
+      windowMs:          2800,  // how long a temptation / probe window stays up
+      temptReleaseGain:  0.5,   // release opacity added at a temptation's peak (the exit beckons)
+      temptPullPx:       10,    // the ring drifts this far toward the exit at peak (a soft pull out)
+
+      moteSizePx:        6,     // the drifting probe stimulus
+      moteAlpha:         0.5,   // its peak opacity (× the void ink)
+      moteTravelVmin:    64,    // how far it drifts across the void
+
+      // Adaptive composure (the §5e #4 counter): resisting temptations + ignoring
+      // probes raises composure → the void escalates (temptations bite harder).
+      // Reacting lowers it. The daemon tests whether the stillness is real.
+      composureStart:    0.5,
+      composureResist:   0.18,  // per temptation resisted (raises)
+      composureReact:    0.22,  // per reactive tap during a probe (lowers)
+      composureRestless: 0.08,  // per restless tap with no probe up (lowers)
+      escalation:        0.6,   // max fractional boost to temptation intensity at full composure
+
+      depthBoost:        0.12,  // each resisted temptation adds this to the visual reward (going deeper is felt)
+    },
+
+    // The exit as a deliberate act — leaving stillness shouldn't be a reflex.
+    // Press-and-HOLD 'release' to actually leave; a reach that doesn't commit
+    // reads as ambivalence. On commit (or the cap) the void exhales you out
+    // rather than cutting.
+    exit: {
+      holdMs:    650,  // press-and-hold duration on 'release' to commit to leaving
+      fillAlpha: 0.6,  // the commit-fill indicator opacity (× the void ink)
+      closeMs:   480,  // the void's exhale before it hands back to the session (reduced-motion skips)
+    },
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

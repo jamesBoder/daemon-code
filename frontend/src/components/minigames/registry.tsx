@@ -8,6 +8,7 @@ import { TrapGame } from './TrapGame'
 import type { TrapChoice } from './TrapGame'
 import { Stroop } from './Stroop'
 import type { StroopItem } from './Stroop'
+import { Hold } from './Hold'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -57,6 +58,11 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
       items={raw.items as StroopItem[]}
       onComplete={onComplete}
     />
+  ),
+  hold: ({ raw, onComplete }) => (
+    // The void is personalized: buildHold stamps { seed, charge, intimacy } so it
+    // is never the same room twice and never identical between users.
+    <Hold params={raw} onComplete={onComplete} />
   ),
   trap: ({ raw, onComplete }) => (
     <TrapGame

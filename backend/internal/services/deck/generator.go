@@ -34,6 +34,16 @@ const (
 	// not optimism). On a trap night it's chosen 1-in-3 over a choice-trap.
 	trapOverconfidenceMinCompiles = 21
 	overconfidenceSliderMax       = 12 // slider runs 1..max; well above the ~5–6 a deck actually holds
+
+	// The Hold — the one fragment with no task or content: a void that reads
+	// patience vs. the compulsion to act. Content-free, so it can unlock earlier
+	// than the Trap, but it stays occasional (the daemon earns the right to ask
+	// for nothing) and never shares a night with a trap. On an eligible night it
+	// replaces one scale so the deck length holds.
+	holdMinCompiles  = 7
+	holdOdds         = 4   // 1-in-this chance on an eligible (non-trap) night
+	holdIntimacyFull = 30  // compiles at which the daemon settles a familiar user fully (intimacy = 1)
+	holdNeutralScore = 0.5 // dimension fallback before the model has a read (Day 0)
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -152,12 +162,27 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 		}
 	}
 
+	// The Hold — a contemplative empty beat. Only on a night with no trap (the two
+	// are tonally opposite and shouldn't crowd one session), occasional past its
+	// unlock, and it replaces one scale so the deck length holds.
+	var hold *dynamo.Fragment
+	if trap == nil && overconf == nil && int(profile.CompileCount) >= holdMinCompiles && rand.Intn(holdOdds) == 0 { // #nosec G404 — non-crypto game selection
+		hf := buildHold(profile)
+		hold = &hf
+		if nScales > 1 {
+			nScales--
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
 	}
 	if trap != nil {
 		middle = append(middle, *trap)
+	}
+	if hold != nil {
+		middle = append(middle, *hold)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -421,6 +446,66 @@ func buildOverconfidenceTrap() dynamo.Fragment {
 		Payload:    string(payload),
 		DaemonNote: "The daemon will compare this to what you actually do.",
 	}
+}
+
+// buildHold stamps The Hold — the one fragment with no task and no content. The
+// void is personalized so it's never the same room twice and never identical
+// between users: `seed` (per night) drives the frontend's visual + timing
+// variation; `charge` (the daemon's neuroticism read) makes a more anxious
+// model's void more active with a deeper reward for settling it; `intimacy` (how
+// long the relationship has run) lets the daemon settle a familiar user sooner.
+// The frontend Hold maps these onto its own MG.hold ranges; response_data (dwell,
+// restlessness) is captured now for a future computeHoldSignals (Phase 2). The
+// DaemonNote is deliberately empty — a note would render over the void and break
+// the radical-emptiness design (SessionContainer paints daemon_note at the foot).
+func buildHold(profile db.ShadowProfile) dynamo.Fragment {
+	charge := dimensionScore(profile.ProfileDimensions, "neuroticism", holdNeutralScore)
+	intimacy := clamp01(float64(profile.CompileCount) / holdIntimacyFull)
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":     "hold",
+		"seed":     rand.Int63(), // #nosec G404 — non-crypto visual seed
+		"charge":   round3(charge),
+		"intimacy": round3(intimacy),
+	})
+	return dynamo.Fragment{
+		ID:      uuid.New().String(),
+		Type:    "hold",
+		Payload: string(payload),
+	}
+}
+
+// dimensionScore pulls one behavioral dimension's score (0..1) from the profile
+// JSONB, returning def when the model is absent (Day 0) or that dimension is
+// unset. Extra stored fields (confidence, n, last_delta) are ignored.
+func dimensionScore(raw []byte, name string, def float64) float64 {
+	if len(raw) == 0 {
+		return def
+	}
+	var dims map[string]struct {
+		Score float64 `json:"score"`
+	}
+	if err := json.Unmarshal(raw, &dims); err != nil {
+		return def
+	}
+	if d, ok := dims[name]; ok {
+		return d.Score
+	}
+	return def
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+// round3 trims a 0..1 score to three decimals so the stamped payload stays tidy.
+func round3(v float64) float64 {
+	return float64(int(v*1000+0.5)) / 1000
 }
 
 // clampStake bounds the decoded count into the legible, still-biting stake band.

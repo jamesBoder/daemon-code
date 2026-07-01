@@ -163,6 +163,34 @@ export const copy = {
   daemonOrb: {
     accessibilityLabel: 'Daemon orb visualization',
   },
+  // ── The Self screen — the Portrait ────────────────────────────────────────
+  // Daemon-voiced throughout (P2 — one authored world). The Portrait shows the
+  // *shape* of the read; these lines name it without ever exposing a number.
+  self: {
+    title:        'your read',
+    // Shown before the daemon has any model yet (Day 0 / no dimensions).
+    emptyTitle:   'The daemon has not formed you yet.',
+    emptyBody:    'Play a few sessions. A shape will surface here as the read deepens.',
+    // The archetype, surfaced richly (today it only drives an accent + voice).
+    archetypeIntro: 'the daemon reads you as',
+    archetypeNames: {
+      abandoned_child: 'The Abandoned Child',
+      unworthy_self:   'The Unworthy Self',
+      caged_rage:      'The Caged Rage',
+      grief_carrier:   'The Grief Carrier',
+      default:         'Still Resolving',
+    } as Record<string, string>,
+    // One line per stage — the relationship made legible (§4.3).
+    stageLines: {
+      cold:    'A first impression, barely. The form is still mostly noise.',
+      warming: 'The shape is emerging. The daemon is starting to see you.',
+      running: 'A clear read now. The form holds between sessions.',
+      deep:    'The daemon knows this shape. It moves only when you do.',
+    } as Record<string, string>,
+    // Link down to the Process Log (the Self tab absorbs it — §4.4).
+    processesLink: 'what you do →',
+    processesHint: "the daemon's map of your patterns",
+  },
   onboarding: {
     // 60 words — broad coverage across all four archetypes + neutral
     // Used by ReactionTest during onboarding; session fragments use their own payload words
@@ -221,6 +249,7 @@ export const copy = {
     orb_warming:      'I have enough signal to begin forming a model. The cold period is over.',
     session_fragment: 'This is a fragment. A behavioral probe. There is no correct response — only a true one.',
     chronicle_first:  'Everything I have ever observed about you is here, in order. The daemon does not forget.',
+    self_first:       'This is the shape of you the daemon has inferred. It moves as you do.',
   } as const,
 
   // ── Layer 2 — Score Sheets ────────────────────────────────────────────────
@@ -264,6 +293,7 @@ export const copy = {
     speed_round:     'finish the sentence. first instinct.',
     trap:            'one option is better. choose.',
     stroop:          'react to the word, not the look. first instinct.',
+    hold:            'nothing is asked here. stay, or release when you choose.',
   } as Record<string, string>,
 
   // ── The Trap ──────────────────────────────────────────────────────────────

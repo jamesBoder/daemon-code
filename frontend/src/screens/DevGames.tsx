@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Stroop } from '../components/minigames/Stroop'
 import type { StroopItem, StroopCue } from '../components/minigames/Stroop'
+import { Hold } from '../components/minigames/Hold'
 import { copy } from '../lib/copy'
 import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
 
@@ -98,10 +99,17 @@ function buildDeck(): StroopItem[] {
   return [...lead, ...rest]
 }
 
-type GameKey = 'stroop'
+// The Hold's per-night payload, randomized per run (the real deck-builder stamps
+// these nightly). Module-level so the impure rng stays out of component render.
+function randomHoldParams() {
+  return { seed: Math.floor(Math.random() * 2 ** 31), charge: Math.random(), intimacy: Math.random() }
+}
+
+type GameKey = 'stroop' | 'hold'
 
 const GAMES: { key: GameKey; label: string }[] = [
   { key: 'stroop', label: 'The Stroop Variant' },
+  { key: 'hold',   label: 'The Hold' },
 ]
 
 type Phase = 'menu' | 'context' | 'game'
@@ -112,6 +120,9 @@ export function DevGames() {
   const [result,  setResult]  = useState<unknown>(null)
   const [runId,   setRunId]   = useState(0) // remount the game on replay
   const [deck,    setDeck]    = useState<StroopItem[]>(buildDeck) // rebuilt per run
+  // The Hold's per-night payload, randomized each run so the seed/charge/intimacy
+  // personalization can be felt (the real deck-builder stamps these nightly).
+  const [holdParams, setHoldParams] = useState<{ seed: number; charge: number; intimacy: number } | null>(null)
   // Force motion on regardless of the OS prefers-reduced-motion setting, so the
   // full experience can be evaluated even on a reduced-motion dev machine.
   const [forceMotion, setForceMotion] = useState(true)
@@ -126,6 +137,7 @@ export function DevGames() {
   function start(key: GameKey) {
     setResult(null)
     setDeck(buildDeck())
+    if (key === 'hold') setHoldParams(randomHoldParams())
     setRunId(n => n + 1)
     setActive(key)
     setPhase('context')
@@ -170,10 +182,24 @@ export function DevGames() {
     )
   }
 
-  if (phase === 'game' && active === 'stroop') {
+  if (phase === 'game' && active) {
+    const game =
+      active === 'stroop' ? (
+        <Stroop key={runId} items={deck} onComplete={handleComplete} forceMotion={forceMotion} />
+      ) : (
+        <Hold key={runId} params={holdParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
+      )
     return (
       <>
-        <Stroop key={runId} items={deck} onComplete={handleComplete} forceMotion={forceMotion} />
+        {game}
+        {active === 'hold' && holdParams && (
+          <div style={{
+            position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, zIndex: 50,
+            fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+          }}>
+            seed {holdParams.seed} · charge {holdParams.charge.toFixed(2)} · intimacy {holdParams.intimacy.toFixed(2)}
+          </div>
+        )}
         <button
           onClick={exitToMenu}
           style={{

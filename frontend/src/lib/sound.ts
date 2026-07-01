@@ -47,6 +47,23 @@ const SOUND = {
   filterRangeHz: 3800,  // cutoff = filterMinHz + confidence * filterRangeHz
   filterRampS:  3.0,    // glide time when confidence changes (roadmap: 3.0s)
   filterQ:      1.2,
+
+  // The Hold's own tone — a fragment-scoped low pad (NOT the global ambient bed),
+  // started and stopped by the void itself. A felt, calm fundamental + a soft
+  // fifth; its level and low-pass cutoff open as the user settles (the lantern
+  // metaphor made audible — stillness clarifies the sound, like the grain clears).
+  hold: {
+    rootHz:        52,    // a low, felt fundamental
+    fifthHz:       78,    // a soft fifth above → an open, calm interval
+    detuneCents:   6,     // slight detune → a living shimmer
+    type:          'triangle' as OscillatorType,
+    level:         0.06,  // peak gain at full stillness (very low — felt, not heard)
+    fadeS:         2.5,   // start / stop ramp
+    cutoffMinHz:   180,   // low-pass cutoff at zero stillness (muffled)
+    cutoffRangeHz: 1600,  // …opens this much as you settle
+    rampS:         0.4,   // glide for level / cutoff updates
+    releaseHz:     196,   // a soft exhale tone on commit (G3)
+  },
 } as const
 
 // ── Shared context (lazy, gesture-bootstrapped) ───────────────────────────────
@@ -221,4 +238,82 @@ export function stopAmbient() {
     osc1.stop(); osc2.stop()
   }
   ambient = null
+}
+
+// ── The Hold's fragment-scoped tone ───────────────────────────────────────────
+
+let holdTone: { osc1: OscillatorNode; osc2: OscillatorNode; filter: BiquadFilterNode; gain: GainNode } | null = null
+
+/** Start the Hold's low pad (idempotent). No-ops unless sound is enabled. Level
+ *  and cutoff start muffled; setHoldTone opens them as the user settles. */
+export function startHoldTone() {
+  if (!isSoundEnabled() || holdTone) return
+  const c = audio()
+  if (!c) return
+  const t = c.currentTime
+  const H = SOUND.hold
+
+  const filter = c.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.setValueAtTime(H.cutoffMinHz, t)
+  filter.Q.value = SOUND.filterQ
+
+  const gain = c.createGain()
+  gain.gain.setValueAtTime(SOUND.silenceFloor, t) // setHoldTone ramps this with stillness
+
+  const osc1 = c.createOscillator()
+  const osc2 = c.createOscillator()
+  osc1.type = osc2.type = H.type
+  osc1.frequency.setValueAtTime(H.rootHz, t)
+  osc2.frequency.setValueAtTime(H.fifthHz, t)
+  osc2.detune.setValueAtTime(H.detuneCents, t) // slow shimmer against osc1
+
+  osc1.connect(filter)
+  osc2.connect(filter)
+  filter.connect(gain).connect(c.destination)
+  osc1.start(t)
+  osc2.start(t)
+
+  holdTone = { osc1, osc2, filter, gain }
+}
+
+/** Drive the Hold tone from stillness (0..1): louder + brighter as you settle. */
+export function setHoldTone(stillness: number) {
+  if (!holdTone) return
+  const c = audio()
+  if (!c) return
+  const H = SOUND.hold
+  const t = c.currentTime
+  const s = Math.max(0, Math.min(1, stillness))
+  const level = Math.max(SOUND.silenceFloor, H.level * s)
+  holdTone.gain.gain.cancelScheduledValues(t)
+  holdTone.gain.gain.setValueAtTime(Math.max(holdTone.gain.gain.value, SOUND.silenceFloor), t)
+  holdTone.gain.gain.exponentialRampToValueAtTime(level, t + H.rampS)
+  holdTone.filter.frequency.exponentialRampToValueAtTime(H.cutoffMinHz + s * H.cutoffRangeHz, t + H.rampS)
+}
+
+/** A soft exhale tone when the user commits to leaving. No-ops unless enabled. */
+export function playHoldRelease() {
+  if (!isSoundEnabled()) return
+  const c = audio()
+  if (!c) return
+  ping(c, SOUND.hold.releaseHz, SOUND.hold.type, SOUND.hold.fadeS * 0.2, SOUND.uiLevel * 0.5, c.currentTime)
+}
+
+/** Fade out and tear down the Hold tone. */
+export function stopHoldTone() {
+  if (!holdTone) return
+  const c = audio()
+  const { osc1, osc2, gain } = holdTone
+  if (c) {
+    const t = c.currentTime
+    gain.gain.cancelScheduledValues(t)
+    gain.gain.setValueAtTime(Math.max(gain.gain.value, SOUND.silenceFloor), t)
+    gain.gain.exponentialRampToValueAtTime(SOUND.silenceFloor, t + SOUND.hold.fadeS)
+    osc1.stop(t + SOUND.hold.fadeS + SOUND.stopTailS)
+    osc2.stop(t + SOUND.hold.fadeS + SOUND.stopTailS)
+  } else {
+    osc1.stop(); osc2.stop()
+  }
+  holdTone = null
 }

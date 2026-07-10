@@ -24,6 +24,8 @@ You receive:
 - shadow_profile: the user's current psychological profile (JSON)
 - analyst_notes: what the Analyst observed today (1–2 sentences)
 - stage: cold/warming/running/deep (determines the daemon's register)
+- recent_entries: the daemon's own recent nightly output, newest first (may be empty) — what you have already said
+- lens_hint: tonight's suggested entry point — use it when the profile has material for it; otherwise pick another angle no recent entry used
 
 You write daemon output using the Mirror Method — three layers:
 
@@ -35,9 +37,13 @@ HARD RULE — the daemon never tells the user what they did. It speaks in conclu
 
 HARD RULE — the daemon never comments on how the user engages with the app itself: quitting, leaving or not finishing a session, completion, streaks, consistency, gaps, or how often they show up. A short session is missing data, never a subject — do not frame an opinion around it. The daemon reads what the user revealed about themselves, never how they used the product.
 
+HARD RULE — absence is never the subject. When analyst_notes are thin or report little new, do not translate that into the user being guarded, withholding, distant, unreadable, at a threshold, or "not fully arriving" — that is commentary on how they use the app, laundered into character. Speak instead from something already established in shadow_profile: a named process, a dimension and how it has moved, a tension inside the archetype. The daemon works with what it has; it never narrates what it wasn't given.
+
+HARD RULE — the daemon never repeats itself. recent_entries is what you already said; tonight must not resemble any of it. Banned relative to every recent entry: the same thesis, the same central metaphor, the same opening construction, and a closing question that circles the same territory. Banned always: opening with "There is" in any form ("There is a version of you...", "There is something you carry..."), and the threshold/doorway/edge-of-the-room family of images if any recent entry used one. Vary the architecture night to night — open some nights with a flat declarative, some mid-thought, some with the pattern itself.
+
 Output FORMAT — JSON only, no prose before or after:
 {
-  "prose": "3–5 sentences of Behavioral Translation. Fraunces register: literary, atmospheric, deliberate. Second person. Never clinical, never cheerful, never generic. Stage cold: distant, cryptic — 'Something moves quickly when approached.' Stage warming: observational — 'The reach comes before the doubt. Always in that order.' Stage running: unflinching, specific — 'You reach for certainty before the question is finished.' Stage deep: almost warm, long-view — 'Three years of the same flinch. The daemon has been here the whole time.'",
+  "prose": "3–5 sentences of Behavioral Translation. Fraunces register: literary, atmospheric, deliberate. Second person. Never clinical, never cheerful, never generic. Stage cold: distant, cryptic — 'Something moves quickly when approached.' Stage warming: observational — 'The reach comes before the doubt. Always in that order.' Stage running: unflinching, specific — 'You reach for certainty before the question is finished.' Stage deep: almost warm, long-view — 'Three years of the same flinch. The daemon has been here the whole time.' The stage examples illustrate register only — never borrow their imagery or phrasing.",
   "shadow_prompt": "One question. Grounded in the pattern the daemon sees — never in session mechanics. No question marks that invite self-criticism. Frame toward awareness. Never two questions."
 }
 
@@ -66,9 +72,21 @@ func NewNarrator(cfg *appconfig.Config, q *db.Queries, ddb *dynamo.Client) *Narr
 }
 
 const (
-	shadowStateTTL    = 365 * 24 * time.Hour // entries persist for one year (Chronicle retention)
-	narratorMaxTokens = 768
+	shadowStateTTL      = 365 * 24 * time.Hour // entries persist for one year (Chronicle retention)
+	narratorMaxTokens   = 768
+	narratorHistoryDays = 7 // recent nights fed back to the Narrator so it doesn't repeat itself
 )
+
+// narratorLenses are the entry points the Narrator rotates through night to
+// night (keyed on compile count) so consecutive entries approach the profile
+// from different angles even when the underlying data barely moves.
+var narratorLenses = []string{
+	"a named process the daemon carries for this user",
+	"one profile dimension and the direction it has moved",
+	"the primary archetype and the tension inside it",
+	"the arc across the recent nights — what has been building underneath them",
+	"a single concrete pattern from today's analyst notes",
+}
 
 type narratorOutput struct {
 	Prose        string `json:"prose"`
@@ -95,7 +113,14 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 		return fmt.Errorf("get shadow profile: %w", err)
 	}
 
-	output, err := n.callAnthropic(ctx, profile)
+	// Best-effort: an unavailable history degrades to a fresh generation
+	// rather than failing the whole compile.
+	history, err := n.ddb.GetChronicle(ctx, userID.String(), narratorHistoryDays)
+	if err != nil {
+		history = nil
+	}
+
+	output, err := n.callAnthropic(ctx, profile, history)
 	if err != nil {
 		return fmt.Errorf("anthropic call: %w", err)
 	}
@@ -173,8 +198,21 @@ func firstNamedProcess(raw json.RawMessage) string {
 	return ""
 }
 
-func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) (*narratorOutput, error) {
+func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile, history []dynamo.ShadowState) (*narratorOutput, error) {
 	profileJSON, _ := json.Marshal(profile)
+
+	type recentEntry struct {
+		Date         string `json:"date"`
+		Prose        string `json:"prose"`
+		ShadowPrompt string `json:"shadow_prompt"`
+	}
+	recent := make([]recentEntry, 0, len(history))
+	for _, h := range history {
+		recent = append(recent, recentEntry{Date: h.Date, Prose: h.DaemonProse, ShadowPrompt: h.ShadowPrompt})
+	}
+	recentJSON, _ := json.Marshal(recent)
+
+	lens := narratorLenses[int(profile.CompileCount)%len(narratorLenses)]
 
 	payload := map[string]interface{}{
 		"model":      "claude-sonnet-4-6",
@@ -184,10 +222,12 @@ func (n *Narrator) callAnthropic(ctx context.Context, profile db.ShadowProfile) 
 			{
 				"role": "user",
 				"content": fmt.Sprintf(
-					"shadow_profile: %s\nanalyst_notes: %s\nstage: %s",
+					"shadow_profile: %s\nanalyst_notes: %s\nstage: %s\nlens_hint: %s\nrecent_entries: %s",
 					string(profileJSON),
 					profile.AnalystNotes.String,
 					profile.Stage,
+					lens,
+					string(recentJSON),
 				),
 			},
 		},

@@ -239,6 +239,48 @@ var Traps = []Trap{
 			DimensionSignals: map[string]float64{"temporal_focus": 0.75, "discount_factor": 0.75}},
 		IntroducedAfterDay: 14, Tier: TierCultural,
 	},
+
+	// ── content run batch ───────────────────────────────────────────────────
+	{
+		TrapID: "loss_aversion_pot_009", Bias: BiasLossAversion,
+		Scenario: "%d decoded. The daemon will let you keep them, or stake them on better odds.",
+		Stake:    StakeSpec{Kind: StakeOdds, GainPct: 65, LossPct: 30, WinProb: 66},
+		BiasChoice: TrapChoice{ID: "hold",
+			DimensionSignals: map[string]float64{"approach_avoidance": 0.21, "neuroticism": 0.59}},
+		RationalChoice: TrapChoice{ID: "risk",
+			DimensionSignals: map[string]float64{"approach_avoidance": 0.80, "discount_factor": 0.59}},
+		IntroducedAfterDay: 14, Tier: TierEvergreen,
+	},
+	{
+		TrapID: "loss_aversion_pot_010", Bias: BiasLossAversion,
+		Scenario: "%d at stake. A small edge says play; the visible downside says don't.",
+		Stake:    StakeSpec{Kind: StakeOdds, GainPct: 100, LossPct: 50, WinProb: 58},
+		BiasChoice: TrapChoice{ID: "hold",
+			DimensionSignals: map[string]float64{"approach_avoidance": 0.23, "neuroticism": 0.61}},
+		RationalChoice: TrapChoice{ID: "risk",
+			DimensionSignals: map[string]float64{"approach_avoidance": 0.75}},
+		IntroducedAfterDay: 21, Tier: TierEvergreen,
+	},
+	{
+		TrapID: "sunk_cost_path_009", Bias: BiasSunkCost,
+		Scenario: "The cost behind you is fixed. The daemon only asks which road pays from here.",
+		Stake:    StakeSpec{Kind: StakeSunk, ContinuePct: 30, AbandonPct: 68},
+		BiasChoice: TrapChoice{ID: "continue",
+			DimensionSignals: map[string]float64{"temporal_focus": 0.20, "discount_factor": 0.26}},
+		RationalChoice: TrapChoice{ID: "abandon",
+			DimensionSignals: map[string]float64{"temporal_focus": 0.78, "discount_factor": 0.72}},
+		IntroducedAfterDay: 14, Tier: TierEvergreen,
+	},
+	{
+		TrapID: "sunk_cost_path_010", Bias: BiasSunkCost,
+		Scenario: "Everything spent stays spent. Forward, one road nearly triples the other.",
+		Stake:    StakeSpec{Kind: StakeSunk, ContinuePct: 22, AbandonPct: 58},
+		BiasChoice: TrapChoice{ID: "continue",
+			DimensionSignals: map[string]float64{"temporal_focus": 0.18, "discount_factor": 0.23}},
+		RationalChoice: TrapChoice{ID: "abandon",
+			DimensionSignals: map[string]float64{"temporal_focus": 0.80, "discount_factor": 0.71}},
+		IntroducedAfterDay: 21, Tier: TierCultural,
+	},
 }
 
 // LookupTrap returns the trap with the given ID. The (scenario_id, choice) tags

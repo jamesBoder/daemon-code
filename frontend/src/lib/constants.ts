@@ -116,13 +116,10 @@ export const SIGNAL_WHISPER_FADE_MS    = 400                      // ms fade in 
 export const FRAGMENT_HINTS_KEY        = 'daemon_fragment_hints'  // localStorage JSON string[] — tracks seen fragment types
 export const FRAGMENT_CONTEXT_MS       = 2000                     // ms fragment context line shown before game starts
 
-// Live process movement — visual effects (Phase 1 polish)
-export const LIVE_MOVES_QUERY_KEY  = 'live-moves'  // react-query cache key — this session's per-process deltas
+// Decode effect — the daemon line scrambling into place (DecodeText)
 export const DECODE_GLYPHS         = '!<>-_\\/[]{}—=+*^?#________'  // chars the daemon line scrambles through
 export const DECODE_CHAR_MS        = 22    // ms between each character resolving, left to right
 export const DECODE_SCRAMBLE_MS    = 40    // ms between scramble frames on the unresolved tail
-export const STIR_GLOW_BLUR        = 6     // px — box-shadow blur on a strength bar active today
-export const STIR_SWEEP_MS         = 900   // ms — one-shot scan-line sweep across a just-moved bar
 export const DELTA_FLOAT_MS        = 1600  // ms — "+N" float-up lifetime above a just-moved bar
 export const DELTA_FLOAT_RISE      = 18    // px — distance the "+N" rises as it fades
 export const GRAIN_PULSE_MS        = 600   // ms — noise-overlay intensity flicker on a stir / the daemon speaking

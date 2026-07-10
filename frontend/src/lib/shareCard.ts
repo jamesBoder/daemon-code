@@ -1,5 +1,5 @@
 import { SHARE_CARD_SIZE, STREAK_MIN_DAYS } from './constants'
-import type { OrbState, ProcessState } from '../types'
+import type { OrbState } from '../types'
 
 // All card geometry for the 1080×1080 shareable card.
 // Every layout value lives here — nothing bare in the draw functions.
@@ -44,18 +44,7 @@ const CARD = {
   triadDeltaY:  682,
   // column centers: content split into thirds
   triadCols:    [1 / 6, 3 / 6, 5 / 6],
-  // Processes block (or daily signal fallback)
-  sectionFontPx:18,
-  sectionY:     758,
-  procFontPx:   24,
-  procLineH:    40,
-  procY:        796,
-  procMax:      3,
-  procBarW:     140,   // strength bar width
-  procBarH:     3,     // strength bar height
-  procStateW:   150,   // right-side space reserved for the state label
-  procBarGap:   24,    // gap between name column and strength bar
-  // Daily signal fallback (when no named processes)
+  // Daily signal quote
   quoteFontPx:  26,
   quoteLineH:   38,
   quoteMaxLines:2,
@@ -84,14 +73,6 @@ const CARD = {
   hairline:     0.5,                          // canvas lineWidth for all border strokes
   letterSpacing:'1.5px',                      // mono labels — canvas equivalent of 0.06em
 } as const
-
-// Mirrors the --process-* CSS tokens — must stay in sync with index.css
-const PROC_STATE_COLORS: Record<ProcessState, string> = {
-  running:   '#22c55e',
-  sleeping:  '#475569',
-  weakening: '#f59e0b',
-  new:       '#6366f1',
-}
 
 // Mirrors DaemonOrb.tsx orbVisuals — must stay in sync if that component changes
 const ORB_VISUALS: Record<OrbState, { outerOpacity: number; innerScale: number; glowOpacity: number }> = {
@@ -299,64 +280,7 @@ function drawTriad(ctx: CanvasRenderingContext2D, stats: TriadStat[]): void {
   ctx.restore()
 }
 
-export interface ShareProcess {
-  name:     string
-  state:    ProcessState
-  strength: number  // 0–100
-}
-
-function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
-  if (ctx.measureText(text).width <= maxW) return text
-  let out = text
-  while (out.length > 1 && ctx.measureText(out + '…').width > maxW) {
-    out = out.slice(0, -1)
-  }
-  return out + '…'
-}
-
-function drawProcesses(ctx: CanvasRenderingContext2D, processes: ShareProcess[]): void {
-  const contentX     = CARD.x + CARD.padH
-  const contentRight = CARD.x + CARD.w - CARD.padH
-  const barX         = contentRight - CARD.procStateW - CARD.procBarW
-  const nameX        = contentX + CARD.procFontPx
-  const nameMaxW     = barX - nameX - CARD.procBarGap
-
-  ctx.save()
-  ctx.textBaseline = 'top'
-
-  ctx.font = FONT.mono(CARD.sectionFontPx)
-  setLetterSpacing(ctx, CARD.letterSpacing)
-  ctx.fillStyle = CARD.textFoot
-  ctx.textAlign = 'left'
-  ctx.fillText('active processes', contentX, CARD.sectionY)
-  setLetterSpacing(ctx, '0px')
-
-  ctx.font = FONT.mono(CARD.procFontPx)
-  processes.slice(0, CARD.procMax).forEach((p, i) => {
-    const y = CARD.procY + i * CARD.procLineH
-    const stateColor = PROC_STATE_COLORS[p.state] ?? CARD.textMuted
-
-    ctx.textAlign = 'left'
-    ctx.fillStyle = CARD.green
-    ctx.fillText('>', contentX, y)
-    ctx.fillStyle = CARD.textMuted
-    ctx.fillText(truncateToWidth(ctx, p.name, nameMaxW), nameX, y)
-
-    // Strength bar — track + fill, vertically centered on the text line
-    const barY = y + CARD.procFontPx / 2 - CARD.procBarH / 2
-    ctx.fillStyle = CARD.cardBorder
-    ctx.fillRect(barX, barY, CARD.procBarW, CARD.procBarH)
-    ctx.fillStyle = stateColor
-    ctx.fillRect(barX, barY, CARD.procBarW * Math.min(Math.max(p.strength, 0), 100) / 100, CARD.procBarH)
-
-    ctx.textAlign = 'right'
-    ctx.fillStyle = stateColor
-    ctx.fillText(p.state, contentRight, y)
-  })
-  ctx.restore()
-}
-
-// Fallback when the daemon hasn't named processes yet — the daily signal quote
+// The daily signal quote — the block between the triad and the footer
 function drawSignal(ctx: CanvasRenderingContext2D, quote: string, author?: string): void {
   ctx.save()
   ctx.textAlign = 'center'
@@ -401,7 +325,6 @@ export interface CardInput {
   prose:               string
   day:                 number
   orbState:            OrbState
-  processes:           ShareProcess[]  // already filtered to named only, max 3
   accent:              string          // current --accent value, e.g. '#6366f1'
   kernelAccess:        number
   daemonAccuracy:      number
@@ -418,7 +341,7 @@ export async function generateAndShareCard(input: CardInput): Promise<void> {
   // Ensure fonts are loaded before canvas measures or renders them
   await Promise.all([
     document.fonts.load(FONT.prose),
-    document.fonts.load(FONT.mono(CARD.procFontPx)),
+    document.fonts.load(FONT.mono(CARD.authorFontPx)),
     document.fonts.load(FONT.monoMed(CARD.triadValuePx)),
   ])
 
@@ -441,9 +364,7 @@ export async function generateAndShareCard(input: CardInput): Promise<void> {
     { label: 'decoded lines',   value: input.decodedLines.toLocaleString(), delta: input.decodedLinesDelta },
   ])
   drawSeparator(ctx, CARD.sep2Y)
-  if (input.processes.length > 0) {
-    drawProcesses(ctx, input.processes)
-  } else if (input.signalQuote) {
+  if (input.signalQuote) {
     drawSignal(ctx, input.signalQuote, input.signalAuthor)
   }
   drawFooter(ctx)

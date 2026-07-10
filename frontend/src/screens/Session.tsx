@@ -4,7 +4,7 @@ import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson, postSessionComplete } from '../lib/api'
-import { DAY_QUERY_STALE_MS, LIVE_MOVES_QUERY_KEY, ORB_LAYOUT_ID } from '../lib/constants'
+import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID } from '../lib/constants'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
@@ -30,9 +30,7 @@ export function Session() {
     try {
       const live = await postSessionComplete()
       daemonLine = live.daemonLine
-      // Stash this session's per-process moves so the process tab can show the
-      // ephemeral "+N" and sweep once, then reflect the new strengths.
-      queryClient.setQueryData([LIVE_MOVES_QUERY_KEY], live.diff)
+      // The Self tab folds the patterns in — refetch so it reflects tonight's moves.
       queryClient.invalidateQueries({ queryKey: ['processes'] })
     } catch {
       // Live scoring is non-essential; ignore and continue.

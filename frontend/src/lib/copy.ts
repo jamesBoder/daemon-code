@@ -36,14 +36,20 @@ export const copy = {
       low: [
         'logged. the daemon adjusts for interference.',
         'noted. heavy-signal days still count.',
+        'logged. static is data too.',
+        'noted. the read accounts for the noise.',
       ],
       mid: [
         'logged. baseline holds.',
         'noted. steady state read.',
+        'logged. the middle is its own signal.',
+        'noted. nothing the model has to correct for.',
       ],
       high: [
         'logged. clear signal improves the read.',
         'noted. the daemon works best in this range.',
+        'logged. the read sharpens on days like this.',
+        'noted. low interference, high resolution.',
       ],
     },
   },
@@ -56,6 +62,8 @@ export const copy = {
       'Consistent. Logged.',
       'The daemon anticipated this. Pattern confirmed.',
       'Alignment confirmed. Accuracy rising.',
+      'Read confirmed. You moved the way the model said.',
+      'No surprise here. The daemon already had this.',
     ],
     wrongReveals: [
       'New data. The daemon revises.',
@@ -63,6 +71,8 @@ export const copy = {
       'Unexpected. The daemon is taking note.',
       'Contradiction detected. The daemon is updating.',
       'The daemon was wrong. That is noted.',
+      'Off-model. The daemon rewrites the prediction.',
+      'You broke the pattern. The read changes.',
     ],
   },
   push: {
@@ -127,25 +137,51 @@ export const copy = {
       '> fragment history indexed',
       '> response latency: within range',
       '> shadow state reconciled',
+      '> weighing snap-judgment latency...',
+      '> bias alignment recomputed',
+      '> reaction vectors normalized',
+      '> overconfidence delta logged',
+      '> trap response folded into model',
+      '> instinct timing within range',
     ] as readonly string[],
-  },
-  processLog: {
-    unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
-    stillForming:     'still forming',
-    chipNamed:        'named',
-    stirredToday:     'stirred today',
-    emptyTitle:       'The daemon is still reading you.',
-    emptyBody:        'A process takes a few sessions to take shape. Keep coming back.',
-    description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
-    stateDescriptions: {
-      running:   'active in recent sessions',
-      sleeping:  'detected before, quiet now',
-      weakening: 'losing signal',
-      new:       'first appeared this cycle',
-    } as Record<string, string>,
   },
   daemonOrb: {
     accessibilityLabel: 'Daemon orb visualization',
+  },
+  // ── The Self screen — the Portrait ────────────────────────────────────────
+  // Daemon-voiced throughout (P2 — one authored world). The Portrait shows the
+  // *shape* of the read; these lines name it without ever exposing a number.
+  self: {
+    title:        'your read',
+    // Shown before the daemon has any model yet (Day 0 / no dimensions).
+    emptyTitle:   'The daemon has not formed you yet.',
+    emptyBody:    'Play a few sessions. A shape will surface here as the read deepens.',
+    // The archetype, surfaced richly (today it only drives an accent + voice).
+    archetypeIntro: 'the daemon reads you as',
+    archetypeNames: {
+      abandoned_child: 'The Abandoned Child',
+      unworthy_self:   'The Unworthy Self',
+      caged_rage:      'The Caged Rage',
+      grief_carrier:   'The Grief Carrier',
+      default:         'Still Resolving',
+    } as Record<string, string>,
+    // One line per stage — the relationship made legible (§4.3).
+    stageLines: {
+      cold:    'A first impression, barely. The form is still mostly noise.',
+      warming: 'The shape is emerging. The daemon is starting to see you.',
+      running: 'A clear read now. The form holds between sessions.',
+      deep:    'The daemon knows this shape. It moves only when you do.',
+    } as Record<string, string>,
+    // The patterns, folded under the Portrait (the Process Log is gone).
+    // Movement is expressed in language and state — never numbers or bars.
+    patternsTitle: 'what it carries',
+    patternsStateLines: {
+      running:   'running now',
+      new:       'just surfaced',
+      sleeping:  'gone quiet',
+      weakening: 'losing its grip',
+    } as Record<string, string>,
+    patternsForming: 'Something else is still forming. The daemon is watching it.',
   },
   onboarding: {
     // 60 words — broad coverage across all four archetypes + neutral
@@ -201,10 +237,11 @@ export const copy = {
     daemon_accuracy:  'How well I predicted you in the Prediction Duel. It rises as I learn. It falls if you actually change.',
     decoded_lines:    'Every session adds to this. There is no target. The daemon reads indefinitely.',
     shadow_prompt:    "You don't answer this here. You carry it. The daemon may ask again tomorrow.",
-    process_first:    'This is not a label. I derived this from what you actually did.',
+    patterns_first:   'These are not labels. I derived each one from what you actually did.',
     orb_warming:      'I have enough signal to begin forming a model. The cold period is over.',
     session_fragment: 'This is a fragment. A behavioral probe. There is no correct response — only a true one.',
     chronicle_first:  'Everything I have ever observed about you is here, in order. The daemon does not forget.',
+    self_first:       'This is the shape of you the daemon has inferred. It moves as you do.',
   } as const,
 
   // ── Layer 2 — Score Sheets ────────────────────────────────────────────────
@@ -247,7 +284,28 @@ export const copy = {
     prediction_duel: "what do you think you'll do?",
     speed_round:     'finish the sentence. first instinct.',
     trap:            'one option is better. choose.',
+    stroop:          'react to the word, not the look. first instinct.',
+    hold:            'nothing is asked here. stay, or release when you choose.',
+    split:           'divide it. one offer — they can refuse.',
   } as Record<string, string>,
+
+  // ── The Split ─────────────────────────────────────────────────────────────
+  // The negotiation table. Oblique — never "generous"/"fair"/"selfish" (naming
+  // the axis coaches the answer). The framing itself is stamped by buildSplit;
+  // framingFallback covers the dev harness and any older/empty deck. The veto is
+  // real: on commit the other decides, and the verdict is shown (but the
+  // threshold never is).
+  split: {
+    youKeep:         'you keep',
+    theyGet:         'they get',
+    veto:            'they can refuse. then it is gone.',
+    commit:          'commit',
+    deciding:        'they decide.',             // the suspense beat after commit
+    accepted:        'accepted.',                // your offer stood
+    refused:         'refused. it is gone.',     // you reached too far; nobody gets it
+    aria:            'how much of it you keep',
+    framingFallback: 'Something worth having.',
+  },
 
   // ── The Trap ──────────────────────────────────────────────────────────────
   trap: {
@@ -295,7 +353,8 @@ export const copy = {
       key: 'fragment',
       lines: [
         'a single behavioral probe within a session.',
-        'types: reaction_test, weighted_scale, prediction_duel.',
+        'types: reaction_test, weighted_scale, prediction_duel,',
+        '       speed_round, trap, stroop.',
         'the daemon reads your response, not your intention.',
       ],
     },

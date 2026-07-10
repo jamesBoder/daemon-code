@@ -3,11 +3,15 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
+      // Never register the service worker under `npm run dev` (command === 'serve').
+      // A dev SW fights Vite's HMR and causes a full-reload loop; it only belongs in
+      // production builds. Prod (`vite build`) is unaffected.
+      disable:         command === 'serve',
       strategies:      'injectManifest',
       srcDir:          'src',
       filename:        'sw.ts',
@@ -40,4 +44,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

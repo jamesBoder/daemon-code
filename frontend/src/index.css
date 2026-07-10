@@ -33,10 +33,6 @@
   /* Semantic */
   --compile-green:      #22c55e;
   --warning:            #f59e0b;
-  --process-running:    #22c55e;
-  --process-sleeping:   #475569;
-  --process-weakening:  #f59e0b;
-  --process-new:        #6366f1;
 
   /* Spacing */
   --space-1:  4px;  --space-2:  8px;  --space-3:  12px;
@@ -123,7 +119,10 @@ body::after {
   position: fixed;
   inset: 0;
   background-image: url('/noise.png');
-  opacity: 0.025;
+  /* Resting 0.025; components may raise --grain-opacity to intensify the grain
+     (e.g. Stroop drives it from adaptive pressure). The grain-pulse animation
+     below temporarily overrides this. */
+  opacity: var(--grain-opacity, 0.025);
   pointer-events: none;
   z-index: 9999;
 }
@@ -213,11 +212,30 @@ body.grain-pulse::after {
   outline-offset: 2px;
 }
 
-/* ── Process ping animation ─────────────────────────────────────────────────── */
+/* The Hold — the void fades up on entry; faint rings emanate outward as its slow
+   heartbeat (scale + alpha driven by the component's config via --he-* custom
+   props). Both are motion, so the component only mounts them when motion is
+   allowed (reduced motion gets a static, silent void). */
+@keyframes holdReveal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 
-@keyframes process-ping {
-  75%, 100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
+@keyframes holdEmanate {
+  from { transform: translate(-50%, -50%) scale(1);                 opacity: var(--he-alpha, 0.12); }
+  to   { transform: translate(-50%, -50%) scale(var(--he-scale, 5)); opacity: 0; }
+}
+
+/* The Hold's reactivity probe — a faint mote drifts across the void; tapping
+   while it shows reads as reactivity. Travel + opacity come from --mote-* props. */
+@keyframes holdMote {
+  0%   { transform: translate(-50%, -50%) translateX(calc(var(--mote-travel, 200px) * -0.5)); opacity: 0; }
+  50%  { opacity: var(--mote-alpha, 0.5); }
+  100% { transform: translate(-50%, -50%) translateX(calc(var(--mote-travel, 200px) * 0.5));  opacity: 0; }
+}
+
+/* The Hold's exhale — on commit (or the cap) the void fades out rather than
+   cutting, so leaving stillness has a moment of closure. Reduced motion skips it. */
+@keyframes holdFadeOut {
+  to { opacity: 0; }
 }

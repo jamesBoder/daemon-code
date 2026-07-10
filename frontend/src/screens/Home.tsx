@@ -12,14 +12,13 @@ import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { ScoreTriad } from '../components/daemon/ScoreTriad'
 import { apiFetchJson, getPulseToday, homeToCompileData } from '../lib/api'
 import { PulseEntryCard } from '../components/pulse/PulseEntryCard'
-import { ProcessStatus } from '../components/processlog/ProcessStatus'
 import { applyArchetypeAccent } from '../lib/colors'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, DAY_QUERY_STALE_MS, HAIRLINE, LETTER_SPACING_PROCESS, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED_KEY, DAY0_TEXT_MAX_W, DAY_QUERY_STALE_MS, HAIRLINE, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH, MODAL_Z_INDEX, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ORB_LAYOUT_ID, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, TOAST_DISMISS_MS, TOAST_Z_INDEX } from '../lib/constants'
 import { copy } from '../lib/copy'
 import { generateAndShareCard } from '../lib/shareCard'
 import { usePushPrompt } from '../hooks/usePushPrompt'
 import { useAmbient } from '../hooks/useAmbient'
-import type { HomeData, ShadowProfile, Archetype, Process, ProcessState } from '../types'
+import type { HomeData, ShadowProfile, Archetype } from '../types'
 
 
 export function Home() {
@@ -42,13 +41,6 @@ export function Home() {
     queryKey: ['profile'],
     queryFn: () => apiFetchJson<ShadowProfile>('/profile'),
     staleTime: 5 * 60 * 1000,
-  })
-
-  const { data: processes = [] } = useQuery({
-    queryKey: ['processes'],
-    queryFn: () => apiFetchJson<Process[]>('/processes'),
-    staleTime: 5 * 60 * 1000,
-    enabled: !!(home && home.processingSignals > 0),
   })
 
   const { data: pulse } = useQuery({
@@ -104,15 +96,10 @@ export function Home() {
     setSharing(true)
     try {
       const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
-      const namedProcesses = processes
-        .filter(p => !p.unnamed && p.name)
-        .slice(0, 3)
-        .map(p => ({ name: p.name as string, state: p.state as ProcessState, strength: p.strength }))
       await generateAndShareCard({
         prose:               home.daemonProse,
         day:                 home.day,
         orbState:            home.orbState,
-        processes:           namedProcesses,
         accent,
         kernelAccess:        home.kernelAccess,
         daemonAccuracy:      home.daemonAccuracy,
@@ -230,10 +217,6 @@ export function Home() {
               Begin session →
             </DaemonButton>
 
-            {processes.length > 0 && (
-              <ProcessStrip processes={processes} onViewAll={() => navigate('/processes')} />
-            )}
-
             <PulseEntryCard visible={!!(pulse?.scenario && !pulse.completed)} />
 
             {/* Secondary actions — share + chronicle */}
@@ -280,70 +263,6 @@ export function Home() {
       {showPushPrompt && <PushPrompt onDismiss={dismissPush} onEnable={enablePush} />}
       <BottomNav />
     </>
-  )
-}
-
-const STRIP = {
-  max:  3,  // process rows shown in the home strip
-  barH: 2,  // px — strength bar height, mirrors ProcessEntry
-} as const
-
-function ProcessStrip({ processes, onViewAll }: { processes: Process[]; onViewAll: () => void }) {
-  const active = processes.filter(p => p.state === 'running' || p.state === 'new')
-  const rest   = processes.filter(p => p.state !== 'running' && p.state !== 'new')
-  const top    = [...active, ...rest].slice(0, STRIP.max)
-
-  return (
-    <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
-          active processes
-        </span>
-        <button
-          onClick={onViewAll}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, padding: 0, minHeight: MIN_TOUCH_TARGET, display: 'flex', alignItems: 'center' }}
-        >
-          view all →
-        </button>
-      </div>
-      {top.map((p, i) => {
-        const name = p.name
-          ? p.name
-          : `unnamed_process_${String(i + 1).padStart(3, '0')}`
-        return (
-          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', minWidth: 0, flex: 1 }}>
-              <span style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 'var(--text-xs)',
-                color: p.unnamed ? 'var(--text-muted)' : 'var(--text-primary)',
-                letterSpacing: LETTER_SPACING_PROCESS,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {name}
-              </span>
-              {p.unnamed ? (
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', lineHeight: 'var(--leading-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  {copy.processLog.stillForming}
-                </span>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <div style={{ flex: 1, height: STRIP.barH, background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${p.strength}%`, background: 'var(--accent)', borderRadius: 'var(--radius-full)', transition: 'width 0.6s ease' }} />
-                  </div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_PROCESS, flexShrink: 0 }}>
-                    {p.strength}%
-                  </span>
-                </div>
-              )}
-            </div>
-            <ProcessStatus state={p.state as ProcessState} />
-          </div>
-        )
-      })}
-    </div>
   )
 }
 

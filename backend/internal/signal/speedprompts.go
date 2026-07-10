@@ -257,6 +257,62 @@ var SpeedPrompts = []SpeedPrompt{
 		},
 		IntroducedAfterDay: 5, Tier: TierEvergreen,
 	},
+
+	// --- content run batch (deck-only) ---
+	{
+		PromptID: "good_news", Starter: "When something good happens, I...",
+		Options: []SpeedOption{
+			{Text: "wait for the catch", DimensionSignals: map[string]float64{"neuroticism": 0.80, "temporal_focus": 0.70}},
+			{Text: "tell someone right away", DimensionSignals: map[string]float64{"approach_avoidance": 0.80, "agreeableness": 0.65}},
+			{Text: "keep it to myself", DimensionSignals: map[string]float64{"approach_avoidance": 0.25}},
+		},
+		IntroducedAfterDay: 4, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "a_compliment", Starter: "A compliment lands as...",
+		Options: []SpeedOption{
+			{Text: "something to deflect", DimensionSignals: map[string]float64{"neuroticism": 0.70, "agreeableness": 0.55}},
+			{Text: "proof I'm on track", DimensionSignals: map[string]float64{"conscientiousness": 0.60, "locus_of_control": 0.70}},
+			{Text: "nice but irrelevant", DimensionSignals: map[string]float64{"locus_of_control": 0.80, "agreeableness": 0.30}},
+		},
+		IntroducedAfterDay: 6, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "being_wrong", Starter: "Realizing I was wrong, I...",
+		Options: []SpeedOption{
+			{Text: "say so out loud", DimensionSignals: map[string]float64{"openness": 0.80, "approach_avoidance": 0.70}},
+			{Text: "quietly correct it", DimensionSignals: map[string]float64{"conscientiousness": 0.70, "approach_avoidance": 0.40}},
+			{Text: "defend it a while longer", DimensionSignals: map[string]float64{"grim_trigger": 0.65, "openness": 0.20}},
+		},
+		IntroducedAfterDay: 7, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "a_crowd", Starter: "In a crowded room, I...",
+		Options: []SpeedOption{
+			{Text: "find the edge of it", DimensionSignals: map[string]float64{"approach_avoidance": 0.20, "neuroticism": 0.55}},
+			{Text: "work the whole room", DimensionSignals: map[string]float64{"approach_avoidance": 0.85, "agreeableness": 0.55}},
+			{Text: "find one person to talk to", DimensionSignals: map[string]float64{"agreeableness": 0.70, "approach_avoidance": 0.45}},
+		},
+		IntroducedAfterDay: 4, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "money_is", Starter: "Money is mostly...",
+		Options: []SpeedOption{
+			{Text: "security to bank", DimensionSignals: map[string]float64{"discount_factor": 0.85, "neuroticism": 0.55}},
+			{Text: "freedom to spend", DimensionSignals: map[string]float64{"discount_factor": 0.20, "openness": 0.60}},
+			{Text: "a scoreboard", DimensionSignals: map[string]float64{"locus_of_control": 0.70, "temporal_focus": 0.60}},
+		},
+		IntroducedAfterDay: 6, Tier: TierEvergreen,
+	},
+	{
+		PromptID: "starting_over", Starter: "Starting over sounds...",
+		Options: []SpeedOption{
+			{Text: "like a relief", DimensionSignals: map[string]float64{"openness": 0.75, "temporal_focus": 0.80}},
+			{Text: "like a waste", DimensionSignals: map[string]float64{"temporal_focus": 0.20, "discount_factor": 0.40}},
+			{Text: "like a last resort", DimensionSignals: map[string]float64{"neuroticism": 0.60, "approach_avoidance": 0.35}},
+		},
+		IntroducedAfterDay: 7, Tier: TierEvergreen,
+	},
 }
 
 // LookupSpeedOption returns the tagged option for a starter + chosen text pair,

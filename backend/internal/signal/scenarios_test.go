@@ -17,11 +17,19 @@ func validDirection(dim, dir string) bool {
 
 func TestScenarioLibraryIntegrity(t *testing.T) {
 	seenScenarios := map[string]bool{}
+	seenText := map[string]bool{}
 	for _, s := range Scenarios {
 		if s.ScenarioID == "" || seenScenarios[s.ScenarioID] {
 			t.Fatalf("scenario %q: missing or duplicate ScenarioID", s.Text)
 		}
 		seenScenarios[s.ScenarioID] = true
+
+		// Duplicate prompt text silently shrinks the no-repeat window even when
+		// IDs differ — guard the library promise, not just key uniqueness.
+		if s.Text == "" || seenText[s.Text] {
+			t.Fatalf("scenario %q: missing or duplicate scenario Text", s.ScenarioID)
+		}
+		seenText[s.Text] = true
 
 		// The generator selects 6 from the pool; the spec calls for 10–15 oblique nodes.
 		if len(s.NodePool) < 6 {

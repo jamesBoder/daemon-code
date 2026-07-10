@@ -75,21 +75,6 @@ export interface CompileData {
   decodedLinesDelta: number
 }
 
-// Data shape for a single process entry (component is ProcessEntry, type is ProcessEntryData)
-export interface ProcessEntryData {
-  id: string
-  name: string
-  state: ProcessState
-  strength: number
-  unnamed: boolean
-  firstDetected?: string
-  lastSeen?: string
-  daemonNote?: string
-  // What happened to this process in the latest compile, from /session/recent-diff
-  diffChange?: ProcessDiff['change']
-  diffDelta?: number
-}
-
 // Auth — matches authResponse JSON from /auth/register and /auth/login
 export interface AuthResponse {
   token: string

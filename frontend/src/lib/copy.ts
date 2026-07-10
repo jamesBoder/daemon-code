@@ -145,21 +145,6 @@ export const copy = {
       '> instinct timing within range',
     ] as readonly string[],
   },
-  processLog: {
-    unnamedExpanded:  'The daemon is watching this. Come back tomorrow.',
-    stillForming:     'still forming',
-    chipNamed:        'named',
-    stirredToday:     'stirred today',
-    emptyTitle:       'The daemon is still reading you.',
-    emptyBody:        'A process takes a few sessions to take shape. Keep coming back.',
-    description:      'Behavioral patterns the daemon has identified across your sessions. They strengthen or fade based on how you respond.',
-    stateDescriptions: {
-      running:   'active in recent sessions',
-      sleeping:  'detected before, quiet now',
-      weakening: 'losing signal',
-      new:       'first appeared this cycle',
-    } as Record<string, string>,
-  },
   daemonOrb: {
     accessibilityLabel: 'Daemon orb visualization',
   },
@@ -187,9 +172,16 @@ export const copy = {
       running: 'A clear read now. The form holds between sessions.',
       deep:    'The daemon knows this shape. It moves only when you do.',
     } as Record<string, string>,
-    // Link down to the Process Log (the Self tab absorbs it — §4.4).
-    processesLink: 'what you do →',
-    processesHint: "the daemon's map of your patterns",
+    // The patterns, folded under the Portrait (the Process Log is gone).
+    // Movement is expressed in language and state — never numbers or bars.
+    patternsTitle: 'what it carries',
+    patternsStateLines: {
+      running:   'running now',
+      new:       'just surfaced',
+      sleeping:  'gone quiet',
+      weakening: 'losing its grip',
+    } as Record<string, string>,
+    patternsForming: 'Something else is still forming. The daemon is watching it.',
   },
   onboarding: {
     // 60 words — broad coverage across all four archetypes + neutral
@@ -245,7 +237,7 @@ export const copy = {
     daemon_accuracy:  'How well I predicted you in the Prediction Duel. It rises as I learn. It falls if you actually change.',
     decoded_lines:    'Every session adds to this. There is no target. The daemon reads indefinitely.',
     shadow_prompt:    "You don't answer this here. You carry it. The daemon may ask again tomorrow.",
-    process_first:    'This is not a label. I derived this from what you actually did.',
+    patterns_first:   'These are not labels. I derived each one from what you actually did.',
     orb_warming:      'I have enough signal to begin forming a model. The cold period is over.',
     session_fragment: 'This is a fragment. A behavioral probe. There is no correct response — only a true one.',
     chronicle_first:  'Everything I have ever observed about you is here, in order. The daemon does not forget.',

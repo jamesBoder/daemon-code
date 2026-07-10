@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Home, Zap, Aperture, Scroll, Settings } from 'lucide-react'
 import { BOTTOM_NAV_BUTTON_HEIGHT } from '../../lib/constants'
 
-// Self absorbs the Portrait and links down to the Process Log (§4.4 IA move).
+// Self absorbs the Portrait and folds the daemon's patterns in beneath it.
 const TABS = [
   { label: 'Home',      path: '/home',      Icon: Home     },
   { label: 'Session',   path: '/session',   Icon: Zap      },

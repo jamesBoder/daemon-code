@@ -9,7 +9,6 @@ import { Login } from './screens/auth/Login'
 import { Home } from './screens/Home'
 import { Self } from './screens/Self'
 import { Chronicle } from './screens/Chronicle'
-import { ProcessLog } from './screens/ProcessLog'
 import { Settings } from './screens/Settings'
 import { ROUTE_TRANSITION_MS } from './lib/constants'
 
@@ -26,8 +25,7 @@ const DevGames = import.meta.env.DEV
   : null
 
 // BottomNav destinations share a key — AnimatePresence never crossfades between them.
-// /processes stays here (it keeps the BottomNav, reachable from the Self tab).
-const BOTTOM_NAV_PATHS = new Set(['/home', '/self', '/chronicle', '/processes', '/settings'])
+const BOTTOM_NAV_PATHS = new Set(['/home', '/self', '/chronicle', '/settings'])
 
 function RootRedirect() {
   const { token, onboardingComplete } = useAuthStore()
@@ -67,7 +65,6 @@ function App() {
             <Route path="/home"      element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/self"      element={<ProtectedRoute><Self /></ProtectedRoute>} />
             <Route path="/chronicle" element={<ProtectedRoute><Chronicle /></ProtectedRoute>} />
-            <Route path="/processes" element={<ProtectedRoute><ProcessLog /></ProtectedRoute>} />
             <Route path="/settings"  element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
             <Route path="/codex"            element={<ProtectedRoute><Codex /></ProtectedRoute>} />

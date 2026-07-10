@@ -336,3 +336,218 @@ func deckTypes(deck []dynamo.Fragment) []string {
 	}
 	return types
 }
+
+func TestBuildHold(t *testing.T) {
+	profile := db.ShadowProfile{
+		CompileCount:      0,
+		ProfileDimensions: []byte(`{"neuroticism":{"score":0.8,"confidence":0.5}}`),
+	}
+	f := buildHold(profile)
+	if f.Type != "hold" {
+		t.Fatalf("type %q, want hold", f.Type)
+	}
+	if f.ID == "" {
+		t.Fatal("hold fragment has no ID")
+	}
+	// The note must stay empty — a daemon_note renders over the void and breaks
+	// the radical-emptiness design.
+	if f.DaemonNote != "" {
+		t.Fatalf("hold daemon_note %q, want empty", f.DaemonNote)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+		t.Fatalf("hold payload is not valid JSON: %v", err)
+	}
+	if payload["type"] != "hold" {
+		t.Fatalf("hold payload type %v, want hold", payload["type"])
+	}
+	// charge mirrors the neuroticism read; intimacy is 0 at compile 0.
+	if got := payload["charge"].(float64); got != 0.8 {
+		t.Fatalf("charge %v, want 0.8 (from neuroticism)", got)
+	}
+	if got := payload["intimacy"].(float64); got != 0 {
+		t.Fatalf("intimacy %v, want 0 at compile 0", got)
+	}
+	if _, ok := payload["seed"]; !ok {
+		t.Fatal("hold payload has no seed")
+	}
+}
+
+func TestBuildHoldPersonalization(t *testing.T) {
+	// Absent model → neutral charge; deep relationship → full intimacy.
+	day0 := buildHoldPayload(t, db.ShadowProfile{CompileCount: 0})
+	if day0["charge"].(float64) != holdNeutralScore {
+		t.Fatalf("day-0 charge %v, want neutral %v", day0["charge"], holdNeutralScore)
+	}
+	veteran := buildHoldPayload(t, db.ShadowProfile{CompileCount: holdIntimacyFull * 2})
+	if veteran["intimacy"].(float64) != 1 {
+		t.Fatalf("veteran intimacy %v, want clamped to 1", veteran["intimacy"])
+	}
+	// Per-night uniqueness: two builds get different seeds (the void is never the
+	// same room twice).
+	a := buildHoldPayload(t, db.ShadowProfile{CompileCount: 10})
+	b := buildHoldPayload(t, db.ShadowProfile{CompileCount: 10})
+	if a["seed"] == b["seed"] {
+		t.Fatal("two holds shared a seed — the void should vary per night")
+	}
+}
+
+func buildHoldPayload(t *testing.T, profile db.ShadowProfile) map[string]any {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(buildHold(profile).Payload), &payload); err != nil {
+		t.Fatalf("hold payload is not valid JSON: %v", err)
+	}
+	return payload
+}
+
+// The Hold appears for eligible users and never shares a night with a trap (the
+// two are tonally opposite). Decks that include it still hold the 5-6 length.
+func TestBuildDeckHoldSelection(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 20}
+	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
+
+	sawHold := false
+	for i := 0; i < 500; i++ {
+		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		holds, traps := 0, 0
+		for _, f := range deck {
+			switch f.Type {
+			case "hold":
+				holds++
+			case "trap":
+				traps++
+			}
+		}
+		if holds > 0 && traps > 0 {
+			t.Fatalf("hold shared a night with a trap: %v", deckTypes(deck))
+		}
+		if holds > 1 {
+			t.Fatalf("deck has %d holds: %v", holds, deckTypes(deck))
+		}
+		if holds == 1 && (len(deck) < 5 || len(deck) > 6) {
+			t.Fatalf("hold deck length %d, want 5-6: %v", len(deck), deckTypes(deck))
+		}
+		sawHold = sawHold || holds == 1
+	}
+	if !sawHold {
+		t.Fatal("hold never appeared across 500 decks for an eligible user")
+	}
+}
+
+// Before its unlock, the Hold must never enter the deck.
+func TestBuildDeckHoldBeforeEligibility(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: holdMinCompiles - 1}
+	for i := 0; i < 200; i++ {
+		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+			if f.Type == "hold" {
+				t.Fatal("hold appeared before eligibility")
+			}
+		}
+	}
+}
+
+func TestBuildSplit(t *testing.T) {
+	f := buildSplit(db.ShadowProfile{CompileCount: 10})
+	if f.Type != "split" {
+		t.Fatalf("type %q, want split", f.Type)
+	}
+	if f.ID == "" {
+		t.Fatal("split fragment has no ID")
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+		t.Fatalf("split payload is not valid JSON: %v", err)
+	}
+	if payload["type"] != "split" {
+		t.Fatalf("split payload type %v, want split", payload["type"])
+	}
+	if _, ok := payload["seed"]; !ok {
+		t.Fatal("split payload has no seed")
+	}
+	framing, ok := payload["framing"].(string)
+	if !ok || framing == "" {
+		t.Fatalf("split framing %v, want a non-empty string", payload["framing"])
+	}
+	// The framing must come from the curated set, never invented.
+	found := false
+	for _, fr := range splitFramings {
+		if fr == framing {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("split framing %q is not one of splitFramings", framing)
+	}
+}
+
+func TestBuildSplitVariesPerNight(t *testing.T) {
+	// Per-night uniqueness: two builds get different seeds (the table is never
+	// identical), so the frontend's counterpart presence varies.
+	a := buildSplit(db.ShadowProfile{CompileCount: 10})
+	b := buildSplit(db.ShadowProfile{CompileCount: 10})
+	var pa, pb map[string]any
+	if err := json.Unmarshal([]byte(a.Payload), &pa); err != nil {
+		t.Fatalf("payload a not valid JSON: %v", err)
+	}
+	if err := json.Unmarshal([]byte(b.Payload), &pb); err != nil {
+		t.Fatalf("payload b not valid JSON: %v", err)
+	}
+	if pa["seed"] == pb["seed"] {
+		t.Fatal("two splits shared a seed — the table should vary per night")
+	}
+}
+
+// The Split appears for eligible users and never shares a night with a trap or a
+// hold (one special middle beat per session). Decks that include it still hold
+// the 5-6 length.
+func TestBuildDeckSplitSelection(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 20}
+	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
+
+	sawSplit := false
+	for i := 0; i < 500; i++ {
+		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		splits, traps, holds := 0, 0, 0
+		for _, f := range deck {
+			switch f.Type {
+			case "split":
+				splits++
+			case "trap":
+				traps++
+			case "hold":
+				holds++
+			}
+		}
+		if splits > 0 && (traps > 0 || holds > 0) {
+			t.Fatalf("split shared a night with a trap/hold: %v", deckTypes(deck))
+		}
+		if splits > 1 {
+			t.Fatalf("deck has %d splits: %v", splits, deckTypes(deck))
+		}
+		if splits == 1 && (len(deck) < 5 || len(deck) > 6) {
+			t.Fatalf("split deck length %d, want 5-6: %v", len(deck), deckTypes(deck))
+		}
+		sawSplit = sawSplit || splits == 1
+	}
+	if !sawSplit {
+		t.Fatal("split never appeared across 500 decks for an eligible user")
+	}
+}
+
+// Before its unlock, the Split must never enter the deck.
+func TestBuildDeckSplitBeforeEligibility(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: splitMinCompiles - 1}
+	for i := 0; i < 200; i++ {
+		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+			if f.Type == "split" {
+				t.Fatal("split appeared before eligibility")
+			}
+		}
+	}
+}

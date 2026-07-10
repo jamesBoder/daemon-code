@@ -1,4 +1,4 @@
-import type { CompileData, HomeData, OrbState, SessionCompleteResult } from '../types'
+import type { CompileData, HomeData, OrbState, SelfRead, SessionCompleteResult } from '../types'
 import { useAuthStore } from '../stores/authStore'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
@@ -78,6 +78,11 @@ export async function postPulseResponse(body: PostPulseResponseBody): Promise<vo
 // live process movement + an immediate daemon line.
 export async function postSessionComplete(): Promise<SessionCompleteResult> {
   return apiFetchJson<SessionCompleteResult>('/session/complete', { method: 'POST' })
+}
+
+// The daemon's current read — drives the Portrait on the Self screen.
+export async function fetchSelf(): Promise<SelfRead> {
+  return apiFetchJson<SelfRead>('/self')
 }
 
 export async function patchProfile(polly_voice: string | null): Promise<void> {

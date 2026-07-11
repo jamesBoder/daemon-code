@@ -53,6 +53,19 @@ const (
 	// so the deck length holds.
 	splitMinCompiles = 4 // available early — no right answer, just enough loop to read the framing
 	splitOdds        = 4 // 1-in-this chance on an eligible (no trap, no hold) night
+
+	// The Cut — a fixed budget of keeps against a field of obliquely-labelled
+	// things; cut until only the budget remains. It reads value hierarchy under
+	// FORCED LOSS (sharper than the Weighted Scale's pairwise, which never makes
+	// you pay for anything) plus temporal_focus through what gets sacrificed —
+	// the field is drawn evenly across past/future/neutral items. No right
+	// answer, so it unlocks early; stays occasional and never shares a night with
+	// a trap/hold/split (one special middle beat per session); replaces one scale.
+	cutMinCompiles    = 5 // available early, just after the Split
+	cutOdds           = 4 // 1-in-this chance on an eligible (no trap/hold/split) night
+	cutFieldSize      = 9 // items on the field (3 past + 3 future + 3 neutral)
+	cutFieldPerBucket = 3 // items sampled per temporal bucket
+	cutKeepBudget     = 3 // survivors required — forces exactly 6 cuts
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -62,6 +75,7 @@ type exclusions struct {
 	speedPromptIDs map[string]bool
 	reactionWords  map[string]bool
 	trapIDs        map[string]bool
+	cutItemIDs     map[string]bool
 }
 
 type Generator struct {
@@ -195,6 +209,19 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 		}
 	}
 
+	// The Cut — a fixed keep-budget against a field of things. The fourth and
+	// last special middle beat: mutually exclusive with a trap, hold, and split
+	// (one special beat per session), occasional past its unlock, replacing one
+	// scale so length holds.
+	var cut *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && split == nil && int(profile.CompileCount) >= cutMinCompiles && rand.Intn(cutOdds) == 0 { // #nosec G404 — non-crypto game selection
+		cf := buildCut(exclude.cutItemIDs)
+		cut = &cf
+		if nScales > 1 {
+			nScales--
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -207,6 +234,9 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	}
 	if split != nil {
 		middle = append(middle, *split)
+	}
+	if cut != nil {
+		middle = append(middle, *cut)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -317,6 +347,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		speedPromptIDs: make(map[string]bool),
 		reactionWords:  make(map[string]bool),
 		trapIDs:        make(map[string]bool),
+		cutItemIDs:     make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -354,6 +385,17 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 			}
 			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.TrapID != "" {
 				ex.trapIDs[p.TrapID] = true
+			}
+		case "cut":
+			var p struct {
+				Items []struct {
+					ID string `json:"id"`
+				} `json:"items"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil {
+				for _, it := range p.Items {
+					ex.cutItemIDs[it.ID] = true
+				}
 			}
 		}
 	}
@@ -530,6 +572,67 @@ func buildSplit(profile db.ShadowProfile) dynamo.Fragment {
 	return dynamo.Fragment{
 		ID:      uuid.New().String(),
 		Type:    "split",
+		Payload: string(payload),
+	}
+}
+
+// pickCutItems samples cutFieldPerBucket items from each temporal bucket
+// (past/future/neutral), preferring items not served last night, falling back
+// to a repeat if a bucket's fresh pool runs short — mirrors pickScalePairs.
+// Sampling evenly across buckets (rather than from the pool as a whole) is
+// deliberate: an uneven field would make the sacrifice pattern un-readable for
+// temporal_focus on nights where, say, no future-tagged item was even offered.
+func pickCutItems(exclude map[string]bool) []signal.CutItem {
+	buckets := []string{signal.CutTemporalPast, signal.CutTemporalFuture, signal.CutTemporalNeutral}
+	var field []signal.CutItem
+	for _, bucket := range buckets {
+		var pool, served []signal.CutItem
+		for _, it := range signal.CutItems {
+			if it.Temporal != bucket {
+				continue
+			}
+			if exclude[it.ID] {
+				served = append(served, it)
+			} else {
+				pool = append(pool, it)
+			}
+		}
+		rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] }) // #nosec G404 — non-crypto content sampling
+		if len(pool) < cutFieldPerBucket {
+			rand.Shuffle(len(served), func(i, j int) { served[i], served[j] = served[j], served[i] }) // #nosec G404 — non-crypto content sampling
+			pool = append(pool, served...)
+		}
+		n := cutFieldPerBucket
+		if n > len(pool) {
+			n = len(pool)
+		}
+		field = append(field, pool[:n]...)
+	}
+	rand.Shuffle(len(field), func(i, j int) { field[i], field[j] = field[j], field[i] }) // #nosec G404 — non-crypto field ordering
+	return field
+}
+
+// buildCut stamps The Cut — a fixed keep-budget against a field of obliquely-
+// labelled things (features-horizon.md §5b/§5d "Severance"). cutKeepBudget
+// survivors are required, forcing exactly cutFieldSize-cutKeepBudget cuts; what
+// gets sacrificed first, last, or forced by stalling is the signal (Phase 2
+// computeCutSignals). Nothing here reads the model at build time — like the
+// Split, there is no right answer, so the field is model-agnostic.
+func buildCut(exclude map[string]bool) dynamo.Fragment {
+	field := pickCutItems(exclude)
+	items := make([]map[string]string, len(field))
+	for i, it := range field {
+		items[i] = map[string]string{"id": it.ID, "text": it.Text, "temporal": it.Temporal}
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":        "cut",
+		"seed":        rand.Int63(), // #nosec G404 — non-crypto visual seed
+		"items":       items,
+		"keep_budget": cutKeepBudget,
+	})
+	return dynamo.Fragment{
+		ID:      uuid.New().String(),
+		Type:    "cut",
 		Payload: string(payload),
 	}
 }

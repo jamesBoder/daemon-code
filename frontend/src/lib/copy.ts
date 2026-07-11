@@ -287,6 +287,7 @@ export const copy = {
     stroop:          'react to the word, not the look. first instinct.',
     hold:            'nothing is asked here. stay, or release when you choose.',
     split:           'divide it. one offer — they can refuse.',
+    cut:             'keep what you can. press and hold to cut the rest.',
   } as Record<string, string>,
 
   // ── The Split ─────────────────────────────────────────────────────────────
@@ -305,6 +306,19 @@ export const copy = {
     refused:         'refused. it is gone.',     // you reached too far; nobody gets it
     aria:            'how much of it you keep',
     framingFallback: 'Something worth having.',
+  },
+
+  // ── The Cut — Severance ───────────────────────────────────────────────────
+  // A field of oblique things, a fixed budget of keeps. No verdict beyond the
+  // close — the meaning of what got protected is the Analyst's job, not the
+  // screen's. autoCutClose fires the rare beat where the daemon had to cut for
+  // the user (stalled past idleAutoCutMs) rather than the user finishing it.
+  cut: {
+    keepLabel:    (n: number) => `keep ${n}`,
+    remainingLabel: (n: number) => `${n} left to cut`,
+    tearAria:     (text: string) => `${text}. press and hold to cut this.`,
+    close:        'noted.',
+    autoCutClose: 'the daemon cut it for you.',
   },
 
   // ── The Trap ──────────────────────────────────────────────────────────────

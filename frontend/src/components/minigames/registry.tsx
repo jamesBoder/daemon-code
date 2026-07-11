@@ -10,6 +10,7 @@ import { Stroop } from './Stroop'
 import type { StroopItem } from './Stroop'
 import { Hold } from './Hold'
 import { Split } from './Split'
+import { Cut } from './Cut'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -69,6 +70,12 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
     // buildSplit stamps { seed, framing }: the rotated resource framing plus a
     // per-night seed that jitters the watching counterpart's presence.
     <Split params={raw} onComplete={onComplete} />
+  ),
+  cut: ({ raw, onComplete }) => (
+    // buildCut stamps { seed, items, keep_budget }: the field sampled evenly
+    // across past/future/neutral things, plus a seed that jitters each card's
+    // scatter rotation.
+    <Cut params={raw} onComplete={onComplete} />
   ),
   trap: ({ raw, onComplete }) => (
     <TrapGame

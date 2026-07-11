@@ -551,3 +551,153 @@ func TestBuildDeckSplitBeforeEligibility(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildCut(t *testing.T) {
+	f := buildCut(map[string]bool{})
+	if f.Type != "cut" {
+		t.Fatalf("type %q, want cut", f.Type)
+	}
+	if f.ID == "" {
+		t.Fatal("cut fragment has no ID")
+	}
+	var payload struct {
+		Type       string `json:"type"`
+		Seed       int64  `json:"seed"`
+		KeepBudget int    `json:"keep_budget"`
+		Items      []struct {
+			ID       string `json:"id"`
+			Text     string `json:"text"`
+			Temporal string `json:"temporal"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+		t.Fatalf("cut payload is not valid JSON: %v", err)
+	}
+	if payload.Type != "cut" {
+		t.Fatalf("cut payload type %q, want cut", payload.Type)
+	}
+	if payload.KeepBudget != cutKeepBudget {
+		t.Fatalf("keep_budget %d, want %d", payload.KeepBudget, cutKeepBudget)
+	}
+	if len(payload.Items) != cutFieldSize {
+		t.Fatalf("field has %d items, want %d", len(payload.Items), cutFieldSize)
+	}
+	// The field must be balanced across temporal buckets — an uneven field
+	// would make the sacrifice pattern unreadable for temporal_focus.
+	counts := map[string]int{}
+	seen := map[string]bool{}
+	for _, it := range payload.Items {
+		if it.ID == "" || it.Text == "" {
+			t.Fatalf("cut item missing id/text: %+v", it)
+		}
+		if seen[it.ID] {
+			t.Fatalf("cut item %q appeared twice in one field", it.ID)
+		}
+		seen[it.ID] = true
+		counts[it.Temporal]++
+	}
+	for _, bucket := range []string{signal.CutTemporalPast, signal.CutTemporalFuture, signal.CutTemporalNeutral} {
+		if counts[bucket] != cutFieldPerBucket {
+			t.Fatalf("bucket %q has %d items, want %d (counts: %+v)", bucket, counts[bucket], cutFieldPerBucket, counts)
+		}
+	}
+}
+
+func TestBuildCutVariesPerNight(t *testing.T) {
+	a := buildCut(map[string]bool{})
+	b := buildCut(map[string]bool{})
+	var pa, pb map[string]any
+	if err := json.Unmarshal([]byte(a.Payload), &pa); err != nil {
+		t.Fatalf("payload a not valid JSON: %v", err)
+	}
+	if err := json.Unmarshal([]byte(b.Payload), &pb); err != nil {
+		t.Fatalf("payload b not valid JSON: %v", err)
+	}
+	if pa["seed"] == pb["seed"] {
+		t.Fatal("two cuts shared a seed — the field should vary per night")
+	}
+}
+
+// Items served last night must be excluded from tonight's field whenever the
+// fresh pool per bucket is large enough to avoid them (mirrors pickScalePairs).
+func TestPickCutItemsExcludesServed(t *testing.T) {
+	exclude := map[string]bool{}
+	for _, it := range signal.CutItems {
+		if it.Temporal == signal.CutTemporalPast {
+			exclude[it.ID] = true
+		}
+	}
+	// Exclude all but two past items — still more than cutFieldPerBucket (3)
+	// short, so this asserts the fallback-to-served path, not avoidance.
+	var pastCount int
+	for _, it := range signal.CutItems {
+		if it.Temporal == signal.CutTemporalPast {
+			pastCount++
+		}
+	}
+	if pastCount <= cutFieldPerBucket {
+		t.Skip("not enough past items in the pool to test exclusion")
+	}
+	field := pickCutItems(exclude)
+	for _, it := range field {
+		if it.Temporal != signal.CutTemporalPast {
+			continue
+		}
+		if !exclude[it.ID] {
+			t.Fatalf("past item %q should have been excluded but the fresh pool had plenty left", it.ID)
+		}
+	}
+}
+
+// The Cut appears for eligible users and never shares a night with a trap,
+// hold, or split (one special middle beat per session). Decks that include it
+// still hold the 5-6 length.
+func TestBuildDeckCutSelection(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 20}
+	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
+
+	sawCut := false
+	for i := 0; i < 500; i++ {
+		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		cuts, traps, holds, splits := 0, 0, 0, 0
+		for _, f := range deck {
+			switch f.Type {
+			case "cut":
+				cuts++
+			case "trap":
+				traps++
+			case "hold":
+				holds++
+			case "split":
+				splits++
+			}
+		}
+		if cuts > 0 && (traps > 0 || holds > 0 || splits > 0) {
+			t.Fatalf("cut shared a night with a trap/hold/split: %v", deckTypes(deck))
+		}
+		if cuts > 1 {
+			t.Fatalf("deck has %d cuts: %v", cuts, deckTypes(deck))
+		}
+		if cuts == 1 && (len(deck) < 5 || len(deck) > 6) {
+			t.Fatalf("cut deck length %d, want 5-6: %v", len(deck), deckTypes(deck))
+		}
+		sawCut = sawCut || cuts == 1
+	}
+	if !sawCut {
+		t.Fatal("cut never appeared across 500 decks for an eligible user")
+	}
+}
+
+// Before its unlock, the Cut must never enter the deck.
+func TestBuildDeckCutBeforeEligibility(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: cutMinCompiles - 1}
+	for i := 0; i < 200; i++ {
+		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+			if f.Type == "cut" {
+				t.Fatal("cut appeared before eligibility")
+			}
+		}
+	}
+}

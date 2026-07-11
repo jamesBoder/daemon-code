@@ -401,6 +401,60 @@ export const MG = {
     },
   },
 
+  // ── The Cut — Severance (features-horizon.md §5b/§5d) ─────────────────────
+  // A fixed keep-budget against a field of obliquely-labelled things: cut until
+  // only the budget remains. HIGH-liberty design — the only fragment that
+  // destroys anything. Reuses the house grain as where cut things go (a burst
+  // on tear, same material Hold clears with stillness) and claims red
+  // (--archetype-rage territory) as an accent no other fragment uses. Cutting
+  // is a press-and-HOLD (Hold's exit mechanic, repurposed for destruction, not
+  // departure) so a release before completion is a real, recorded hesitation —
+  // not a fat-finger tap. The daemon cuts FOR you if you stall long enough
+  // (never a soft-lock, and indecision becomes a recorded decision — §5e).
+  cut: {
+    fieldSizeFallback: 9, // dev-harness / empty-payload fallback field size
+    keepBudgetFallback: 3, // dev-harness / empty-payload fallback keep budget
+    gridCols:      3,     // 3x3 field
+    gridGap:       'var(--space-3)',
+    cardMinH:      92,    // px
+    cardMaxW:      560,   // px — whole-field max width on desktop
+    red:           '220, 38, 38', // --archetype-rage, rgb triplet — Cut's claimed accent
+
+    // Press-and-hold to tear. Longer than the Hold's exit (650ms) — destroying
+    // should feel more deliberate than leaving.
+    tearHoldMs:    900,
+    tearGlowMaxPx: 18,   // red edge glow at full hold
+    abortSnapMs:   180,  // how fast an aborted tear's fill resets
+
+    // The crumble — the cut item dissolves into the house grain rather than
+    // just disappearing (the inverse of Hold, which the void clears WITH
+    // stillness; here tearing ADDS to it, then it settles).
+    crumbleMs:      420,
+    crumbleRotateDeg: 14, // max random rotation (± ) as a card crumbles
+    grainSurge:     0.06, // added to --grain-opacity on a completed cut
+    grainSurgeMs:   500,  // …decaying back to resting over this
+
+    // The kept few glow — intensifies as the field thins, culminating in the
+    // final tableau (survivors lit, the rest ash). Indigo, same presence tint
+    // as the Split's acceptance reward — matching what "the daemon approves"
+    // looks like everywhere else.
+    presence:       '124, 106, 245',
+    keptGlowMaxPx:  16,
+    keptGlowAlpha:  0.5,
+
+    // Anti-stall (§5e #4): the field can't be stared at forever. Smolder is a
+    // pure tension cue (no cut yet); if idleness continues past the cap the
+    // daemon cuts one remaining item FOR the user — indecision recorded as a
+    // decision, and the read distinguishes a chosen cut from an auto one.
+    idleSmolderMs:  9000,  // no activity for this long → the field begins to smolder
+    idleAutoCutMs:  15000, // …and this long → the daemon cuts one at random
+    smolderMaxAlpha: 0.35, // peak red-edge intensity during the smolder ramp (--cut-smolder-alpha)
+    smolderGlowPx:  14,    // peak smolder glow blur radius (--cut-smolder-px)
+
+    // The close — kept items glow, the field is ash, one beat, then advance.
+    closeMs:        700,
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

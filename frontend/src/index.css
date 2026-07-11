@@ -239,3 +239,12 @@ body.grain-pulse::after {
 @keyframes holdFadeOut {
   to { opacity: 0; }
 }
+
+/* The Cut's smolder — a pure tension cue (§5e #4 anti-stall): the field's
+   edges pulse with its claimed red accent the longer it goes untouched, before
+   the daemon cuts one for the user. An opacity/glow pulse, not positional
+   motion, so it plays regardless of prefers-reduced-motion (feedback rule). */
+@keyframes cutSmolder {
+  0%, 100% { box-shadow: 0 0 0 rgba(220, 38, 38, 0); }
+  50%      { box-shadow: 0 0 var(--cut-smolder-px, 14px) rgba(220, 38, 38, var(--cut-smolder-alpha, 0.3)); }
+}

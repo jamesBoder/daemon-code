@@ -3,7 +3,9 @@ import { Stroop } from '../components/minigames/Stroop'
 import type { StroopItem, StroopCue } from '../components/minigames/Stroop'
 import { Hold } from '../components/minigames/Hold'
 import { Split } from '../components/minigames/Split'
+import { Cut } from '../components/minigames/Cut'
 import { copy } from '../lib/copy'
+import { MG } from '../lib/minigame'
 import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
 
 // Dev-only playtest harness for the Phase 1 fragment batch (features-phase1.md).
@@ -122,12 +124,60 @@ function randomSplitParams() {
   }
 }
 
-type GameKey = 'stroop' | 'hold' | 'split'
+// The Cut's item pool for playtesting — mirrors buildCut's balanced sampling
+// (3 past + 3 future + 3 neutral) from a small stand-in pool; the real backend
+// samples from a much larger curated set in internal/signal/cutitems.go.
+const CUT_ITEMS = {
+  past: [
+    'the version of you from last year',
+    'the apology you never got',
+    'who you were before this',
+    'the last time it was easy',
+    'the friend you drifted from',
+  ],
+  future: [
+    'the version of you not built yet',
+    'the day this gets easier',
+    "someone you haven't met yet",
+    'the risk you haven\'t taken',
+    "the door you haven't opened",
+  ],
+  neutral: [
+    'the habit that keeps you safe',
+    'the story you tell about yourself',
+    'the thing you check first',
+    'your first instinct',
+    'what you reach for under pressure',
+  ],
+} as const
+
+function shuffled<T>(arr: readonly T[]): T[] {
+  return shuffle([...arr])
+}
+
+function randomCutParams() {
+  const perBucket = MG.cut.fieldSizeFallback / 3
+  const items = (['past', 'future', 'neutral'] as const).flatMap(temporal =>
+    shuffled(CUT_ITEMS[temporal]).slice(0, perBucket).map((text, i) => ({
+      id: `dev_${temporal}_${i}`,
+      text,
+      temporal,
+    })),
+  )
+  return {
+    seed: Math.floor(Math.random() * 2 ** 31),
+    items: shuffled(items),
+    keep_budget: MG.cut.keepBudgetFallback,
+  }
+}
+
+type GameKey = 'stroop' | 'hold' | 'split' | 'cut'
 
 const GAMES: { key: GameKey; label: string }[] = [
   { key: 'stroop', label: 'The Stroop Variant' },
   { key: 'hold',   label: 'The Hold' },
   { key: 'split',  label: 'The Split' },
+  { key: 'cut',    label: 'The Cut' },
 ]
 
 type Phase = 'menu' | 'context' | 'game'
@@ -143,6 +193,8 @@ export function DevGames() {
   const [holdParams, setHoldParams] = useState<{ seed: number; charge: number; intimacy: number } | null>(null)
   // The Split's per-run payload — a seed + one rotated framing.
   const [splitParams, setSplitParams] = useState<{ seed: number; framing: string } | null>(null)
+  // The Cut's per-run payload — a seed + a balanced 3/3/3 temporal field.
+  const [cutParams, setCutParams] = useState<ReturnType<typeof randomCutParams> | null>(null)
   // Force motion on regardless of the OS prefers-reduced-motion setting, so the
   // full experience can be evaluated even on a reduced-motion dev machine.
   const [forceMotion, setForceMotion] = useState(true)
@@ -159,6 +211,7 @@ export function DevGames() {
     setDeck(buildDeck())
     if (key === 'hold') setHoldParams(randomHoldParams())
     if (key === 'split') setSplitParams(randomSplitParams())
+    if (key === 'cut') setCutParams(randomCutParams())
     setRunId(n => n + 1)
     setActive(key)
     setPhase('context')
@@ -209,8 +262,10 @@ export function DevGames() {
         <Stroop key={runId} items={deck} onComplete={handleComplete} forceMotion={forceMotion} />
       ) : active === 'hold' ? (
         <Hold key={runId} params={holdParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
-      ) : (
+      ) : active === 'split' ? (
         <Split key={runId} params={splitParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
+      ) : (
+        <Cut key={runId} params={cutParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
       )
     return (
       <>
@@ -229,6 +284,14 @@ export function DevGames() {
             fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
           }}>
             seed {splitParams.seed} · "{splitParams.framing}"
+          </div>
+        )}
+        {active === 'cut' && cutParams && (
+          <div style={{
+            position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, zIndex: 50,
+            fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+          }}>
+            seed {cutParams.seed} · keep {cutParams.keep_budget} of {cutParams.items.length}
           </div>
         )}
         <button

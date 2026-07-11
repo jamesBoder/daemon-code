@@ -15,7 +15,7 @@ Each day you play a short session of adaptive mini-games — reaction tests, ins
 - **Daily sessions** — 5 mini-games per day, each designed to surface instinct rather than intention
 - **Nightly analysis** — an AI pipeline runs while you sleep, reading your session data and producing a behavioural observation narrated in audio
 - **Shadow prompt** — one question derived from your session, carried into your day unanswered
-- **Process Log** — a live map of your active behavioural patterns (approval loops, avoidance cycles, performance drift) with states that shift as you change
+- **Named patterns** — behavioural patterns the daemon has identified (approval loops, avoidance cycles, performance drift), surfaced as part of your Self read — never as numbers, only as language that shifts as you change
 - **The Chronicle** — every observation the daemon has ever written about you, in order
 - **Voice** — the daemon speaks, in a tone matched to your psychological archetype
 

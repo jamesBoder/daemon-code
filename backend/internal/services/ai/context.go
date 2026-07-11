@@ -31,6 +31,37 @@ const (
 	// Guards against epoch-magnitude values (~1.7e12 ms) that occur when the frontend's
 	// useEffect timing ref fires after a fast interaction — the > 0 guard alone is insufficient.
 	maxTimingMs = 300_000 // 5 minutes; any real user interaction is far below this
+
+	// --- Hold / Split / Cut signal wiring (the fragments' Phase 2) ---
+	// Deterministic response_data → dimension mappings. Each game contributes a
+	// 0–1 value into the shared dimension sums, so its read merges with the
+	// scale/speed/trap sources and reaches both the nightly Analyst and the
+	// live in-session scorer (SessionDimensionSignals) identically.
+
+	// The Hold. Agitation: taps against a void that asks nothing — restless or
+	// reactive — normalized so holdAgitationNorm taps read as max. A clean zero
+	// is itself the signal (calm in emptiness).
+	holdAgitationNorm = 6.0
+	// Patience (discount_factor): resisting the void's dangled exits is valuing
+	// the deeper, slower reward. One resisted temptation reads holdResistBase;
+	// each further one adds holdResistStep (capped at 1). Bolting the moment an
+	// exit is offered reads holdBoltSignal — the steepest discounting the void
+	// can observe.
+	holdResistBase = 0.5
+	holdResistStep = 0.25
+	holdBoltSignal = 0.1
+
+	// The Cut. temporal_focus comes from what survives the field: keeping a
+	// future-tagged item or cutting a past-tagged one both lean future (→ 1.0).
+	// A balanced field carries 6 non-neutral items; require cutTemporalMinN
+	// resolvable decisions before reading anything (a stale client or pruned
+	// pool yields fewer library hits).
+	cutTemporalMinN = 4
+	// Hesitation (neuroticism): aborted tears are reaches that couldn't commit;
+	// a daemon-forced auto-cut (stalled past the deadline) reads as double one.
+	// cutHesitationNorm such events read as max.
+	cutHesitationNorm = 6.0
+	cutAutoCutWeight  = 2.0
 )
 
 // analystContext is the complete pre-computed context object passed to the Analyst Lambda.
@@ -144,6 +175,43 @@ type trapResultData struct {
 	Choice         string `json:"choice"`
 	ResponseTimeMs int    `json:"response_time_ms"`
 	Predicted      *int   `json:"predicted,omitempty"`
+}
+
+// Hold returns a single object per void (frontend Hold.tsx, v:2). Only the
+// fields the dimension engine reads are decoded; dwell/ttfa stay available to
+// the Analyst through the raw card_responses.
+type holdResponseData struct {
+	V                   int     `json:"v"`
+	Ended               string  `json:"ended"`
+	Stillness           float64 `json:"stillness"`
+	TemptationsResisted int     `json:"temptations_resisted"`
+	ReactiveTaps        int     `json:"reactive_taps"`
+	RestlessTaps        int     `json:"restless_taps"`
+	ReleaseAttempts     int     `json:"release_attempts"`
+	LeftOnTemptation    bool    `json:"left_on_temptation"`
+}
+
+// Split returns a single object per table (frontend Split.tsx). v:1 rows predate
+// the real-veto redesign and carry only you_keep; v:2 adds they_get + accepted.
+type splitResponseData struct {
+	V        int     `json:"v"`
+	YouKeep  float64 `json:"you_keep"`
+	TheyGet  float64 `json:"they_get"`
+	Accepted bool    `json:"accepted"`
+}
+
+// Cut returns a single object per field (frontend Cut.tsx, v:1). Item temporal
+// tags are recovered from signal.CutItems by ID — the client's echoed temporal
+// is never trusted (the LookupTrap precedent).
+type cutResponseData struct {
+	V    int `json:"v"`
+	Cuts []struct {
+		ID   string `json:"id"`
+		Auto bool   `json:"auto"`
+	} `json:"cuts"`
+	AbortedTears int      `json:"aborted_tears"`
+	AutoCuts     int      `json:"auto_cuts"`
+	Survivors    []string `json:"survivors"`
 }
 
 // trapBiasMinSamples is the minimum trap responses (per bias, and overall) before
@@ -365,6 +433,98 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 		for dim, sig := range choice.DimensionSignals {
 			dimSums[dim] += sig
 			dimCounts[dim]++
+		}
+	}
+
+	// --- Hold-based dimensions (agitation in the void; patience with its exits) ---
+	for _, r := range responses {
+		if r.FragmentType != "hold" {
+			continue
+		}
+		var res holdResponseData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		taps := float64(res.RestlessTaps + res.ReactiveTaps)
+		if taps < 0 {
+			continue // corrupt row
+		}
+		dimSums["neuroticism"] += math.Min(1, taps/holdAgitationNorm)
+		dimCounts["neuroticism"]++
+
+		// Patience: only when a temptation actually resolved — bolting on one
+		// or resisting at least one. Leaving before the first window finished
+		// says nothing about discounting, so no read.
+		switch {
+		case res.LeftOnTemptation:
+			dimSums["discount_factor"] += holdBoltSignal
+			dimCounts["discount_factor"]++
+		case res.TemptationsResisted > 0:
+			dimSums["discount_factor"] += math.Min(1, holdResistBase+holdResistStep*float64(res.TemptationsResisted-1))
+			dimCounts["discount_factor"]++
+		}
+	}
+
+	// --- Split-based dimensions (the offer under a real veto → agreeableness) ---
+	for _, r := range responses {
+		if r.FragmentType != "split" {
+			continue
+		}
+		var res splitResponseData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		theyGet := res.TheyGet
+		if res.V < 2 {
+			theyGet = 1 - res.YouKeep // pre-veto rows carry only you_keep
+		}
+		if theyGet < 0 || theyGet > 1 {
+			continue // corrupt row
+		}
+		// The disposition is the offer itself, accepted or refused — the verdict
+		// belongs to the counterpart, not the user.
+		dimSums["agreeableness"] += theyGet
+		dimCounts["agreeableness"]++
+	}
+
+	// --- Cut-based dimensions (what survives the field; hesitation at the tear) ---
+	for _, r := range responses {
+		if r.FragmentType != "cut" {
+			continue
+		}
+		var res cutResponseData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		// temporal_focus: every resolvable non-neutral item is one decision —
+		// keeping future or cutting past leans future (1.0); the reverse leans
+		// past (0.0). Temporal tags come from the static library, never the client.
+		futureLean, nonNeutral := 0, 0
+		tally := func(id string, kept bool) {
+			item, ok := signal.LookupCutItem(id)
+			if !ok || item.Temporal == signal.CutTemporalNeutral {
+				return
+			}
+			nonNeutral++
+			if kept == (item.Temporal == signal.CutTemporalFuture) {
+				futureLean++
+			}
+		}
+		for _, c := range res.Cuts {
+			tally(c.ID, false)
+		}
+		for _, id := range res.Survivors {
+			tally(id, true)
+		}
+		if nonNeutral >= cutTemporalMinN {
+			dimSums["temporal_focus"] += float64(futureLean) / float64(nonNeutral)
+			dimCounts["temporal_focus"]++
+		}
+
+		if res.AbortedTears >= 0 && res.AutoCuts >= 0 {
+			hesitation := math.Min(1, (float64(res.AbortedTears)+cutAutoCutWeight*float64(res.AutoCuts))/cutHesitationNorm)
+			dimSums["neuroticism"] += hesitation
+			dimCounts["neuroticism"]++
 		}
 	}
 

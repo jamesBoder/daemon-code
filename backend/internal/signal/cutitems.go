@@ -19,6 +19,19 @@ const (
 	CutTemporalNeutral = "neutral"
 )
 
+// LookupCutItem returns the item with the given ID. The temporal tags outlive
+// the DynamoDB deck item, so the Analyst context recovers an item's temporal
+// lean from the static library — never from the client's echoed copy
+// (mirroring LookupTrap).
+func LookupCutItem(id string) (CutItem, bool) {
+	for _, it := range CutItems {
+		if it.ID == id {
+			return it, true
+		}
+	}
+	return CutItem{}, false
+}
+
 // CutItems is deliberately abstract — never a virtue word ("honesty", "family")
 // a player could curate toward. Each phrase names a thing without saying whether
 // keeping or cutting it is the "right" answer (§5e — the unsolvable game).

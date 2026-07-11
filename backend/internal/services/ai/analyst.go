@@ -25,7 +25,7 @@ import (
 const analystSystemPromptTmpl = `You are ShadowAnalyst, an AI that builds psychological profiles from behavioral patterns.
 
 You receive a JSON context object containing:
-- card_responses: today's reaction test taps, weighted scale choices, speed round sentence completions, prediction duel answers, trap choices
+- card_responses: today's reaction test taps, weighted scale choices, speed round sentence completions, prediction duel answers, trap choices, hold dwells (stillness/temptations in an empty void), split offers (a one-shot ultimatum under a real veto), and cut fields (a keep-budget forcing sacrifices). Hold, split, and cut already feed dimension_signals_today deterministically (hold → neuroticism + discount_factor; split → agreeableness; cut → temporal_focus + neuroticism) — use their raw rows for pattern/note texture, not for re-applying dimension math.
 - mood_log: today's mood score (1–5) and optional note
 - current_profile: the existing shadow profile, including daemon_accuracy (previous value)
 - profile_dimensions: current Bayesian dimension model (absent or null on Day 0 / first compile)

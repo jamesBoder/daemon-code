@@ -65,13 +65,30 @@ func (h *handler) GetSessionRecentDiff(w http.ResponseWriter, r *http.Request) {
 func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
-	deck, err := h.ddb.GetDailyDeck(r.Context(), userID.String())
+	todaysDeck, err := h.ddb.GetDailyDeck(r.Context(), userID.String())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not load session")
 		return
 	}
 
-	if deck == nil {
+	// On-demand regeneration: session-completion-triggered compiles fixed
+	// the daemon running forever with no activity, but left a gap — nothing
+	// re-triggers deck generation for a user who simply missed a day, since
+	// there's no session to complete without a deck to play. Only for users
+	// with an existing profile (CompileCount >= 1) — a genuine Day 0 user
+	// has nothing yet to build a deck from, and that's not this gap.
+	// Best-effort: a failure here just falls through to the existing
+	// not-ready response, same as today.
+	if todaysDeck == nil {
+		if profile, perr := h.q.GetShadowProfile(r.Context(), userID); perr == nil && profile.CompileCount >= 1 {
+			today := time.Now().UTC().Format("2006-01-02") // NOT dynamo.ServiceDate — that rolls to tomorrow past noon UTC, which GetDailyDeck's same-day lookup would never find
+			if gerr := h.deckGen.GenerateForUser(r.Context(), userID, today); gerr == nil {
+				todaysDeck, _ = h.ddb.GetDailyDeck(r.Context(), userID.String())
+			}
+		}
+	}
+
+	if todaysDeck == nil {
 		respondWithJSON(w, http.StatusOK, map[string]interface{}{
 			"fragments": []interface{}{},
 			"ready":     false,
@@ -80,7 +97,7 @@ func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"fragments": deck.Fragments,
+		"fragments": todaysDeck.Fragments,
 		"ready":     true,
 	})
 }

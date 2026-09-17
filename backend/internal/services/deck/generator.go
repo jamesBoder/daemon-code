@@ -115,6 +115,26 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		return fmt.Errorf("parse user_id: %w", err)
 	}
 
+	// The nightly/session-triggered chain always builds the NEXT deck — the
+	// user just finished today's (or it's the 23:00 nightly slot) — so it
+	// stamps with ServiceDate's "roll to tomorrow past noon UTC" policy.
+	return g.GenerateForUser(ctx, userID, dynamo.ServiceDate(time.Now()))
+}
+
+// GenerateForUser builds and stores a deck for one user, stamped with the
+// given date — the same logic Run uses via the nightly/session-triggered
+// chain, extracted so it's callable directly without an EventBridge event
+// and with an explicit date rather than Run's hardcoded "always the next
+// day" policy. Used by GetSessionToday for on-demand regeneration:
+// session-completion-triggered compiles (see docs/simplify-pass.md) fixed
+// the "daemon compiles forever with no activity" problem, but left a gap —
+// nothing re-triggers deck generation for a user who simply missed a day,
+// since there's no session to complete without a deck to play.
+// GetSessionToday calls this with TODAY's actual date (not ServiceDate,
+// which would roll to tomorrow past noon UTC and silently fail to produce
+// a deck GetDailyDeck's same-day query would ever find) when it finds none
+// for today, closing that gap.
+func (g *Generator) GenerateForUser(ctx context.Context, userID uuid.UUID, date string) error {
 	profile, err := g.q.GetShadowProfile(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("get shadow profile: %w", err)
@@ -142,9 +162,6 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 	}
 
 	fragments := g.buildDeck(ctx, profile, patterns, usedContentIDs(prevDeck), pred)
-	// Stamp with the date this deck serves (the following UTC day for the
-	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
-	date := dynamo.ServiceDate(time.Now())
 
 	if err := g.ddb.PutDailyDeck(ctx, dynamo.DailyDeck{
 		UserID:    userID.String(),

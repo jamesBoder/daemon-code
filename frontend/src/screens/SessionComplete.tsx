@@ -25,9 +25,13 @@ export function SessionComplete() {
   const queryClient   = useQueryClient()
   const location      = useLocation()
 
-  const state         = location.state as { fragmentCount?: number; daemonLine?: string } | null
+  const state         = location.state as { fragmentCount?: number; daemonLine?: string; returnTo?: string } | null
   const fragmentCount = state?.fragmentCount ?? 0
   const daemonLine    = state?.daemonLine
+  // Set when the session was started from the new PLAY console
+  // (docs/simplify-pass.md) — absent for the old BottomNav entry point,
+  // whose "Done" behavior (→ /home) is unchanged.
+  const returnTo      = state?.returnTo ?? '/home'
 
   const [ceremonyDone, setCeremonyDone] = useState(false)
 
@@ -138,7 +142,7 @@ export function SessionComplete() {
         </div>
       )}
 
-      <DaemonButton onClick={() => navigate('/home', { replace: true })}>
+      <DaemonButton onClick={() => navigate(returnTo, { replace: true })}>
         Done
       </DaemonButton>
     </div>

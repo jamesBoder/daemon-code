@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { CONSOLE } from '../../lib/console'
-import { CONSOLE_FLICKER_Z_INDEX, CONSOLE_OVERLAY_Z_INDEX, HAIRLINE, HEADER_Z_INDEX, MIN_TOUCH_TARGET } from '../../lib/constants'
+import { CONSOLE_CONTENT_Z_INDEX, CONSOLE_FLICKER_Z_INDEX, CONSOLE_OVERLAY_Z_INDEX, HAIRLINE, HEADER_Z_INDEX, MIN_TOUCH_TARGET } from '../../lib/constants'
 import { playSound } from '../../lib/sound'
 
 export type ConsoleTab = 'play' | 'self'
@@ -147,12 +147,20 @@ export function ConsoleShell({ active, children }: ConsoleShellProps) {
         </button>
       </div>
 
+      {/* Real PLAY/SELF content — explicitly above the scanline/vignette
+          texture (CONSOLE_OVERLAY_Z_INDEX) so interactive UI (buttons etc.)
+          always renders at full clarity. Those overlays have no z-index of
+          their own reason to sit above real content; without this, an
+          "auto" z-index loses to their explicit one regardless of DOM
+          order, which is exactly what washed out the low-contrast Begin
+          button in testing (2026-09-17). */}
       <div
         style={{
           position: 'fixed',
           top: `calc(${CONSOLE.tabStrip.heightPx}px + env(safe-area-inset-top))`,
           left: 0, right: 0, bottom: 0,
           overflowY: 'auto',
+          zIndex: CONSOLE_CONTENT_Z_INDEX,
         }}
       >
         {children}

@@ -1,0 +1,158 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Settings as SettingsIcon } from 'lucide-react'
+import { CONSOLE } from '../../lib/console'
+import { CONSOLE_FLICKER_Z_INDEX, CONSOLE_OVERLAY_Z_INDEX, HAIRLINE, HEADER_Z_INDEX, MIN_TOUCH_TARGET } from '../../lib/constants'
+import { playSound } from '../../lib/sound'
+
+export type ConsoleTab = 'play' | 'self'
+
+const TABS: { key: ConsoleTab; label: string; path: string }[] = [
+  { key: 'play', label: 'PLAY', path: '/play' },
+  { key: 'self', label: 'SELF', path: '/play/self' },
+]
+
+interface ConsoleShellProps {
+  active:   ConsoleTab
+  children: ReactNode
+}
+
+// The persistent console frame wrapping PLAY and SELF (docs/simplify-pass.md,
+// "Frontend spec: shell & navigation" + "visual/design language"). Replaces
+// BottomNav for these two screens with a top tab strip, Pip-Boy-literal per
+// the user's chosen direction — a device you're looking INTO, not a normal
+// app with tabs. New route, additive: BottomNav and every existing screen
+// stay untouched until cutover.
+export function ConsoleShell({ active, children }: ConsoleShellProps) {
+  const navigate = useNavigate()
+  const [flicker, setFlicker] = useState(false)
+
+  function switchTab(tab: ConsoleTab, path: string) {
+    if (tab === active) return
+    playSound('click')
+    setFlicker(true)
+    navigate(path)
+  }
+
+  // Flicker is a brightness dip, not spatial motion — never reduced-motion
+  // gated (see [[reduced-motion-gate]]), plays for every user.
+  useEffect(() => {
+    if (!flicker) return
+    const t = setTimeout(() => setFlicker(false), CONSOLE.tabSwitch.flickerMs)
+    return () => clearTimeout(t)
+  }, [flicker])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--background)' }}>
+      {/* Scanline texture — same layering family as the grain overlay, sits
+          beneath the chrome so tab labels stay crisp. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed', inset: 0, pointerEvents: 'none',
+          zIndex: CONSOLE_OVERLAY_Z_INDEX,
+          backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,${CONSOLE.scanline.opacity}) 0px, rgba(255,255,255,${CONSOLE.scanline.opacity}) 1px, transparent 1px, transparent ${CONSOLE.scanline.repeatPx}px)`,
+        }}
+      />
+      {/* Screen-edge vignette — suggests curved glass rather than a flat view. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed', inset: 0, pointerEvents: 'none',
+          zIndex: CONSOLE_OVERLAY_Z_INDEX,
+          background: `radial-gradient(ellipse at center, transparent ${CONSOLE.vignette.reachPct}%, rgba(0,0,0,${CONSOLE.vignette.opacity}) 100%)`,
+        }}
+      />
+      {/* Tab-switch flicker — a brief whole-screen dip, the device-touch beat
+          that pairs with the tab-switch sound. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed', inset: 0, pointerEvents: 'none',
+          zIndex: CONSOLE_FLICKER_Z_INDEX,
+          background: '#000',
+          opacity: flicker ? CONSOLE.tabSwitch.flickerDipOpacity : 0,
+          transition: `opacity ${CONSOLE.tabSwitch.flickerMs}ms ease-out`,
+        }}
+      />
+
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          height: `calc(${CONSOLE.tabStrip.heightPx}px + env(safe-area-inset-top))`,
+          paddingTop: 'env(safe-area-inset-top)',
+          background: 'rgba(13, 16, 24, 0.92)',
+          borderBottom: `${HAIRLINE} solid rgba(255, 255, 255, 0.07)`,
+          backdropFilter: 'blur(16px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+          display: 'flex', alignItems: 'center',
+          zIndex: HEADER_Z_INDEX,
+        }}
+      >
+        <div style={{ flex: 1, display: 'flex', height: CONSOLE.tabStrip.heightPx }}>
+          {TABS.map(({ key, label, path }) => {
+            const isActive = key === active
+            return (
+              <button
+                key={key}
+                onClick={() => switchTab(key, path)}
+                style={{
+                  flex: '0 0 auto',
+                  height: '100%',
+                  padding: '0 var(--space-5)',
+                  display: 'flex', alignItems: 'center',
+                  position: 'relative',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: CONSOLE.tabStrip.fontSizePx,
+                  letterSpacing: CONSOLE.tabStrip.letterSpacing,
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  textShadow: isActive
+                    ? `${CONSOLE.chromaticGlow.offsetPx}px 0 rgba(220,38,38,${CONSOLE.chromaticGlow.redA}), -${CONSOLE.chromaticGlow.offsetPx}px 0 rgba(34,211,238,${CONSOLE.chromaticGlow.cyanA})`
+                    : 'none',
+                  transition: 'color 0.15s',
+                }}
+              >
+                {label}
+                {isActive && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute', bottom: 0,
+                      left: 'var(--space-5)', right: 'var(--space-5)',
+                      height: CONSOLE.tabStrip.underlineHeightPx,
+                      background: 'var(--accent)',
+                    }}
+                  />
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={() => navigate('/settings')}
+          aria-label="Settings"
+          style={{
+            width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <SettingsIcon size={CONSOLE.settingsIcon.sizePx} strokeWidth={1.5} />
+        </button>
+      </div>
+
+      <div
+        style={{
+          position: 'fixed',
+          top: `calc(${CONSOLE.tabStrip.heightPx}px + env(safe-area-inset-top))`,
+          left: 0, right: 0, bottom: 0,
+          overflowY: 'auto',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}

@@ -47,6 +47,8 @@ export const SESSION_PROGRESS_Z_INDEX = 10   // session progress bar — above b
 export const HEADER_Z_INDEX           = 50   // fixed screen header — above session, below modals
 export const TOAST_Z_INDEX            = 20   // above scrollable content, below modals (MODAL_Z_INDEX)
 export const MODAL_Z_INDEX            = 100  // above all position:fixed session content
+export const CONSOLE_OVERLAY_Z_INDEX  = 40   // console scanline/vignette texture — above content, below the tab strip
+export const CONSOLE_FLICKER_Z_INDEX  = 9998 // console tab-switch dip — above everything except the grain overlay (9999)
 export const MODAL_MAX_WIDTH   = 320   // px — confirm modal max width
 
 // Session

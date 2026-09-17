@@ -17,6 +17,11 @@ const Session        = lazy(() => import('./screens/Session').then(m => ({ defau
 const SessionComplete = lazy(() => import('./screens/SessionComplete').then(m => ({ default: m.SessionComplete })))
 const Codex          = lazy(() => import('./screens/Codex').then(m => ({ default: m.Codex })))
 const Pulse          = lazy(() => import('./screens/Pulse').then(m => ({ default: m.Pulse })))
+// The new console shell (docs/simplify-pass.md) — additive, reachable at
+// /play and /play/self alongside every existing screen, which stay live and
+// unchanged until cutover.
+const Play    = lazy(() => import('./screens/console/Play').then(m => ({ default: m.Play })))
+const SelfTab = lazy(() => import('./screens/console/SelfTab').then(m => ({ default: m.SelfTab })))
 // Dev-only fragment playtest harness. The import lives behind a static
 // import.meta.env.DEV check so Rollup dead-code-eliminates the dynamic import
 // (and its chunk) entirely from production builds.
@@ -71,6 +76,10 @@ function App() {
             <Route path="/pulse"            element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
             <Route path="/session"          element={<ProtectedRoute><Session /></ProtectedRoute>} />
             <Route path="/session/complete" element={<ProtectedRoute><SessionComplete /></ProtectedRoute>} />
+
+            {/* New console shell — additive, does not replace /home or /self */}
+            <Route path="/play"      element={<ProtectedRoute><Play /></ProtectedRoute>} />
+            <Route path="/play/self" element={<ProtectedRoute><SelfTab /></ProtectedRoute>} />
 
             {import.meta.env.DEV && DevGames && (
               <Route path="/dev/games" element={<ProtectedRoute><DevGames /></ProtectedRoute>} />

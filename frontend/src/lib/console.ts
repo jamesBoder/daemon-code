@@ -13,12 +13,21 @@ export const CONSOLE = {
     sizePx: 18,             // hit area uses the shared MIN_TOUCH_TARGET constant, not duplicated here
   },
   scanline: {
-    opacity: 0.05,          // faint — texture, not a visible pattern
-    repeatPx: 3,            // scanline pitch
+    // A soft repeating brightness ripple, not hard on/off lines — the earlier
+    // 1px-hard-edge version read as a burned-in defect rather than texture
+    // (real feedback, 2026-09-17). Wider pitch + a smooth 3-stop gradient
+    // instead of sharp stops.
+    opacity: 0.035,
+    repeatPx: 6,
   },
   vignette: {
-    opacity: 0.55,          // edge darkening strength
-    reachPct: 65,           // % of the frame the radial gradient covers before fading
+    // The base (#070809) is already near-black — darkening edges further is
+    // imperceptible, there's no headroom (real feedback: "hard to see any
+    // darkening"). Lift the CENTER slightly instead and let it fade to
+    // nothing outward — that's what actually reads as a vignette against a
+    // near-black scene.
+    glowOpacity: 0.05,
+    reachPct: 70,           // % of the frame the center glow extends before fading to nothing
   },
   tabSwitch: {
     flickerMs: 110,         // brief dip-then-recover on tab change

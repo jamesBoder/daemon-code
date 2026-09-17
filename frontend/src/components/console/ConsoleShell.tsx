@@ -44,23 +44,27 @@ export function ConsoleShell({ active, children }: ConsoleShellProps) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'var(--background)' }}>
-      {/* Scanline texture — same layering family as the grain overlay, sits
-          beneath the chrome so tab labels stay crisp. */}
+      {/* Scanline texture — a soft repeating ripple (3-stop gradient, not a
+          hard on/off line) so it reads as texture rather than a defect. Same
+          layering family as the grain overlay, sits beneath the chrome so
+          tab labels stay crisp. */}
       <div
         aria-hidden
         style={{
           position: 'fixed', inset: 0, pointerEvents: 'none',
           zIndex: CONSOLE_OVERLAY_Z_INDEX,
-          backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,${CONSOLE.scanline.opacity}) 0px, rgba(255,255,255,${CONSOLE.scanline.opacity}) 1px, transparent 1px, transparent ${CONSOLE.scanline.repeatPx}px)`,
+          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0px, rgba(255,255,255,${CONSOLE.scanline.opacity}) ${CONSOLE.scanline.repeatPx / 2}px, transparent ${CONSOLE.scanline.repeatPx}px)`,
         }}
       />
-      {/* Screen-edge vignette — suggests curved glass rather than a flat view. */}
+      {/* Screen-edge vignette — a subtle center brightness lift fading
+          outward, not edge-darkening (the base is already near-black, so
+          darkening further is imperceptible — see lib/console.ts). */}
       <div
         aria-hidden
         style={{
           position: 'fixed', inset: 0, pointerEvents: 'none',
           zIndex: CONSOLE_OVERLAY_Z_INDEX,
-          background: `radial-gradient(ellipse at center, transparent ${CONSOLE.vignette.reachPct}%, rgba(0,0,0,${CONSOLE.vignette.opacity}) 100%)`,
+          background: `radial-gradient(ellipse at center, rgba(255,255,255,${CONSOLE.vignette.glowOpacity}) 0%, transparent ${CONSOLE.vignette.reachPct}%)`,
         }}
       />
       {/* Tab-switch flicker — a brief whole-screen dip, the device-touch beat

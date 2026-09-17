@@ -162,7 +162,11 @@ export function Settings() {
 
   return (
     <>
-      <ScreenHeader title="settings" />
+      {/* onBack always shown now, not just when reached from the console shell
+          (docs/simplify-pass.md) — the bezel Settings icon has no other way
+          back, and adding it here doesn't remove BottomNav for the old
+          entry path, so nothing regresses there. */}
+      <ScreenHeader title="settings" onBack={() => navigate(-1)} />
       <div className="screen" style={{ overflowY: 'auto', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))`, paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
         <div style={{ padding: 'var(--space-6) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 

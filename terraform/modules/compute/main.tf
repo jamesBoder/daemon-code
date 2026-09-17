@@ -293,7 +293,11 @@ resource "aws_apigatewayv2_api" "api" {
   tags          = var.tags
 
   cors_configuration {
-    allow_origins = ["https://${var.static_domain}"]
+    # feat-console-redesign.daemon-code.pages.dev — Cloudflare Pages branch-
+    # preview URL for the console-redesign work (docs/simplify-pass.md),
+    # temporary while that branch is unmerged. Remove once it's merged or the
+    # branch is deleted.
+    allow_origins = ["https://${var.static_domain}", "https://feat-console-redesign.daemon-code.pages.dev"]
     allow_methods = ["GET", "POST", "DELETE", "PUT", "PATCH"]
     allow_headers = ["Content-Type", "Authorization"]
     max_age       = 86400

@@ -34,7 +34,7 @@ func TestBuildDeckArc(t *testing.T) {
 		if len(deck) < 5 || len(deck) > 6 {
 			t.Fatalf("deck length %d, want 5-6", len(deck))
 		}
-		if deck[0].Type != "reaction_test" && deck[0].Type != "speed_round" {
+		if deck[0].Type != "reaction_test" && deck[0].Type != "speed_round" && deck[0].Type != "stroop" {
 			t.Fatalf("opener type %q, want a fast game", deck[0].Type)
 		}
 		if deck[len(deck)-1].Type != "prediction_duel" {
@@ -697,6 +697,112 @@ func TestBuildDeckCutBeforeEligibility(t *testing.T) {
 		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "cut" {
 				t.Fatal("cut appeared before eligibility")
+			}
+		}
+	}
+}
+
+func TestBuildStroop(t *testing.T) {
+	f := buildStroop(map[string]bool{})
+	if f.Type != "stroop" {
+		t.Fatalf("type %q, want stroop", f.Type)
+	}
+	if f.ID == "" {
+		t.Fatal("stroop fragment has no ID")
+	}
+	var payload struct {
+		Type  string `json:"type"`
+		Items []struct {
+			ID          string    `json:"id"`
+			Word        string    `json:"word"`
+			Axis        string    `json:"axis"`
+			Poles       [2]string `json:"poles"`
+			MeaningPole int       `json:"meaningPole"`
+			Styling     string    `json:"styling"`
+			Cue         string    `json:"cue"`
+			Font        string    `json:"font"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+		t.Fatalf("stroop payload is not valid JSON: %v", err)
+	}
+	if payload.Type != "stroop" {
+		t.Fatalf("payload type %q, want stroop", payload.Type)
+	}
+	if len(payload.Items) != stroopTrialCount {
+		t.Fatalf("stroop run has %d items, want %d", len(payload.Items), stroopTrialCount)
+	}
+
+	// The opening run holds to a single axis (the illusion), then rotates.
+	leadAxis := payload.Items[0].Axis
+	axes := map[string]bool{}
+	for i, it := range payload.Items {
+		lib, ok := signal.LookupStroopItem(it.ID)
+		if !ok {
+			t.Fatalf("item %q not in the stroop library", it.ID)
+		}
+		if it.Word != lib.Word || it.Axis != lib.Axis || it.MeaningPole != lib.MeaningPole || it.Styling != lib.Styling {
+			t.Fatalf("item %q payload drifted from the library: %+v vs %+v", it.ID, it, lib)
+		}
+		if it.Poles != signal.StroopAxes[it.Axis].Poles {
+			t.Fatalf("item %q poles %v, want %v", it.ID, it.Poles, signal.StroopAxes[it.Axis].Poles)
+		}
+		if i < stroopLeadCount && it.Axis != leadAxis {
+			t.Fatalf("lead item %d has axis %q, want the single lead axis %q", i, it.Axis, leadAxis)
+		}
+		axes[it.Axis] = true
+	}
+	if len(axes) < 2 {
+		t.Fatalf("stroop run never rotated off the lead axis: %v", axes)
+	}
+}
+
+func TestPickStroopItemsExcludesServed(t *testing.T) {
+	exclude := map[string]bool{}
+	for _, it := range signal.StroopItems[:stroopTrialCount] {
+		exclude[it.ID] = true
+	}
+	for i := 0; i < 20; i++ {
+		for _, it := range pickStroopItems(exclude) {
+			if exclude[it.ID] {
+				t.Fatalf("served item %q reappeared with a sufficient fresh pool", it.ID)
+			}
+		}
+	}
+}
+
+func TestBuildDeckStroopSelection(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 20}
+	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
+
+	sawStroop := false
+	for i := 0; i < 500; i++ {
+		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		stroops := 0
+		for _, f := range deck {
+			if f.Type == "stroop" {
+				stroops++
+			}
+		}
+		if stroops > 1 {
+			t.Fatalf("deck has %d stroops: %v", stroops, deckTypes(deck))
+		}
+		sawStroop = sawStroop || stroops == 1
+	}
+	if !sawStroop {
+		t.Fatal("stroop never appeared across 500 decks for an eligible user")
+	}
+}
+
+// Before its unlock, the Stroop must never enter the deck.
+func TestBuildDeckStroopBeforeEligibility(t *testing.T) {
+	g := &Generator{}
+	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: stroopMinCompiles - 1}
+	for i := 0; i < 200; i++ {
+		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+			if f.Type == "stroop" {
+				t.Fatal("stroop appeared before eligibility")
 			}
 		}
 	}

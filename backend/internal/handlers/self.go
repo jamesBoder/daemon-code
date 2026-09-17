@@ -18,8 +18,13 @@ type selfDimension struct {
 
 // selfResponse is the read the Self screen renders the Portrait from. No raw
 // numbers are ever shown to the user — they drive the generative form.
+// DimensionsPrev is the prior snapshot (profile_dimensions_prev, taken every
+// snapshotInterval compiles) — the Portrait morphs from it on load so the
+// change in the read is *seen*, not just stored. Omitted when no snapshot
+// exists yet.
 type selfResponse struct {
 	Dimensions       map[string]selfDimension `json:"dimensions"`
+	DimensionsPrev   map[string]selfDimension `json:"dimensionsPrev,omitempty"`
 	SignalConfidence float64                  `json:"signalConfidence"`
 	Archetype        string                   `json:"archetype"`
 	Stage            string                   `json:"stage"`
@@ -47,6 +52,7 @@ func (h *handler) GetSelf(w http.ResponseWriter, r *http.Request) {
 
 	resp := selfResponse{
 		Dimensions:       dims,
+		DimensionsPrev:   parseDimensions(profile.ProfileDimensionsPrev), // nil (omitted) until the first snapshot
 		SignalConfidence: numericToFloat(profile.SignalConfidence),
 		Archetype:        profile.PrimaryArchetype,
 		Stage:            profile.Stage,

@@ -8,6 +8,7 @@ import { TrapGame } from './TrapGame'
 import type { TrapChoice } from './TrapGame'
 import { Stroop } from './Stroop'
 import type { StroopItem } from './Stroop'
+import { STROOP_FONTS } from '../../lib/minigame'
 import { Hold } from './Hold'
 import { Split } from './Split'
 import { Cut } from './Cut'
@@ -56,8 +57,14 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
     />
   ),
   stroop: ({ raw, onComplete }) => (
+    // buildStroop stamps items with a font KEY (e.g. "nosifer"); the CSS stack
+    // lives client-side in STROOP_FONTS. An unknown/absent key falls back to
+    // the styling register's default face inside Stroop itself.
     <Stroop
-      items={raw.items as StroopItem[]}
+      items={(raw.items as StroopItem[]).map(it => ({
+        ...it,
+        font: it.font ? STROOP_FONTS[it.font] : undefined,
+      }))}
       onComplete={onComplete}
     />
   ),

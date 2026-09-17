@@ -481,6 +481,22 @@ export const MG = {
 
 } as const
 
+/** The Stroop Variant's dissonant faces, keyed by the short names the backend
+ *  stamps on deck items (signal/stroopitems.go). The server curates WHICH word
+ *  gets which face; what the face IS (the CSS stack, loaded in index.html)
+ *  lives here so no CSS ever crosses the API. */
+export const STROOP_FONTS: Record<string, string> = {
+  nosifer: "'Nosifer', var(--font-display)",             // dripping horror
+  abril:   "'Abril Fatface', var(--font-display)",       // dramatic high-contrast display (legible)
+  eater:   "'Eater', var(--font-display)",               // horror
+  cinzel:  "'Cinzel', var(--font-display)",              // engraved classical
+  glitch:  "'Rubik Glitch', var(--font-display)",        // datamosh glitch
+  bungee:  "'Bungee', var(--font-display)",              // chunky block
+  cinzeld: "'Cinzel Decorative', var(--font-display)",   // ornate engraved caps (legible)
+  megrim:  "'Megrim', var(--font-display)",              // thin eerie geometric
+  monoton: "'Monoton', var(--font-display)",             // retro lined
+}
+
 /** True when the viewport is wider than the desktop breakpoint.
  *  Computed once at module load — safe for layout decisions. */
 export const isDesktop =

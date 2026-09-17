@@ -66,6 +66,17 @@ const (
 	cutFieldSize      = 9 // items on the field (3 past + 3 future + 3 neutral)
 	cutFieldPerBucket = 3 // items sampled per temporal bucket
 	cutKeepBudget     = 3 // survivors required — forces exactly 6 cuts
+
+	// The Stroop Variant — meaning vs. styling in open conflict, snap-judged on
+	// a rotating axis. Mechanically a fast game (rapid binary responses), so it
+	// lives in the second fast slot alongside the speed round rather than in the
+	// special-beat chain — regular presence, not a rare event. The lead run
+	// opens on a single axis so the player settles, then the axis rotates
+	// (§5e — the illusion).
+	stroopMinCompiles = 3 // a few sessions of plain fast games before the dissonant one
+	stroopOdds        = 3 // 1-in-this chance the second fast slot is a stroop
+	stroopTrialCount  = 14
+	stroopLeadCount   = 4 // opening single-axis run before the rotation starts
 )
 
 // exclusions holds content IDs served by the previous deck, kept out of
@@ -76,6 +87,7 @@ type exclusions struct {
 	reactionWords  map[string]bool
 	trapIDs        map[string]bool
 	cutItemIDs     map[string]bool
+	stroopItemIDs  map[string]bool
 }
 
 type Generator struct {
@@ -270,8 +282,13 @@ func (g *Generator) pickFastGames(profile db.ShadowProfile, exclude exclusions) 
 		reaction, other = other, reaction
 	}
 
+	// The second fast slot rotates: usually the other reaction word set or a
+	// speed round, occasionally the Stroop — the dissonant one stays a jolt,
+	// not a routine.
 	second := other
-	if int(profile.CompileCount) >= speedRoundMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
+	if int(profile.CompileCount) >= stroopMinCompiles && rand.Intn(stroopOdds) == 0 { // #nosec G404 — non-crypto game selection
+		second = buildStroop(exclude.stroopItemIDs)
+	} else if int(profile.CompileCount) >= speedRoundMinCompiles && rand.Intn(2) == 0 { // #nosec G404 — non-crypto game selection
 		if sr, ok := buildSpeedRound(profile.CompileCount, exclude.speedPromptIDs); ok {
 			second = sr
 		}
@@ -348,6 +365,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		reactionWords:  make(map[string]bool),
 		trapIDs:        make(map[string]bool),
 		cutItemIDs:     make(map[string]bool),
+		stroopItemIDs:  make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -395,6 +413,17 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 			if json.Unmarshal([]byte(f.Payload), &p) == nil {
 				for _, it := range p.Items {
 					ex.cutItemIDs[it.ID] = true
+				}
+			}
+		case "stroop":
+			var p struct {
+				Items []struct {
+					ID string `json:"id"`
+				} `json:"items"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil {
+				for _, it := range p.Items {
+					ex.stroopItemIDs[it.ID] = true
 				}
 			}
 		}
@@ -634,6 +663,80 @@ func buildCut(exclude map[string]bool) dynamo.Fragment {
 		ID:      uuid.New().String(),
 		Type:    "cut",
 		Payload: string(payload),
+	}
+}
+
+// pickStroopItems samples tonight's conflict words: an opening run of
+// stroopLeadCount items on a single axis (the illusion — §5e #3: let the player
+// settle before the rotation pulls the rug), then the rest drawn across every
+// other item. Items served yesterday are held back unless the pool runs short,
+// per the standard fresh/served fallback.
+func pickStroopItems(exclude map[string]bool) []signal.StroopItem {
+	var fresh, served []signal.StroopItem
+	for _, it := range signal.StroopItems {
+		if exclude[it.ID] {
+			served = append(served, it)
+		} else {
+			fresh = append(fresh, it)
+		}
+	}
+	rand.Shuffle(len(fresh), func(i, j int) { fresh[i], fresh[j] = fresh[j], fresh[i] })      // #nosec G404 — non-crypto content sampling
+	rand.Shuffle(len(served), func(i, j int) { served[i], served[j] = served[j], served[i] }) // #nosec G404 — non-crypto content sampling
+	pool := append(fresh, served...)
+
+	// Lead axis: the first fresh item's axis anchors the opening run, so the
+	// lead rotates night to night with the shuffle.
+	var lead, rest []signal.StroopItem
+	leadAxis := pool[0].Axis
+	for _, it := range pool {
+		if it.Axis == leadAxis && len(lead) < stroopLeadCount {
+			lead = append(lead, it)
+		} else {
+			rest = append(rest, it)
+		}
+	}
+	n := stroopTrialCount - len(lead)
+	if n > len(rest) {
+		n = len(rest)
+	}
+	return append(lead, rest[:n]...)
+}
+
+// buildStroop stamps the Stroop Variant — a word's meaning and its styling in
+// open conflict, snap-judged on an axis that rotates across the run
+// (features-horizon.md §5a/§5d/§5e). The payload items mirror the frontend
+// StroopItem shape verbatim; meaning-pole and styling tags ride along for
+// rendering, but the Analyst recovers congruence server-side via
+// signal.LookupStroopItem, never from the echoed copy.
+func buildStroop(exclude map[string]bool) dynamo.Fragment {
+	picked := pickStroopItems(exclude)
+	items := make([]map[string]interface{}, len(picked))
+	for i, it := range picked {
+		m := map[string]interface{}{
+			"id":          it.ID,
+			"word":        it.Word,
+			"axis":        it.Axis,
+			"poles":       signal.StroopAxes[it.Axis].Poles,
+			"meaningPole": it.MeaningPole,
+			"styling":     it.Styling,
+		}
+		if it.Cue != "" {
+			m["cue"] = it.Cue
+		}
+		if it.Font != "" {
+			m["font"] = it.Font
+		}
+		items[i] = m
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type":  "stroop",
+		"items": items,
+	})
+	return dynamo.Fragment{
+		ID:         uuid.New().String(),
+		Type:       "stroop",
+		Payload:    string(payload),
+		DaemonNote: "The word and its costume will disagree. Notice which one you obey.",
 	}
 }
 

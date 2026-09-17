@@ -114,6 +114,7 @@ export const SIGNAL_HINTS_KEY          = 'daemon_hints_seen'      // localStorag
 export const SIGNAL_WHISPER_DISPLAY_MS = 6000                     // ms each whisper is visible
 export const SIGNAL_WHISPER_FADE_MS    = 400                      // ms fade in / fade out
 export const FRAGMENT_HINTS_KEY        = 'daemon_fragment_hints'  // localStorage JSON string[] — tracks seen fragment types
+export const PORTRAIT_MORPH_SEEN_KEY   = 'portrait_morph_seen'    // localStorage string — last snapshot pair the Portrait morph played to completion
 export const FRAGMENT_CONTEXT_MS       = 2000                     // ms fragment context line shown before game starts
 
 // Decode effect — the daemon line scrambling into place (DecodeText)

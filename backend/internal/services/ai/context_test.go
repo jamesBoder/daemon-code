@@ -359,15 +359,73 @@ func TestComputeDimensionSignalsCutBelowTemporalFloor(t *testing.T) {
 }
 
 func TestComputeDimensionSignalsNewGamesMalformed(t *testing.T) {
-	// Malformed rows for all three games must contribute nothing.
+	// Malformed rows for the new games must contribute nothing.
 	out := computeDimensionSignals([]db.CardResponse{
 		{FragmentType: "hold", ResponseData: []byte(`not json`)},
 		{FragmentType: "split", ResponseData: []byte(`not json`)},
 		{FragmentType: "cut", ResponseData: []byte(`not json`)},
+		{FragmentType: "stroop", ResponseData: []byte(`not json`)},
 		// An out-of-range offer (corrupt client) must be dropped too.
 		splitResponse(t, splitResponseData{V: 2, TheyGet: 1.7}),
 	}, nil)
 	if len(out) != 0 {
 		t.Fatalf("malformed/corrupt responses produced signals: %v", out)
+	}
+}
+
+// --- Stroop signal wiring ---
+
+// stroopResponse builds a stroop card_responses row from wire-format trials.
+// followedMeaning is true/false, or nil for a timeout — mirroring Stroop.tsx.
+func stroopResponse(t *testing.T, trials ...map[string]interface{}) db.CardResponse {
+	t.Helper()
+	rd, err := json.Marshal(map[string]interface{}{"v": 1, "trials": trials})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db.CardResponse{FragmentType: "stroop", ResponseData: rd}
+}
+
+func stroopTrial(id string, followed interface{}) map[string]interface{} {
+	return map[string]interface{}{"id": id, "followedMeaning": followed}
+}
+
+func TestComputeDimensionSignalsStroop(t *testing.T) {
+	// 4 incongruent trials (meaning and styling at opposite poles), 2 pulled by
+	// the look → 0.5 neuroticism. The congruent trial (threat_rest: calm styling
+	// on a positive word) and the timeout must contribute nothing.
+	out := computeDimensionSignals([]db.CardResponse{
+		stroopResponse(t,
+			stroopTrial("threat_safe", false), // pulled
+			stroopTrial("threat_home", true),  // held to the meaning
+			stroopTrial("attach_hold", false), // pulled
+			stroopTrial("trust_open", true),   // held to the meaning
+			stroopTrial("threat_rest", false), // congruent — not diagnostic
+			stroopTrial("threat_danger", nil), // timeout — no judgment
+		),
+	}, nil)
+	neuro, ok := out["neuroticism"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("neuroticism signal missing from %v", out)
+	}
+	if neuro["signal"] != 0.5 {
+		t.Fatalf("neuroticism signal = %v, want 0.5", neuro["signal"])
+	}
+}
+
+func TestComputeDimensionSignalsStroopBelowFloor(t *testing.T) {
+	// Only 3 resolved incongruent trials (< stroopPullMinN) — unknown IDs and
+	// congruent trials don't count toward the floor → no read at all.
+	out := computeDimensionSignals([]db.CardResponse{
+		stroopResponse(t,
+			stroopTrial("threat_safe", false),
+			stroopTrial("threat_home", true),
+			stroopTrial("trust_open", false),
+			stroopTrial("threat_rest", true),      // congruent
+			stroopTrial("not_a_real_item", false), // unknown ID
+		),
+	}, nil)
+	if _, ok := out["neuroticism"]; ok {
+		t.Fatal("neuroticism appeared below the incongruent-trial floor")
 	}
 }

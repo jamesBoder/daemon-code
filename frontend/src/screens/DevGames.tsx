@@ -5,7 +5,7 @@ import { Hold } from '../components/minigames/Hold'
 import { Split } from '../components/minigames/Split'
 import { Cut } from '../components/minigames/Cut'
 import { copy } from '../lib/copy'
-import { MG } from '../lib/minigame'
+import { MG, STROOP_FONTS } from '../lib/minigame'
 import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
 
 // Dev-only playtest harness for the Phase 1 fragment batch (features-phase1.md).
@@ -17,15 +17,17 @@ import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
 
 // Extravagant fonts (§5d) — most words use the register default (Anton/Cormorant);
 // many use loud display faces to vary the texture and the distractor.
-const NOSIFER = "'Nosifer', var(--font-display)"            // dripping horror
-const ABRIL  = "'Abril Fatface', var(--font-display)"      // dramatic high-contrast display (legible)
-const EATER   = "'Eater', var(--font-display)"              // horror
-const CINZEL  = "'Cinzel', var(--font-display)"             // engraved classical
-const GLITCH  = "'Rubik Glitch', var(--font-display)"       // datamosh glitch
-const BUNGEE  = "'Bungee', var(--font-display)"             // chunky block
-const CINZELD = "'Cinzel Decorative', var(--font-display)" // ornate engraved caps (legible)
-const MEGRIM  = "'Megrim', var(--font-display)"             // thin eerie geometric
-const MONOTON = "'Monoton', var(--font-display)"            // retro lined
+// Single source of truth for the CSS stacks is STROOP_FONTS (minigame.ts) —
+// the same map the fragment registry uses to resolve the backend's font keys.
+const NOSIFER = STROOP_FONTS.nosifer
+const ABRIL   = STROOP_FONTS.abril
+const EATER   = STROOP_FONTS.eater
+const CINZEL  = STROOP_FONTS.cinzel
+const GLITCH  = STROOP_FONTS.glitch
+const BUNGEE  = STROOP_FONTS.bungee
+const CINZELD = STROOP_FONTS.cinzeld
+const MEGRIM  = STROOP_FONTS.megrim
+const MONOTON = STROOP_FONTS.monoton
 
 // The "trick": the response axis rotates. A sharp player who settles into one
 // judgment gets the rug pulled. Each axis also reads a different dimension.

@@ -182,6 +182,12 @@ export const copy = {
       weakening: 'losing its grip',
     } as Record<string, string>,
     patternsForming: 'Something else is still forming. The daemon is watching it.',
+    // Trend since the last read (ProcessDiff via /session/recent-diff) — the
+    // direction of movement as language, never a delta or a percentage.
+    patternsTrendLines: {
+      strength_up:   'gaining ground since the last read',
+      strength_down: 'fading since the last read',
+    } as Record<string, string>,
   },
   onboarding: {
     // 60 words — broad coverage across all four archetypes + neutral

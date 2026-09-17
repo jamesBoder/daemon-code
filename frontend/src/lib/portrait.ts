@@ -42,6 +42,13 @@ export const PORTRAIT = {
   breatheSpeed: 0.0006, // radians/ms
   rotateSpeed: 0.000035, // radians/ms (slow drift)
 
+  // The morph — when a prior snapshot exists and differs from the current read,
+  // the Portrait opens as the old form and crossfades into the new one: the
+  // change in the read made visible ("you, then — you, now"). Once per app
+  // session per snapshot pair, so it stays an event, not wallpaper.
+  morphMs: 3200, // crossfade duration
+  morphHoldMs: 600, // beat on the old form before the crossfade starts
+
   // Render detail — the curve/gradient shaping constants the renderer applies.
   // Hoisted out of draw()/tracePetal() so the form stays tunable from one place.
   turbFreq: 3, // angular frequency of the neuroticism edge wobble
@@ -105,6 +112,16 @@ export function seededRandom(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+// The prior snapshot as its own renderable read, or null when there is nothing
+// to morph from: no snapshot yet, or a snapshot identical to the current read.
+export function prevRead(read: SelfRead): SelfRead | null {
+  const prev = read.dimensionsPrev
+  if (!prev || Object.keys(prev).length === 0) return null
+  const asRead: SelfRead = { ...read, dimensions: prev, dimensionsPrev: undefined }
+  if (hashScores(asRead) === hashScores(read)) return null
+  return asRead
 }
 
 // Map the daemon's read onto visual parameters. The numbers never surface to the

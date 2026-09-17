@@ -62,6 +62,14 @@ const (
 	// cutHesitationNorm such events read as max.
 	cutHesitationNorm = 6.0
 	cutAutoCutWeight  = 2.0
+
+	// The Stroop Variant. Only INCONGRUENT trials are diagnostic — where the
+	// word's meaning and its styling point at opposite poles, so following one
+	// means defying the other. Being pulled by the look on such a trial is the
+	// threat-calibration signal (styling over content → neuroticism). Congruent
+	// trials and timeouts say nothing and are skipped; require stroopPullMinN
+	// resolved incongruent trials before reading anything.
+	stroopPullMinN = 4
 )
 
 // analystContext is the complete pre-computed context object passed to the Analyst Lambda.
@@ -212,6 +220,17 @@ type cutResponseData struct {
 	AbortedTears int      `json:"aborted_tears"`
 	AutoCuts     int      `json:"auto_cuts"`
 	Survivors    []string `json:"survivors"`
+}
+
+// Stroop returns one object per run (frontend Stroop.tsx, v:1). FollowedMeaning
+// is nil on a timeout. Congruence is recovered from signal.StroopItems by ID —
+// the client's echoed styling is never trusted (the LookupTrap precedent).
+type stroopResponseData struct {
+	V      int `json:"v"`
+	Trials []struct {
+		ID              string `json:"id"`
+		FollowedMeaning *bool  `json:"followedMeaning"`
+	} `json:"trials"`
 }
 
 // trapBiasMinSamples is the minimum trap responses (per bias, and overall) before
@@ -524,6 +543,35 @@ func computeDimensionSignals(responses []db.CardResponse, reactionTimes []float6
 		if res.AbortedTears >= 0 && res.AutoCuts >= 0 {
 			hesitation := math.Min(1, (float64(res.AbortedTears)+cutAutoCutWeight*float64(res.AutoCuts))/cutHesitationNorm)
 			dimSums["neuroticism"] += hesitation
+			dimCounts["neuroticism"]++
+		}
+	}
+
+	// --- Stroop-based dimensions (pulled by the look over the word → neuroticism) ---
+	for _, r := range responses {
+		if r.FragmentType != "stroop" {
+			continue
+		}
+		var res stroopResponseData
+		if json.Unmarshal(r.ResponseData, &res) != nil {
+			continue
+		}
+		pulled, incongruent := 0, 0
+		for _, t := range res.Trials {
+			if t.FollowedMeaning == nil {
+				continue // timeout — no judgment was made
+			}
+			item, ok := signal.LookupStroopItem(t.ID)
+			if !ok || !item.Incongruent() {
+				continue // congruent trials can't separate meaning from styling
+			}
+			incongruent++
+			if !*t.FollowedMeaning {
+				pulled++
+			}
+		}
+		if incongruent >= stroopPullMinN {
+			dimSums["neuroticism"] += float64(pulled) / float64(incongruent)
 			dimCounts["neuroticism"]++
 		}
 	}

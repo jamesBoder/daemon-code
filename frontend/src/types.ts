@@ -36,6 +36,9 @@ export interface DimensionValue {
 // maps and treats any missing one as zero-confidence.
 export interface SelfRead {
   dimensions: Partial<Record<string, DimensionValue>>
+  /** Prior dimension snapshot (every few compiles) — the Portrait morphs from
+   *  it on load. Absent until the first snapshot exists. */
+  dimensionsPrev?: Partial<Record<string, DimensionValue>>
   signalConfidence: number
   archetype: Archetype
   stage: OrbState

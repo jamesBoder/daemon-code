@@ -16,7 +16,7 @@ import {
   SCREEN_HEADER_HEIGHT,
 } from '../lib/constants'
 import { copy } from '../lib/copy'
-import type { Process, ProcessState } from '../types'
+import type { Process, ProcessState, RecentDiffResponse } from '../types'
 
 const SELF = {
   portraitSize: 300, // px — square canvas edge (capped to viewport by Portrait)
@@ -46,6 +46,21 @@ export function Self() {
     queryFn: () => apiFetchJson<Process[]>('/processes'),
     staleTime: 5 * 60 * 1000,
   })
+
+  // The most recent movement (nightly compile or live scorer) — gives each
+  // pattern a direction, not just a state. Best-effort: a miss just means no
+  // trend lines.
+  const { data: recentDiff } = useQuery({
+    queryKey: ['recent-diff'],
+    queryFn: () => apiFetchJson<RecentDiffResponse>('/session/recent-diff'),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const trendById = new Map<string, string>()
+  for (const d of recentDiff?.diff ?? []) {
+    const line = copy.self.patternsTrendLines[d.change]
+    if (line) trendById.set(d.id, line)
+  }
 
   const named = processes
     .filter(p => !p.unnamed && p.name)
@@ -161,6 +176,11 @@ export function Self() {
                             {copy.self.patternsStateLines[p.state] ?? copy.self.patternsStateLines.sleeping}
                           </span>
                         </div>
+                        {trendById.has(p.id) && (
+                          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', lineHeight: 'var(--leading-xs)', color: 'var(--accent)', fontStyle: 'italic' }}>
+                            {trendById.get(p.id)}
+                          </span>
+                        )}
                         {p.daemon_note && (
                           <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', lineHeight: 'var(--leading-base)', color: 'var(--text-secondary)', margin: 0 }}>
                             {p.daemon_note}

@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/middleware"
@@ -128,6 +130,10 @@ type sessionCompleteResponse struct {
 // PostSessionComplete runs the cheap deterministic scorer when a session's deck
 // finishes: it moves the bars of reinforced processes, may seed one "still
 // forming" process, and returns a varied daemon line. Free and instant.
+//
+// This is also where the heavier Analyst pipeline gets triggered — the daemon
+// only compiles on days a session actually completed, not on a nightly sweep
+// of every user regardless of activity (see docs/simplify-pass.md).
 func (h *handler) PostSessionComplete(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
@@ -135,6 +141,17 @@ func (h *handler) PostSessionComplete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not finalize session")
 		return
+	}
+
+	// Trigger Analyst immediately — fire-and-forget, do not block the response.
+	if h.sqsClient != nil && h.cfg.SQSQueueURL != "" {
+		body, _ := json.Marshal(map[string]string{"user_id": userID.String()})
+		if _, err := h.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+			QueueUrl:    aws.String(h.cfg.SQSQueueURL),
+			MessageBody: aws.String(string(body)),
+		}); err != nil {
+			log.Printf("session complete: trigger analyst for user %s: %v", userID, err)
+		}
 	}
 
 	respondWithJSON(w, http.StatusOK, sessionCompleteResponse{Diff: result.Diff, DaemonLine: result.DaemonLine})

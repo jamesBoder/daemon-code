@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -29,7 +30,7 @@ func TestBuildDeckArc(t *testing.T) {
 
 	sawSpeedRound := false
 	for i := 0; i < 200; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 
 		if len(deck) < 5 || len(deck) > 6 {
 			t.Fatalf("deck length %d, want 5-6", len(deck))
@@ -76,7 +77,7 @@ func TestBuildDeckBeforeSpeedRoundEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 0}
 	for i := 0; i < 50; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "speed_round" {
 				t.Fatal("speed round appeared before eligibility")
 			}
@@ -128,7 +129,7 @@ func TestBuildSpeedRoundExcludesServed(t *testing.T) {
 
 func TestBuildDeckNoPatternsHasNoDuel(t *testing.T) {
 	g := &Generator{}
-	deck := g.buildDeck(db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{}, db.TomorrowPrediction{})
+	deck := g.buildDeck(context.Background(), db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{}, db.TomorrowPrediction{})
 	for _, f := range deck {
 		if f.Type == "prediction_duel" {
 			t.Fatal("duel present without patterns")
@@ -198,7 +199,7 @@ func TestReactionTestSampling(t *testing.T) {
 		Words []string `json:"words"`
 	}
 	for i := 0; i < 100; i++ {
-		deck := g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{})
 		seen := map[string]bool{}
 		for _, f := range deck {
 			if f.Type != "reaction_test" {
@@ -410,7 +411,7 @@ func TestBuildDeckHoldSelection(t *testing.T) {
 
 	sawHold := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		holds, traps := 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -441,7 +442,7 @@ func TestBuildDeckHoldBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: holdMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "hold" {
 				t.Fatal("hold appeared before eligibility")
 			}
@@ -511,7 +512,7 @@ func TestBuildDeckSplitSelection(t *testing.T) {
 
 	sawSplit := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		splits, traps, holds := 0, 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -544,7 +545,7 @@ func TestBuildDeckSplitBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: splitMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "split" {
 				t.Fatal("split appeared before eligibility")
 			}
@@ -659,7 +660,7 @@ func TestBuildDeckCutSelection(t *testing.T) {
 
 	sawCut := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		cuts, traps, holds, splits := 0, 0, 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -694,7 +695,7 @@ func TestBuildDeckCutBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: cutMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "cut" {
 				t.Fatal("cut appeared before eligibility")
 			}

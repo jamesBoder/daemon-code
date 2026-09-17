@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -71,21 +72,34 @@ const (
 // exclusions holds content IDs served by the previous deck, kept out of
 // tonight's sampling so consecutive sessions don't repeat.
 type exclusions struct {
-	pairIDs        map[string]bool
-	speedPromptIDs map[string]bool
-	reactionWords  map[string]bool
-	trapIDs        map[string]bool
-	cutItemIDs     map[string]bool
+	pairIDs          map[string]bool
+	speedPromptIDs   map[string]bool
+	reactionWords    map[string]bool
+	trapIDs          map[string]bool
+	cutItemIDs       map[string]bool
+	pulseScenarioIDs map[string]bool
 }
 
 type Generator struct {
 	cfg *appconfig.Config
 	ddb *dynamo.Client
 	q   *db.Queries
+
+	// pulseGen is nil on a zero-value Generator (every existing test constructs
+	// one this way) — buildPulse treats that as "beat unavailable" rather than
+	// panicking, so none of those tests need updating to exercise a network call
+	// they were never meant to make. NewGenerator always sets it.
+	pulseGen pulseTextGenerator
 }
 
 func NewGenerator(cfg *appconfig.Config, ddb *dynamo.Client, q *db.Queries) *Generator {
-	return &Generator{cfg: cfg, ddb: ddb, q: q}
+	httpCl := &http.Client{Timeout: 60 * time.Second}
+	return &Generator{
+		cfg:      cfg,
+		ddb:      ddb,
+		q:        q,
+		pulseGen: &anthropicPulseGenerator{apiKey: cfg.AnthropicAPIKey, httpCl: httpCl},
+	}
 }
 
 func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) error {
@@ -127,7 +141,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		pred = db.TomorrowPrediction{}
 	}
 
-	fragments := g.buildDeck(profile, patterns, usedContentIDs(prevDeck), pred)
+	fragments := g.buildDeck(ctx, profile, patterns, usedContentIDs(prevDeck), pred)
 	// Stamp with the date this deck serves (the following UTC day for the
 	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
 	date := dynamo.ServiceDate(time.Now())
@@ -159,7 +173,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 // assembly below, register its renderer in the frontend fragment registry, and
 // teach computeDimensionSignals (internal/services/ai/context.go) its
 // response_data shape.
-func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions, pred db.TomorrowPrediction) []dynamo.Fragment {
+func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions, pred db.TomorrowPrediction) []dynamo.Fragment {
 	fast := g.pickFastGames(profile, exclude)
 	opener, second := fast[0], fast[1]
 
@@ -222,6 +236,23 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 		}
 	}
 
+	// The Map — the fifth and last special middle beat: mutually exclusive with
+	// a trap, hold, split, and cut (one special beat per session). Unlike its
+	// siblings this one calls out to Anthropic to generate its daemon text;
+	// buildPulse handles a failed call with hedged fallback text rather than
+	// dropping the beat, and g.pulseGen is nil on a zero-value Generator (every
+	// existing test), so this never fires unexpectedly in tests that don't ask
+	// for it. Replaces one scale so length holds, same as the rest of the chain.
+	var pulse *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && split == nil && cut == nil && int(profile.CompileCount) >= pulseMinCompiles && rand.Intn(pulseOdds) == 0 { // #nosec G404 — non-crypto game selection
+		if pf, ok := buildPulse(ctx, g.pulseGen, profile, exclude.pulseScenarioIDs); ok {
+			pulse = &pf
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -237,6 +268,9 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	}
 	if cut != nil {
 		middle = append(middle, *cut)
+	}
+	if pulse != nil {
+		middle = append(middle, *pulse)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -343,11 +377,12 @@ func adjacencyViolations(fragments []dynamo.Fragment, prevType string) int {
 // contribute nothing.
 func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 	ex := exclusions{
-		pairIDs:        make(map[string]bool),
-		speedPromptIDs: make(map[string]bool),
-		reactionWords:  make(map[string]bool),
-		trapIDs:        make(map[string]bool),
-		cutItemIDs:     make(map[string]bool),
+		pairIDs:          make(map[string]bool),
+		speedPromptIDs:   make(map[string]bool),
+		reactionWords:    make(map[string]bool),
+		trapIDs:          make(map[string]bool),
+		cutItemIDs:       make(map[string]bool),
+		pulseScenarioIDs: make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -396,6 +431,13 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 				for _, it := range p.Items {
 					ex.cutItemIDs[it.ID] = true
 				}
+			}
+		case "pulse":
+			var p struct {
+				ScenarioID string `json:"scenario_id"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.ScenarioID != "" {
+				ex.pulseScenarioIDs[p.ScenarioID] = true
 			}
 		}
 	}

@@ -41,6 +41,7 @@ type ShadowState struct {
 	OrbState        string `dynamodbav:"orb_state"`  // profile.Stage at time of compile; used by Chronicle
 	DaemonProse     string `dynamodbav:"daemon_prose"`
 	ShadowPrompt    string `dynamodbav:"shadow_prompt"` // Mirror Method question; written by Narrator
+	Takeaway        string `dynamodbav:"takeaway"`      // short quotable line distilling the prose; feeds Self + the share card (see docs/simplify-pass.md)
 	AudioURL        string `dynamodbav:"audio_url"`
 	CompileStats    string `dynamodbav:"compile_stats"`     // JSON []CompileStat
 	RecentDiff      string `dynamodbav:"recent_diff"`       // JSON []processDiff; Analyst-computed, written by Narrator

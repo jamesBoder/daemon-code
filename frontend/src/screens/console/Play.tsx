@@ -1,14 +1,20 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ConsoleShell } from '../../components/console/ConsoleShell'
 import { DaemonOrb } from '../../components/daemon/DaemonOrb'
 import { DaemonButton } from '../../components/ui/DaemonButton'
 import { apiFetchJson } from '../../lib/api'
+import { playSound } from '../../lib/sound'
+import { CONSOLE } from '../../lib/console'
 import { DAY_QUERY_STALE_MS } from '../../lib/constants'
 import type { HomeData, SessionTodayResponse } from '../../types'
 
 // PLAY's idle state — the "console readout" (docs/simplify-pass.md), absorbing
-// Home's daily-entry function without its density of daemon-mystique framing.
+// Home's daily-entry function. Copy is written fresh for this — a terse
+// status readout, not narrative daemon-voice prose (real feedback,
+// 2026-09-18: the first version reused Home's old "the daemon is still
+// processing" line verbatim and read as no different from the old app).
 // The "playing" and "complete" states deliberately reuse the existing
 // Session.tsx / SessionComplete.tsx screens unchanged (both are already
 // full-bleed, chrome-free, which is exactly what "chrome hidden during
@@ -16,6 +22,7 @@ import type { HomeData, SessionTodayResponse } from '../../types'
 // logic — see the returnTo threading in Session.tsx and SessionComplete.tsx.
 export function Play() {
   const navigate = useNavigate()
+  const [leaving, setLeaving] = useState(false)
 
   const { data: home, isLoading: homeLoading } = useQuery({
     queryKey: ['home'],
@@ -31,12 +38,19 @@ export function Play() {
   const isLoading = homeLoading || sessionLoading
   const ready = session?.ready && (session?.fragments?.length ?? 0) > 0
 
+  // Leaving the console to play is a deliberate device action, not a plain
+  // page jump — same flicker+click beat as a tab switch, so entering a
+  // session feels continuous with the shell rather than dropping out of it.
   function begin() {
-    navigate('/session', { state: { returnTo: '/play' } })
+    playSound('click')
+    setLeaving(true)
+    window.setTimeout(() => {
+      navigate('/session', { state: { returnTo: '/play' } })
+    }, CONSOLE.tabSwitch.flickerMs)
   }
 
   return (
-    <ConsoleShell active="play">
+    <ConsoleShell active="play" flickering={leaving}>
       <div
         style={{
           minHeight: '100%',
@@ -48,28 +62,21 @@ export function Play() {
         <DaemonOrb state={isLoading ? 'cold' : home?.orbState} kernelAccess={home?.kernelAccess} />
 
         {isLoading && (
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)' }}>
-            reading...
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+            reading
           </p>
         )}
 
         {!isLoading && !ready && (
-          <p
-            style={{
-              fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)',
-              lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)',
-              textAlign: 'center', maxWidth: 280,
-            }}
-          >
-            The daemon is still processing.<br />
-            Today&rsquo;s session isn&rsquo;t ready yet.
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+            standby — not ready yet
           </p>
         )}
 
         {!isLoading && ready && (
           <>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)' }}>
-              day {home?.day ?? '—'}
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+              day {home?.day ?? '—'} — ready
             </p>
             <DaemonButton onClick={begin}>Begin</DaemonButton>
           </>

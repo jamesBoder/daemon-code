@@ -15,6 +15,15 @@ const TABS: { key: ConsoleTab; label: string; path: string }[] = [
 interface ConsoleShellProps {
   active:   ConsoleTab
   children: ReactNode
+  // Lets a screen (e.g. Play.tsx leaving to start a session) trigger the same
+  // whole-screen flicker as a tab switch. Deliberately NOT done by having the
+  // screen render its own overlay — a screen's content renders inside the
+  // content wrapper below, which has its own z-index and therefore its own
+  // stacking context; a fixed div nested in there can never out-rank the tab
+  // strip's z-index no matter what value it's given itself (found testing
+  // Play.tsx's "leaving" transition, 2026-09-18). This flicker div is a
+  // top-level sibling of the tab strip, so it actually covers it.
+  flickering?: boolean
 }
 
 // The persistent console frame wrapping PLAY and SELF (docs/simplify-pass.md,
@@ -23,7 +32,7 @@ interface ConsoleShellProps {
 // the user's chosen direction — a device you're looking INTO, not a normal
 // app with tabs. New route, additive: BottomNav and every existing screen
 // stay untouched until cutover.
-export function ConsoleShell({ active, children }: ConsoleShellProps) {
+export function ConsoleShell({ active, children, flickering = false }: ConsoleShellProps) {
   const navigate = useNavigate()
   const [flicker, setFlicker] = useState(false)
 
@@ -75,7 +84,7 @@ export function ConsoleShell({ active, children }: ConsoleShellProps) {
           position: 'fixed', inset: 0, pointerEvents: 'none',
           zIndex: CONSOLE_FLICKER_Z_INDEX,
           background: '#000',
-          opacity: flicker ? CONSOLE.tabSwitch.flickerDipOpacity : 0,
+          opacity: (flicker || flickering) ? CONSOLE.tabSwitch.flickerDipOpacity : 0,
           transition: `opacity ${CONSOLE.tabSwitch.flickerMs}ms ease-out`,
         }}
       />

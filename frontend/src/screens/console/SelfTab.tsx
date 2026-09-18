@@ -112,7 +112,12 @@ export function SelfTab() {
             </motion.button>
           </div>
         ) : !hasRead ? (
-          <div style={{ paddingTop: 'var(--space-12)', textAlign: 'center' }}>
+          // Real bug found 2026-09-18: textAlign:'center' (ported verbatim
+          // from the old Self.tsx) does nothing for DaemonOrb — it renders a
+          // fixed-width block motion.div with no auto margins, and
+          // text-align only affects inline content. Proper flex centering,
+          // matching what Play.tsx's idle state already does correctly.
+          <div style={{ paddingTop: 'var(--space-12)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <DaemonOrb state="cold" />
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', lineHeight: 'var(--leading-xl)', color: 'var(--text-primary)', maxWidth: SELF.stateMaxW, margin: 'var(--space-6) auto 0' }}>
               {copy.self.emptyTitle}<br />

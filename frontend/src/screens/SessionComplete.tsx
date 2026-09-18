@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ConsoleShell } from '../components/console/ConsoleShell'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DecodeText } from '../components/daemon/DecodeText'
 import { NamingCeremony } from '../components/daemon/NamingCeremony'
@@ -32,6 +33,7 @@ export function SessionComplete() {
   // (docs/simplify-pass.md) — absent for the old BottomNav entry point,
   // whose "Done" behavior (→ /home) is unchanged.
   const returnTo      = state?.returnTo ?? '/home'
+  const fromConsole    = !!state?.returnTo
 
   const [ceremonyDone, setCeremonyDone] = useState(false)
 
@@ -89,13 +91,19 @@ export function SessionComplete() {
     )
   }
 
-  return (
+  const content = (
     <div style={{
-      position: 'fixed', inset: 0,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       gap: 'var(--space-6)',
       padding: 'var(--space-8)',
+      // Full-viewport centering only makes sense when this div itself owns
+      // the viewport (the old standalone path). Inside ConsoleShell, its
+      // own content wrapper already positions/sizes this area — a nested
+      // position:fixed here would ignore that entirely and cover the tab
+      // strip, the exact bug fixed on Play.tsx's Begin transition earlier
+      // this session (see lib/console.ts / ConsoleShell's flickering prop).
+      ...(fromConsole ? { minHeight: '100%' } : { position: 'fixed' as const, inset: 0 }),
     }}>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE }}>
         session complete
@@ -147,6 +155,14 @@ export function SessionComplete() {
       </DaemonButton>
     </div>
   )
+
+  // Chrome visible again at Complete — this isn't mid-game, no reason to
+  // hide it (docs/simplify-pass.md). Only for the new console entry point;
+  // the old standalone route's look is unchanged.
+  if (fromConsole) {
+    return <ConsoleShell active="play">{content}</ConsoleShell>
+  }
+  return content
 }
 
 function DiffCard({ entry }: { entry: ProcessDiff }) {

@@ -103,7 +103,7 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
       text={raw.text as string}
       observation={raw.daemon_observation as string}
       prediction={raw.daemon_prediction as string}
-      nodes={raw.nodes as PulseNode[]}
+      nodes={(raw.nodes as PulseNode[] | undefined) ?? []}
       onComplete={onComplete}
     />
   ),

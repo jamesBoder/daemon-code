@@ -159,7 +159,14 @@ export function PulseMap({ scenarioId, text, observation, prediction, nodes, onC
   // The response posts only once the reveal is read — SessionContainer advances
   // the moment onComplete fires, so calling it at compile would cut the daemon's
   // observation off.
-  const finish = useCallback(() => onComplete(responseRef.current), [onComplete])
+  // Guarded: the reveal overlay calls this on every tap after the prediction
+  // shows, and SessionContainer would post + advance once per call.
+  const finishedRef = useRef(false)
+  const finish = useCallback(() => {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onComplete(responseRef.current)
+  }, [onComplete])
 
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
@@ -413,7 +420,7 @@ function PhaseMap({
           color:      'var(--text-primary)',
           opacity:    0.3,
           textAlign:  'center',
-          padding:    'var(--space-4)',
+          padding:    'calc(var(--space-8) + env(safe-area-inset-top)) var(--space-4) var(--space-4)',
           margin:     0,
           flexShrink: 0,
         }}>

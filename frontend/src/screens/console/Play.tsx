@@ -7,7 +7,8 @@ import { DaemonButton } from '../../components/ui/DaemonButton'
 import { apiFetchJson } from '../../lib/api'
 import { playSound } from '../../lib/sound'
 import { CONSOLE } from '../../lib/console'
-import { DAY_QUERY_STALE_MS } from '../../lib/constants'
+import { generateAndShareCard } from '../../lib/shareCard'
+import { DAY_QUERY_STALE_MS, TOAST_DISMISS_MS } from '../../lib/constants'
 import type { HomeData, SessionTodayResponse } from '../../types'
 
 // PLAY's idle state — the "console readout" (docs/simplify-pass.md), absorbing
@@ -23,6 +24,8 @@ import type { HomeData, SessionTodayResponse } from '../../types'
 export function Play() {
   const navigate = useNavigate()
   const [leaving, setLeaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [shareError, setShareError] = useState(false)
 
   const { data: home, isLoading: homeLoading } = useQuery({
     queryKey: ['home'],
@@ -47,6 +50,42 @@ export function Play() {
     window.setTimeout(() => {
       navigate('/session', { state: { returnTo: '/play' } })
     }, CONSOLE.tabSwitch.flickerMs)
+  }
+
+  // The share card (ported from Home.tsx, which PLAY absorbed) now quotes the
+  // Narrator's short takeaway instead of excerpting a sentence out of the full
+  // prose — falls back to the prose for entries generated before takeaway existed.
+  const shareText = home?.takeaway || home?.daemonProse
+
+  async function share() {
+    if (sharing || !home || !shareText) return
+    setSharing(true)
+    try {
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+      await generateAndShareCard({
+        prose:               shareText,
+        day:                 home.day,
+        orbState:            home.orbState,
+        accent,
+        kernelAccess:        home.kernelAccess,
+        daemonAccuracy:      home.daemonAccuracy,
+        decodedLines:        home.decodedLines,
+        kernelAccessDelta:   home.kernelAccessDelta,
+        daemonAccuracyDelta: home.daemonAccuracyDelta,
+        decodedLinesDelta:   home.decodedLinesDelta,
+        consecutiveDays:     home.consecutiveDays,
+        signalQuote:         home.dailySignalQuote,
+        signalAuthor:        home.dailySignalAuthor,
+      })
+    } catch (err) {
+      // AbortError means the user cancelled the share sheet — not an error
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setShareError(true)
+        setTimeout(() => setShareError(false), TOAST_DISMISS_MS)
+      }
+    } finally {
+      setSharing(false)
+    }
   }
 
   return (
@@ -80,6 +119,12 @@ export function Play() {
             </p>
             <DaemonButton onClick={begin}>Begin</DaemonButton>
           </>
+        )}
+
+        {!isLoading && shareText && (
+          <DaemonButton variant="secondary" onClick={share} disabled={sharing}>
+            {sharing ? 'generating…' : shareError ? 'could not share' : 'Share today'}
+          </DaemonButton>
         )}
       </div>
     </ConsoleShell>

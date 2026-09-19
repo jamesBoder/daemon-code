@@ -11,6 +11,8 @@ import type { StroopItem } from './Stroop'
 import { Hold } from './Hold'
 import { Split } from './Split'
 import { Cut } from './Cut'
+import { PulseMap } from './PulseMap'
+import type { PulseNode } from './PulseMap'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -89,6 +91,19 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
       choiceA={raw.choice_a as TrapChoice | undefined}
       choiceB={raw.choice_b as TrapChoice | undefined}
       max={raw.max as number | undefined}
+      onComplete={onComplete}
+    />
+  ),
+  pulse: ({ raw, onComplete }) => (
+    // buildPulse stamps the scenario, its pre-generated daemon observation +
+    // prediction, and the six outer nodes; the response_data shape is what
+    // ai.computePulseSignals parses.
+    <PulseMap
+      scenarioId={raw.scenario_id as string}
+      text={raw.text as string}
+      observation={raw.daemon_observation as string}
+      prediction={raw.daemon_prediction as string}
+      nodes={raw.nodes as PulseNode[]}
       onComplete={onComplete}
     />
   ),

@@ -310,6 +310,7 @@ export const copy = {
     hold:            'nothing is asked here. stay, or release when you choose.',
     split:           'divide it. one offer — they can refuse.',
     cut:             'keep what you can. press and hold to cut the rest.',
+    pulse:           'connect what belongs together. up to three wires.',
   } as Record<string, string>,
 
   // ── The Split ─────────────────────────────────────────────────────────────

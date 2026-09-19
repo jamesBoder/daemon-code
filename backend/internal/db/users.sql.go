@@ -70,15 +70,22 @@ func (q *Queries) GetAllActiveUsers(ctx context.Context) ([]GetAllActiveUsersRow
 }
 
 const getUsersWithoutSessionOn = `-- name: GetUsersWithoutSessionOn :many
+-- $1 = today's session date, $2 = only users created before this instant
 SELECT u.id FROM users u
 WHERE u.onboarding_complete = TRUE
+  AND u.created_at < $2
   AND NOT EXISTS (
     SELECT 1 FROM card_responses c WHERE c.user_id = u.id AND c.session_date = $1
   )
 `
 
-func (q *Queries) GetUsersWithoutSessionOn(ctx context.Context, sessionDate pgtype.Date) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, getUsersWithoutSessionOn, sessionDate)
+type GetUsersWithoutSessionOnParams struct {
+	SessionDate pgtype.Date        `json:"session_date"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetUsersWithoutSessionOn(ctx context.Context, arg GetUsersWithoutSessionOnParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, getUsersWithoutSessionOn, arg.SessionDate, arg.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

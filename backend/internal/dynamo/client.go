@@ -222,6 +222,19 @@ func (c *Client) GetPushSubscription(ctx context.Context, userID string) (*PushS
 	return &sub, nil
 }
 
+// DeletePushSubscription removes a user's stored subscription — used when the
+// push service reports it permanently gone, so it isn't retried every night.
+func (c *Client) DeletePushSubscription(ctx context.Context, userID string) error {
+	_, err := c.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(c.tableState),
+		Key: map[string]types.AttributeValue{
+			"user_id": &types.AttributeValueMemberS{Value: userID},
+			"date":    &types.AttributeValueMemberS{Value: "push_subscription"},
+		},
+	})
+	return err
+}
+
 func (c *Client) PutPushSubscription(ctx context.Context, userID string, sub PushSubscription) error {
 	type item struct {
 		PushSubscription

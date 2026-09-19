@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
@@ -51,19 +52,19 @@ func (n *Notifier) Run(ctx context.Context, event events.EventBridgeEvent) error
 	}
 
 	opening := firstSentence(state.DaemonProse)
-	return n.sendPush(ctx, *sub, opening)
+	return n.sendPush(ctx, userID, *sub, opening)
 }
 
-func (n *Notifier) sendPush(_ context.Context, sub dynamo.PushSubscription, proseOpening string) error {
+func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, proseOpening string) error {
 	payload, _ := json.Marshal(map[string]string{
-		"title":  "daemon compiled",
-		"body":   proseOpening + "...",
-		"screen": "home",
+		"title": "daemon compiled",
+		"body":  proseOpening + "...",
+		"url":   "/home", // the service worker reads url; the old "screen" key was ignored
 	})
-	return n.push(sub, payload)
+	return n.push(ctx, userID, sub, payload)
 }
 
-func (n *Notifier) push(sub dynamo.PushSubscription, payload []byte) error {
+func (n *Notifier) push(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, payload []byte) error {
 	resp, err := webpush.SendNotification(payload, &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{
@@ -79,7 +80,30 @@ func (n *Notifier) push(sub dynamo.PushSubscription, payload []byte) error {
 		return fmt.Errorf("vapid push: %w", err)
 	}
 	defer resp.Body.Close()
-	return nil
+
+	gone, err := classifyPushStatus(resp.StatusCode)
+	if gone {
+		// Permanently expired/unsubscribed: drop it so it isn't retried nightly.
+		if delErr := n.ddb.DeletePushSubscription(ctx, userID.String()); delErr != nil {
+			return fmt.Errorf("delete expired push subscription: %w", delErr)
+		}
+		return nil
+	}
+	return err
+}
+
+// classifyPushStatus maps a push service HTTP status to an outcome: gone
+// (404/410 — the subscription is permanently dead) or an error for any other
+// non-2xx (transient, worth surfacing in the logs).
+func classifyPushStatus(status int) (gone bool, err error) {
+	switch {
+	case status >= 200 && status < 300:
+		return false, nil
+	case status == http.StatusNotFound || status == http.StatusGone:
+		return true, nil
+	default:
+		return false, fmt.Errorf("push service returned status %d", status)
+	}
 }
 
 func firstSentence(prose string) string {
@@ -115,5 +139,5 @@ func (n *Notifier) Remind(ctx context.Context, userID uuid.UUID) error {
 		"body":  reminderBody,
 		"url":   reminderURL,
 	})
-	return n.push(*sub, payload)
+	return n.push(ctx, userID, *sub, payload)
 }

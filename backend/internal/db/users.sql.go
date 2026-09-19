@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -61,6 +62,34 @@ func (q *Queries) GetAllActiveUsers(ctx context.Context) ([]GetAllActiveUsersRow
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersWithoutSessionOn = `-- name: GetUsersWithoutSessionOn :many
+SELECT u.id FROM users u
+WHERE u.onboarding_complete = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM card_responses c WHERE c.user_id = u.id AND c.session_date = $1
+  )
+`
+
+func (q *Queries) GetUsersWithoutSessionOn(ctx context.Context, sessionDate pgtype.Date) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, getUsersWithoutSessionOn, sessionDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

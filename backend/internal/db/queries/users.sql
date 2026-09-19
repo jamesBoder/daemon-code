@@ -14,3 +14,10 @@ UPDATE users SET onboarding_complete = TRUE, updated_at = NOW() WHERE id = $1;
 
 -- name: GetAllActiveUsers :many
 SELECT id, timezone FROM users WHERE onboarding_complete = TRUE;
+
+-- name: GetUsersWithoutSessionOn :many
+SELECT u.id FROM users u
+WHERE u.onboarding_complete = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM card_responses c WHERE c.user_id = u.id AND c.session_date = $1
+  );

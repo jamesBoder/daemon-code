@@ -60,7 +60,10 @@ func (n *Notifier) sendPush(_ context.Context, sub dynamo.PushSubscription, pros
 		"body":   proseOpening + "...",
 		"screen": "home",
 	})
+	return n.push(sub, payload)
+}
 
+func (n *Notifier) push(sub dynamo.PushSubscription, payload []byte) error {
 	resp, err := webpush.SendNotification(payload, &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{
@@ -87,4 +90,30 @@ func firstSentence(prose string) string {
 		return prose[:120]
 	}
 	return prose
+}
+
+// Reminder copy — a plain system nudge, deliberately not the daemon's voice
+// (the daemon never comments on engagement; see docs/simplify-pass.md).
+const (
+	reminderTitle = "daemon code"
+	reminderBody  = "Today's session is ready."
+	reminderURL   = "/play"
+)
+
+// Remind sends the "haven't played today" push to one user. A user with no
+// push subscription is skipped silently — they never opted in.
+func (n *Notifier) Remind(ctx context.Context, userID uuid.UUID) error {
+	sub, err := n.ddb.GetPushSubscription(ctx, userID.String())
+	if err != nil {
+		return fmt.Errorf("get push subscription: %w", err)
+	}
+	if sub == nil {
+		return nil
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"title": reminderTitle,
+		"body":  reminderBody,
+		"url":   reminderURL,
+	})
+	return n.push(*sub, payload)
 }

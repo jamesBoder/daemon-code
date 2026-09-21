@@ -55,7 +55,7 @@ export function Login() {
 
       const data = await r.json() as AuthResponse
       setAuth(data.token, data.onboarding_complete)
-      navigate(data.onboarding_complete ? '/home' : '/onboarding')
+      navigate(data.onboarding_complete ? '/play' : '/onboarding')
     } catch {
       setError('Something went wrong. Try again.')
     } finally {

@@ -116,7 +116,7 @@ export function Onboarding() {
 
   function enterDaemon() {
     setAuth(token!, true)
-    navigate('/home', { replace: true })
+    navigate('/play', { replace: true })
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────

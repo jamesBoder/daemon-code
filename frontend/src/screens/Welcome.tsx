@@ -8,7 +8,7 @@ export function Welcome() {
   const navigate = useNavigate()
   const { token, onboardingComplete } = useAuthStore()
 
-  if (token) return <Navigate to={onboardingComplete === false ? '/onboarding' : '/home'} replace />
+  if (token) return <Navigate to={onboardingComplete === false ? '/onboarding' : '/play'} replace />
 
   return (
     <motion.div

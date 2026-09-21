@@ -59,7 +59,7 @@ func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.Pu
 	payload, _ := json.Marshal(map[string]string{
 		"title": "daemon compiled",
 		"body":  proseOpening + "...",
-		"url":   "/home", // the service worker reads url; the old "screen" key was ignored
+		"url":   "/play", // the service worker reads url; the old "screen" key was ignored
 	})
 	return n.push(ctx, userID, sub, payload)
 }

@@ -37,7 +37,7 @@ function RootRedirect() {
   if (!token) return <Navigate to="/welcome" replace />
   // If stored flag is absent (legacy user), default to true → go to home
   if (onboardingComplete === false) return <Navigate to="/onboarding" replace />
-  return <Navigate to="/home" replace />
+  return <Navigate to="/play" replace />
 }
 
 function App() {

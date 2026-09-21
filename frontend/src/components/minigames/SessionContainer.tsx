@@ -16,13 +16,16 @@ import type { Fragment } from '../../types'
 interface Props {
   fragments: Fragment[]
   onComplete: (count: number) => void
+  // Set when entered from the new PLAY console — quitting mid-session should
+  // return there instead of the old /home default. See Session.tsx.
+  returnTo?: string
 }
 
 type Phase = 'game' | 'mood'
 
 const transMs = MG.transition.fragmentMs
 
-export function SessionContainer({ fragments, onComplete }: Props) {
+export function SessionContainer({ fragments, onComplete, returnTo }: Props) {
   const navigate  = useNavigate()
   const reduced   = useReducedMotion()
   const transTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -210,7 +213,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
           confirmLabel={copy.session.exitConfirm}
           dangerous
           onCancel={() => setShowExitModal(false)}
-          onConfirm={() => navigate('/home', { replace: true })}
+          onConfirm={() => navigate(returnTo ?? '/home', { replace: true })}
         />
       )}
     </>

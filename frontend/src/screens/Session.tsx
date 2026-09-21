@@ -61,10 +61,10 @@ export function Session() {
           The daemon is still processing.<br />
           Today&rsquo;s session isn&rsquo;t ready yet.
         </p>
-        <DaemonButton onClick={() => navigate('/home')}>Return home →</DaemonButton>
+        <DaemonButton onClick={() => navigate(returnTo ?? '/home')}>Return home →</DaemonButton>
       </div>
     )
   }
 
-  return <SessionContainer fragments={data.fragments} onComplete={handleComplete} />
+  return <SessionContainer fragments={data.fragments} onComplete={handleComplete} returnTo={returnTo} />
 }

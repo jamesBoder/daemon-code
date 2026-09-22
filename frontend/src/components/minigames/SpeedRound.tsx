@@ -27,6 +27,10 @@ export function SpeedRound({ prompts, onComplete }: Props) {
 
   const [idx, setIdx]       = useState(0)
   const [visible, setVisible] = useState(true)
+  // Which option was just tapped — glows briefly through the fade-out so a
+  // choice reads as registered, not just pressed (whileTap alone is gone the
+  // instant the pointer lifts, before the crossfade even starts).
+  const [chosenOption, setChosenOption] = useState<string | null>(null)
   const promptStartRef      = useRef(Date.now())
   const resultsRef          = useRef<SpeedRoundResult[]>([])
   const onCompleteRef       = useRef(onComplete)
@@ -36,6 +40,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
 
   function handleChoice(chosen: string) {
     haptic('tap')
+    setChosenOption(chosen)
     const responseTimeMs = Date.now() - promptStartRef.current
     const next = [...resultsRef.current, { starter: prompt.starter, chosen, responseTimeMs }]
     resultsRef.current = next
@@ -48,6 +53,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
     if (reduced) {
       promptStartRef.current = Date.now()
       setIdx(idx + 1)
+      setChosenOption(null)
       return
     }
 
@@ -56,6 +62,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
     setTimeout(() => {
       setIdx(idx + 1)
       setVisible(true)
+      setChosenOption(null)
       promptStartRef.current = Date.now()
     }, MG.speed.crossfadeMs)
   }
@@ -104,6 +111,12 @@ export function SpeedRound({ prompts, onComplete }: Props) {
               key={option}
               onClick={() => handleChoice(option)}
               whileTap={{ scale: 0.97 }}
+              animate={{
+                boxShadow: chosenOption === option
+                  ? '0 0 20px var(--accent-glow), 0 0 8px rgba(99, 102, 241, 0.4)'
+                  : '0 0 0px rgba(99, 102, 241, 0)',
+              }}
+              transition={{ duration: reduced ? 0 : fadeDuration }}
               className="glass-card"
               style={{
                 width:       '100%',

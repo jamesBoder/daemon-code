@@ -43,6 +43,7 @@ export const MG = {
       size:      56,   // px — ripple circle diameter at scale 1
       scale:     12,   // final scale multiplier
       durationS: 0.45, // animation duration in seconds
+      blurPx:    8,    // softens the burst into a glow, not a hard-edged disc
     },
   },
 

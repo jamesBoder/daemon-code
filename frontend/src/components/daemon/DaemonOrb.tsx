@@ -23,14 +23,28 @@ interface OrbVisual {
   outerOpacity: number
   innerScale: number
   glowOpacity: number
+  // Bloom — how far the blurred light bleeds past the ring (bloomScale, as a
+  // multiple of the orb's own size) and how diffuse it looks (bloomBlurPx).
+  // Both grow with the relationship stage so "deep" genuinely looks like it's
+  // emitting light, not just a brighter flat circle.
+  bloomBlurPx: number
+  bloomScale: number
 }
 
 const orbVisuals: Record<OrbState, OrbVisual> = {
-  cold:    { outerOpacity: 0.40, innerScale: 0.42, glowOpacity: 0.14 },
-  warming: { outerOpacity: 0.55, innerScale: 0.58, glowOpacity: 0.22 },
-  running: { outerOpacity: 0.72, innerScale: 0.72, glowOpacity: 0.32 },
-  deep:    { outerOpacity: 0.90, innerScale: 0.86, glowOpacity: 0.44 },
+  cold:    { outerOpacity: 0.40, innerScale: 0.42, glowOpacity: 0.14, bloomBlurPx: 8,  bloomScale: 1.15 },
+  warming: { outerOpacity: 0.55, innerScale: 0.58, glowOpacity: 0.22, bloomBlurPx: 14, bloomScale: 1.30 },
+  running: { outerOpacity: 0.72, innerScale: 0.72, glowOpacity: 0.32, bloomBlurPx: 22, bloomScale: 1.50 },
+  deep:    { outerOpacity: 0.90, innerScale: 0.86, glowOpacity: 0.44, bloomBlurPx: 32, bloomScale: 1.75 },
 }
+
+// Idle breathing — a slow ambient glow pulse for whenever the orb isn't mid a
+// name/compile pulse. Opacity-only, no scale or position change, so per this
+// app's reduced-motion rule (brightness pulses always play — only spatial
+// drift/sweep/slide gets gated) this runs for every user, unconditionally.
+const ORB_BREATHE_S = 5.2
+const ORB_BREATHE_LOW = 0.75   // fraction of visual.glowOpacity at the dim point
+const ORB_BREATHE_HIGH = 1.30  // fraction of visual.glowOpacity at the bright point
 
 export function DaemonOrb({
   state = 'cold',
@@ -41,6 +55,10 @@ export function DaemonOrb({
 }: DaemonOrbProps) {
   const reduced = useReducedMotion()
   const visual = orbVisuals[state]
+  // Idle = no event pulse requested at all (independent of reduced-motion —
+  // an event pulse that's suppressed under reduced motion still isn't idle,
+  // it stays at the flat glowOpacity below, matching prior behavior).
+  const idle = !namePulse && !compilePulse
 
   return (
     <motion.div
@@ -61,24 +79,33 @@ export function DaemonOrb({
             ? [visual.glowOpacity, visual.glowOpacity * 5, visual.glowOpacity]
             : compilePulse && !reduced
               ? [visual.glowOpacity, visual.glowOpacity * 3, visual.glowOpacity]
+              // Idle case is a flat Framer target — the CSS `animation` below
+              // (not Framer's `animate`) does the actual breathing, since it
+              // isn't vulnerable to a parent re-render resetting the loop.
               : visual.glowOpacity,
           scale: namePulse && !reduced
             ? [1, 1.3, 1]
             : compilePulse && !reduced ? [1, 1.15, 1] : 1,
         }}
-        transition={reduced
-          ? { duration: REDUCED_MOTION_DURATION }
-          : namePulse
+        transition={
+          namePulse && !reduced
             ? { duration: 1.8, ease: 'easeInOut', repeat: Infinity, repeatDelay: 0.3 }
-            : compilePulse
+            : compilePulse && !reduced
               ? { duration: 0.6, ease: 'easeOut' }
-              : springs.smooth
+              : { duration: REDUCED_MOTION_DURATION }
         }
         style={{
           position: 'absolute',
-          inset: 0,
+          // Larger than the orb itself so the blur has room to bleed outward
+          // instead of clipping at the ring's edge — this is what makes it
+          // read as light spilling out, not just a brighter flat gradient.
+          inset: `${-(visual.bloomScale - 1) * 50}%`,
           borderRadius: '50%',
           background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)',
+          filter: `blur(${visual.bloomBlurPx}px)`,
+          animation: idle ? `orbBreathe ${ORB_BREATHE_S}s ease-in-out infinite` : undefined,
+          ['--orb-breathe-low' as string]:  visual.glowOpacity * ORB_BREATHE_LOW,
+          ['--orb-breathe-high' as string]: visual.glowOpacity * ORB_BREATHE_HIGH,
         }}
       />
       <motion.div

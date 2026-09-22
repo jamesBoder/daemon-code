@@ -248,3 +248,14 @@ body.grain-pulse::after {
   0%, 100% { box-shadow: 0 0 0 rgba(220, 38, 38, 0); }
   50%      { box-shadow: 0 0 var(--cut-smolder-px, 14px) rgba(220, 38, 38, var(--cut-smolder-alpha, 0.3)); }
 }
+
+/* The daemon orb's idle bloom — a slow ambient breathing glow whenever it
+   isn't mid a name/compile pulse (DaemonOrb.tsx). Plain CSS rather than a
+   Framer `animate` loop deliberately: a parent re-render recreating the
+   keyframe array (same values, new reference) was observed resetting/
+   freezing the Framer-driven version mid-loop. An opacity pulse, not
+   positional motion, so per this app's reduced-motion rule it always plays. */
+@keyframes orbBreathe {
+  0%, 100% { opacity: var(--orb-breathe-low, 0.2); }
+  50%      { opacity: var(--orb-breathe-high, 0.3); }
+}

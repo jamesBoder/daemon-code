@@ -33,9 +33,9 @@ export const MG = {
 
   // ── ReactionTest specific ──────────────────────────────────────────────────
   reaction: {
-    fadeInMs:       100,   // word fade-in duration
-    fadeOutMs:      180,   // word fade-out duration
-    flashMs:        120,   // accent-color flash duration after a tap
+    fadeInMs:       150,   // word fade-in duration (was 100 — pacing pass)
+    fadeOutMs:      260,   // word fade-out duration (was 180 — pacing pass)
+    flashMs:        120,   // accent-color flash duration after a tap — feedback, left fast on purpose
     flashTransition: '0.06s', // CSS color transition on the word span
     progressHeight:  2,    // px — progress bar height
     progressAnimS:   0.15, // s  — progress bar width animation
@@ -49,15 +49,15 @@ export const MG = {
 
   // ── SpeedRound specific ────────────────────────────────────────────────────
   speed: {
-    crossfadeMs: 80,   // opacity crossfade between prompts
+    crossfadeMs: 150,  // opacity crossfade between prompts (was 80 — pacing pass, barely a fade at that speed)
     mobileMaxW:  380,  // px — container max-width on mobile viewport
   },
 
   // ── PredictionDuel specific ────────────────────────────────────────────────
   duel: {
-    pauseMs:       400,  // dramatic beat between tap and reveal
+    pauseMs:       550,  // dramatic beat between tap and reveal (was 400 — pacing pass)
     revealMs:      1500, // how long reveal text shows before onComplete fires
-    revealFadeS:   0.3,  // reveal text fade-in duration
+    revealFadeS:   0.4,  // reveal text fade-in duration (was 0.3 — pacing pass)
     cardTransition: '0.15s', // card border/color CSS transition
     recordMin:     1,    // daemon record domain bounds — mirror analyst 1-100 rule
     recordMax:     100,
@@ -65,12 +65,15 @@ export const MG = {
   },
 
   // ── Transitions — component-to-component and state-to-state ───────────────
+  // Pacing pass (2026-09-22): these govern reading/breathing time between
+  // states, not tap-feedback flashes (those stay snappy on purpose) — bumped
+  // ~1.5-1.8x across the board so the app doesn't feel rushed between beats.
   transition: {
-    fragmentMs: 220,  // fade between session fragments
-    pairMs:     150,  // fade between scale pairs
-    promptMs:    80,  // speed round prompt crossfade (matches speed.crossfadeMs)
-    stepMs:     250,  // onboarding step transitions
-    revealS:    0.25, // generic reveal fade (confirm buttons, etc.)
+    fragmentMs: 380,  // fade between session fragments (was 220)
+    pairMs:     260,  // fade between scale pairs (was 150)
+    promptMs:   150,  // speed round prompt crossfade, matches speed.crossfadeMs (was 80)
+    stepMs:     400,  // onboarding step transitions (was 250)
+    revealS:    0.35, // generic reveal fade (confirm buttons, etc.) (was 0.25)
   },
 
   // ── Session chrome (progress bar + exit button) ────────────────────────────
@@ -87,7 +90,7 @@ export const MG = {
     trackMaxW:      360,  // px — spectrum track max width
     ackMaxW:        300,  // px — acknowledgement line text column width
     dragMaxFallback: 120, // px — half-track guess before useLayoutEffect measures
-    ackHoldMs:     1400,  // how long the acknowledgement line shows before navigating
+    ackHoldMs:     1700,  // how long the acknowledgement line shows before navigating (was 1400 — pacing pass)
     scoreMin:         1,  // mood score domain — matches /session/mood contract
     scoreMax:         5,
   },
@@ -101,9 +104,9 @@ export const MG = {
     oddsBarFillS:  0.5,    // s  — left-to-right fill (motion only)
     meterH:        8,      // px — locked "sunk" meter height
     meterOpacity:  0.4,    // the sunk meter reads inert — it's already spent
-    commitFlashMs: 150,    // chosen terminal amber flash-in
-    loggedHoldMs:  900,    // "logged." dwell before advancing
-    loggedFadeS:   0.3,    // logged-beat fade timing
+    commitFlashMs: 150,    // chosen terminal amber flash-in — feedback, left fast on purpose
+    loggedHoldMs:  1300,   // "logged." dwell before advancing (was 900 — pacing pass)
+    loggedFadeS:   0.4,    // logged-beat fade timing (was 0.3 — pacing pass)
     dimAlpha:      0.35,   // opacity of the unchosen terminal after commit
     frame:        'var(--warning)',       // the Trap's identity color (amber)
     oddsGain:     'var(--compile-green)', // upside slice of the odds bar
@@ -120,8 +123,8 @@ export const MG = {
     wordSize:    'clamp(56px, 18vw, 88px)', // bigger than any other fragment word
     wordSizeLong: 'clamp(36px, 11vw, 60px)', // long words (decorative fonts overflow otherwise)
     longWordLen:  7,                          // >this many chars → use wordSizeLong
-    trialCapMs:  2600,   // soft cap per trial; no response → recorded as 'none'
-    advanceMs:   500,    // beat after an answer before the next trial (was a blur at 240)
+    trialCapMs:  2600,   // soft cap per trial; no response → recorded as 'none' — game mechanic, not touched by the pacing pass
+    advanceMs:   750,    // beat after an answer before the next trial (was 500, before that a blur at 240 — pacing pass)
     buttonMinH:  56,     // px — well above MIN_TOUCH_TARGET
     buttonGap:   'var(--space-3)',
 

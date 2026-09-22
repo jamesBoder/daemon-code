@@ -17,6 +17,12 @@ const COMPILE_LINES = [
   '> building initial hypothesis...',
 ]
 
+// A brand-new user's very first interaction with the app -- was 200ms
+// (ReactionTest's own component default is 800ms), barely enough to
+// register a word exists, let alone whether it resonates (pacing pass,
+// 2026-09-22).
+const REACTION_WORD_MS = 400
+
 // ── Card layout used for context, transition, and first-look steps ────────────
 function StepCard({ children }: { children: React.ReactNode }) {
   return (
@@ -143,7 +149,7 @@ export function Onboarding() {
         return (
           <ReactionTest
             words={copy.onboarding.reactionWords}
-            durationMs={200}
+            durationMs={REACTION_WORD_MS}
             onComplete={(r) => { reactionRef.current = r; setStep(2) }}
           />
         )

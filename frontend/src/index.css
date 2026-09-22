@@ -238,6 +238,15 @@ body.grain-pulse::after {
   animation: daemonBtnGlow 3.6s ease-in-out infinite;
 }
 
+/* Same treatment, reused on .glass-card for the rare/dramatic moments (a
+   newly-named process on SessionComplete) -- .glass-card's resting shadow
+   stack is identical to .daemon-btn-primary's, so the same keyframe applies
+   directly with no duplication. */
+.glass-card-glow {
+  border-color: rgba(99, 102, 241, 0.28);
+  animation: daemonBtnGlow 3.6s ease-in-out infinite;
+}
+
 /* The console shell's active-tab underline (ConsoleShell.tsx) -- a slow
    breathing glow instead of a flat static bar, echoing a device status LED.
    Opacity/glow only, so it always plays (reduced-motion rule). */

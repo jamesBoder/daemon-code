@@ -169,8 +169,10 @@ function DiffCard({ entry }: { entry: ProcessDiff }) {
   const monoBase = { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', letterSpacing: LETTER_SPACING_PROCESS }
 
   if (entry.change === 'named') {
+    // Named is the most dramatic diff (DIFF_CHANGE_ORDER) -- a process just
+    // crystallized enough to earn an identity. The only diff card that glows.
     return (
-      <div className="glass-card" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+      <div className="glass-card glass-card-glow" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <span style={{ ...monoBase, color: 'var(--text-muted)', wordBreak: 'break-word' }}>
           {entry.from_name ?? '—'}
         </span>

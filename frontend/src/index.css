@@ -8,11 +8,16 @@
   --surface:          #0d1018;
   --surface-elevated: #141925;
   --surface-overlay:  rgba(13, 16, 24, 0.92);
+  --surface-input:    rgba(255, 255, 255, 0.04);
 
   /* Borders */
   --border:           rgba(255, 255, 255, 0.06);
   --border-subtle:    rgba(255, 255, 255, 0.03);
   --border-active:    rgba(255, 255, 255, 0.12);
+  /* The de facto standard subtle border on cards/chrome -- was duplicated as
+     a raw literal in five separate places (including .glass-card itself)
+     before being pulled out here. */
+  --border-glass:     rgba(255, 255, 255, 0.07);
 
   /* Text */
   --text-primary:     #e2e8f0;
@@ -143,7 +148,7 @@ body.grain-pulse::after {
 
 .glass-card {
   background: rgba(13, 16, 24, 0.72);
-  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  border: 0.5px solid var(--border-glass);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   box-shadow:

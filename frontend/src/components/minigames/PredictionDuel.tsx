@@ -142,7 +142,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, record, onComple
                     cursor:       phase === 'idle' ? 'pointer' : 'default',
                     background:   'transparent',
                     borderRadius: 'var(--radius-lg)',
-                    border:       isChosen ? `0.5px solid ${accentColor}` : '0.5px solid rgba(255,255,255,0.07)',
+                    border:       isChosen ? `0.5px solid ${accentColor}` : '0.5px solid var(--border-glass)',
                     boxShadow:    isChosen ? `0 0 16px ${accentColor}30` : undefined,
                     transition:   D.cardTransition,
                   }}

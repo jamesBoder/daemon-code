@@ -130,6 +130,7 @@ export function ConsoleShell({ active, children, flickering = false }: ConsoleSh
                 {isActive && (
                   <span
                     aria-hidden
+                    className="console-tab-underline"
                     style={{
                       position: 'absolute', bottom: 0,
                       left: 'var(--space-5)', right: 'var(--space-5)',

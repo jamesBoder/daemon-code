@@ -9,6 +9,11 @@ interface DaemonButtonProps {
   disabled?: boolean
   type?: 'button' | 'submit' | 'reset'
   style?: CSSProperties
+  // Opt-in ambient accent glow (breathing box-shadow, see .daemon-btn-glow in
+  // index.css) for the one actionable CTA on a screen -- deliberately NOT the
+  // default, since this button is reused everywhere (auth, settings, confirm
+  // modals) and most of those are plain forms, not a single highlighted action.
+  glow?: boolean
 }
 
 export function DaemonButton({
@@ -18,6 +23,7 @@ export function DaemonButton({
   disabled = false,
   type = 'button',
   style,
+  glow = false,
 }: DaemonButtonProps) {
   const reduced = useReducedMotion()
 
@@ -26,7 +32,7 @@ export function DaemonButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`daemon-btn daemon-btn-${variant}`}
+      className={`daemon-btn daemon-btn-${variant}${glow && !disabled ? ' daemon-btn-glow' : ''}`}
       whileTap={reduced ? {} : { scale: 0.98 }}
       style={style}
     >

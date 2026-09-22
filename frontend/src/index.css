@@ -212,6 +212,44 @@ body.grain-pulse::after {
   outline-offset: 2px;
 }
 
+/* Opt-in ambient glow for a screen's one highlighted CTA (DaemonButton's
+   `glow` prop) -- a slow breathing accent-color bloom layered on top of the
+   button's resting shadow stack, not a replacement of it. An opacity/glow
+   pulse, not positional motion, so it always plays (reduced-motion rule). */
+@keyframes daemonBtnGlow {
+  0%, 100% {
+    box-shadow:
+      0 4px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 0 6px var(--accent-glow);
+  }
+  50% {
+    box-shadow:
+      0 4px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 0 18px var(--accent-glow);
+  }
+}
+
+.daemon-btn-glow {
+  border-color: rgba(99, 102, 241, 0.28);
+  animation: daemonBtnGlow 3.6s ease-in-out infinite;
+}
+
+/* The console shell's active-tab underline (ConsoleShell.tsx) -- a slow
+   breathing glow instead of a flat static bar, echoing a device status LED.
+   Opacity/glow only, so it always plays (reduced-motion rule). */
+@keyframes tabUnderlineGlow {
+  0%, 100% { box-shadow: 0 0 2px var(--accent), 0 0 1px var(--accent); }
+  50%      { box-shadow: 0 0 7px var(--accent), 0 0 3px var(--accent); }
+}
+
+.console-tab-underline {
+  animation: tabUnderlineGlow 3.2s ease-in-out infinite;
+}
+
 /* The Hold — the void fades up on entry; faint rings emanate outward as its slow
    heartbeat (scale + alpha driven by the component's config via --he-* custom
    props). Both are motion, so the component only mounts them when motion is

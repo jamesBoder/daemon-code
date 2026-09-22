@@ -117,7 +117,7 @@ export function Play() {
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-mono)', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
               day {home?.day ?? '—'} — ready
             </p>
-            <DaemonButton onClick={begin}>Begin</DaemonButton>
+            <DaemonButton onClick={begin} glow>Begin</DaemonButton>
           </>
         )}
 

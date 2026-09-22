@@ -234,7 +234,7 @@ body.grain-pulse::after {
 }
 
 .daemon-btn-glow {
-  border-color: rgba(99, 102, 241, 0.28);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   animation: daemonBtnGlow 3.6s ease-in-out infinite;
 }
 
@@ -243,7 +243,7 @@ body.grain-pulse::after {
    stack is identical to .daemon-btn-primary's, so the same keyframe applies
    directly with no duplication. */
 .glass-card-glow {
-  border-color: rgba(99, 102, 241, 0.28);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   animation: daemonBtnGlow 3.6s ease-in-out infinite;
 }
 

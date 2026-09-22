@@ -113,8 +113,8 @@ export function SpeedRound({ prompts, onComplete }: Props) {
               whileTap={{ scale: 0.97 }}
               animate={{
                 boxShadow: chosenOption === option
-                  ? '0 0 20px var(--accent-glow), 0 0 8px rgba(99, 102, 241, 0.4)'
-                  : '0 0 0px rgba(99, 102, 241, 0)',
+                  ? '0 0 20px var(--accent-glow), 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent)'
+                  : '0 0 0px transparent',
               }}
               transition={{ duration: reduced ? 0 : fadeDuration }}
               className="glass-card"

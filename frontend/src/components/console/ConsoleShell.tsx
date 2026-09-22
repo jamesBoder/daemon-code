@@ -1,9 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { CONSOLE } from '../../lib/console'
 import { CONSOLE_CONTENT_Z_INDEX, CONSOLE_FLICKER_Z_INDEX, CONSOLE_OVERLAY_Z_INDEX, HAIRLINE, HEADER_Z_INDEX, MIN_TOUCH_TARGET } from '../../lib/constants'
 import { playSound } from '../../lib/sound'
+import { fetchSelf } from '../../lib/api'
+import { applyArchetypeAccent } from '../../lib/colors'
 
 export type ConsoleTab = 'play' | 'self'
 
@@ -35,6 +38,23 @@ interface ConsoleShellProps {
 export function ConsoleShell({ active, children, flickering = false }: ConsoleShellProps) {
   const navigate = useNavigate()
   const [flicker, setFlicker] = useState(false)
+
+  // Archetype-driven accent color (lib/colors.ts) -- previously only wired up
+  // in the old Home.tsx, silently lost when the console shell replaced it as
+  // the default landing experience. Restored here (not in Play.tsx/SelfTab.tsx
+  // individually) so it applies uniformly across PLAY, SELF, and Complete —
+  // every screen ConsoleShell wraps — from one shared query. Reuses SelfTab's
+  // own ['self'] query key/staleTime so the two share a cache entry instead
+  // of double-fetching when a session visits both tabs.
+  const { data: self } = useQuery({
+    queryKey: ['self'],
+    queryFn: fetchSelf,
+    staleTime: 5 * 60 * 1000,
+  })
+  useEffect(() => {
+    if (!self) return
+    applyArchetypeAccent(self.archetype)
+  }, [self?.archetype])
 
   function switchTab(tab: ConsoleTab, path: string) {
     if (tab === active) return

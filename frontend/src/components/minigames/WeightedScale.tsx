@@ -116,7 +116,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
         dragConstraints={{ left: -dragMax, right: dragMax }}
         dragElastic={T.dragElastic}
         onDragEnd={reveal}
-        whileDrag={{ scale: T.handleScale, boxShadow: '0 0 16px var(--accent-glow), 0 0 6px rgba(99, 102, 241, 0.4)' }}
+        whileDrag={{ scale: T.handleScale, boxShadow: '0 0 16px var(--accent-glow), 0 0 6px color-mix(in srgb, var(--accent) 40%, transparent)' }}
         style={{
           x: dragX,
           position: 'absolute', top: '50%', left: `calc(50% - ${T.handleSize / 2}px)`, marginTop: -(T.handleSize / 2),

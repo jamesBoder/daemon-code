@@ -149,7 +149,7 @@ export function SelfTab() {
                     // A static glow, not a breathing one -- this is the
                     // payoff line on a screen meant to be read, not a status
                     // indicator, so it shouldn't pulse for attention.
-                    textShadow: '0 0 24px var(--accent-glow), 0 0 8px rgba(99, 102, 241, 0.35)',
+                    textShadow: '0 0 24px var(--accent-glow), 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent)',
                   }}
                 >
                   {pickArchetypeLabel(data.archetype, data.compileCount)}

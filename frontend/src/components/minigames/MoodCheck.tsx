@@ -131,7 +131,7 @@ export function MoodCheck({ onSelect }: Props) {
 
           <button
             onClick={handleConfirm}
-            className="daemon-btn daemon-btn-primary"
+            className="daemon-btn daemon-btn-primary daemon-btn-glow"
             style={{ width: '100%', maxWidth: T.confirmMaxW }}
           >
             {copy.mood.confirm}

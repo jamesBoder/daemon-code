@@ -140,7 +140,18 @@ export function SelfTab() {
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: LETTER_SPACING_WIDE, textTransform: 'uppercase' }}>
                   {copy.self.archetypeIntro}
                 </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-2xl)', color: 'var(--accent)', marginTop: 'var(--space-2)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize:   'var(--text-2xl)',
+                    color:      'var(--accent)',
+                    marginTop:  'var(--space-2)',
+                    // A static glow, not a breathing one -- this is the
+                    // payoff line on a screen meant to be read, not a status
+                    // indicator, so it shouldn't pulse for attention.
+                    textShadow: '0 0 24px var(--accent-glow), 0 0 8px rgba(99, 102, 241, 0.35)',
+                  }}
+                >
                   {pickArchetypeLabel(data.archetype, data.compileCount)}
                 </div>
               </div>

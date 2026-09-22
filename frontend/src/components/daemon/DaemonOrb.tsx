@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { springs } from '../../lib/springs'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
@@ -46,6 +47,14 @@ const ORB_BREATHE_S = 5.2
 const ORB_BREATHE_LOW = 0.75   // fraction of visual.glowOpacity at the dim point
 const ORB_BREATHE_HIGH = 1.30  // fraction of visual.glowOpacity at the bright point
 
+// compilePulse's own flash is a one-shot 0.6s ease-out, not a held state, but
+// CompileScreen.tsx never resets the prop back to false after triggering it
+// (a pre-existing quirk, harmless before breathing existed) -- so `idle` can't
+// trust the raw prop or the orb goes permanently static on that screen after
+// the first compile. Track the flash locally instead: it's "active" only for
+// its own duration regardless of how long the caller holds the prop true.
+const COMPILE_PULSE_S = 0.6
+
 export function DaemonOrb({
   state = 'cold',
   size = 200,
@@ -55,10 +64,25 @@ export function DaemonOrb({
 }: DaemonOrbProps) {
   const reduced = useReducedMotion()
   const visual = orbVisuals[state]
-  // Idle = no event pulse requested at all (independent of reduced-motion —
+
+  // Both transitions run inside setTimeout callbacks (even the "turn on," at
+  // 0ms) rather than synchronously in the effect body -- this codebase's
+  // react-hooks lint flags a direct setState call at the top of an effect as
+  // a cascading-render risk, and (separately) forbids reading/writing refs
+  // during render, so the usual "derive from a ref-compared prop" pattern
+  // isn't available here either.
+  const [compilePulseActive, setCompilePulseActive] = useState(false)
+  useEffect(() => {
+    if (!compilePulse) return
+    const onT  = setTimeout(() => setCompilePulseActive(true), 0)
+    const offT = setTimeout(() => setCompilePulseActive(false), COMPILE_PULSE_S * 1000)
+    return () => { clearTimeout(onT); clearTimeout(offT) }
+  }, [compilePulse])
+
+  // Idle = no event pulse actively playing (independent of reduced-motion —
   // an event pulse that's suppressed under reduced motion still isn't idle,
   // it stays at the flat glowOpacity below, matching prior behavior).
-  const idle = !namePulse && !compilePulse
+  const idle = !namePulse && !compilePulseActive
 
   return (
     <motion.div
@@ -77,7 +101,7 @@ export function DaemonOrb({
         animate={{
           opacity: namePulse && !reduced
             ? [visual.glowOpacity, visual.glowOpacity * 5, visual.glowOpacity]
-            : compilePulse && !reduced
+            : compilePulseActive && !reduced
               ? [visual.glowOpacity, visual.glowOpacity * 3, visual.glowOpacity]
               // Idle case is a flat Framer target — the CSS `animation` below
               // (not Framer's `animate`) does the actual breathing, since it
@@ -85,13 +109,13 @@ export function DaemonOrb({
               : visual.glowOpacity,
           scale: namePulse && !reduced
             ? [1, 1.3, 1]
-            : compilePulse && !reduced ? [1, 1.15, 1] : 1,
+            : compilePulseActive && !reduced ? [1, 1.15, 1] : 1,
         }}
         transition={
           namePulse && !reduced
             ? { duration: 1.8, ease: 'easeInOut', repeat: Infinity, repeatDelay: 0.3 }
-            : compilePulse && !reduced
-              ? { duration: 0.6, ease: 'easeOut' }
+            : compilePulseActive && !reduced
+              ? { duration: COMPILE_PULSE_S, ease: 'easeOut' }
               : { duration: REDUCED_MOTION_DURATION }
         }
         style={{

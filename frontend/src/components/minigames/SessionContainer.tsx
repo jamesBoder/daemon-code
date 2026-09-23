@@ -108,7 +108,18 @@ export function SessionContainer({ fragments, onComplete, returnTo }: Props) {
     setVisible(true)
   }
 
+  // Guards against a fragment's own onComplete firing more than once for the
+  // same fragment (e.g. a tap-driven reveal-then-continue UI, PulseMap's own
+  // shape) -- without this, a repeat call double-posts to /session/response
+  // and schedules a second, uncoordinated advance() timer. Keyed by fragment
+  // id rather than a plain boolean: SessionContainer itself doesn't remount
+  // per fragment (only the Renderer does via key={fragment.id}), so the ref
+  // has to naturally "reset" by comparing against the current fragment.
+  const completingIdRef = useRef<string | null>(null)
+
   function handleFragmentComplete(responseData: unknown) {
+    if (completingIdRef.current === fragment.id) return
+    completingIdRef.current = fragment.id
     postResponse(fragment, responseData)
     if (reduced) {
       advance(idx)

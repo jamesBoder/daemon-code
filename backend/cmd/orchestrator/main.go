@@ -54,7 +54,14 @@ func main() {
 			return err
 		}
 
-		var sent, failed atomic.Int64
+		// gone is tracked separately from sent -- Remind returns gone=true when
+		// it discovered a dead subscription and cleaned it up rather than
+		// delivering to it. Folding that into "sent" would let a night where a
+		// batch of subscriptions all went stale (a browser data-clear, an
+		// endpoint rotation) log as "100% sent" with zero actual deliveries,
+		// hiding a real delivery outage behind this Lambda's only observability
+		// (found during a full-PR review).
+		var sent, gone, failed atomic.Int64
 		var wg sync.WaitGroup
 		work := make(chan uuid.UUID)
 		for i := 0; i < reminderWorkers; i++ {
@@ -62,9 +69,14 @@ func main() {
 			go func() {
 				defer wg.Done()
 				for id := range work {
-					if err := n.Remind(ctx, id); err != nil {
+					isGone, err := n.Remind(ctx, id)
+					if err != nil {
 						log.Printf("orchestrator: remind user %s: %v", id, err)
 						failed.Add(1)
+						continue
+					}
+					if isGone {
+						gone.Add(1)
 						continue
 					}
 					sent.Add(1)
@@ -77,7 +89,7 @@ func main() {
 		close(work)
 		wg.Wait()
 
-		log.Printf("orchestrator: %d users without a session today; %d processed, %d failed", len(ids), sent.Load(), failed.Load())
+		log.Printf("orchestrator: %d users without a session today; %d sent, %d gone (subscription cleaned up), %d failed", len(ids), sent.Load(), gone.Load(), failed.Load())
 		return nil
 	})
 }

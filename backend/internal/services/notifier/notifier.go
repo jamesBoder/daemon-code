@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -52,10 +53,14 @@ func (n *Notifier) Run(ctx context.Context, event events.EventBridgeEvent) error
 	}
 
 	opening := firstSentence(state.DaemonProse)
-	return n.sendPush(ctx, userID, *sub, opening)
+	gone, err := n.sendPush(ctx, userID, *sub, opening)
+	if gone {
+		log.Printf("notifier: push subscription for user %s was dead, cleaned up (not delivered)", userID)
+	}
+	return err
 }
 
-func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, proseOpening string) error {
+func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, proseOpening string) (gone bool, err error) {
 	payload, _ := json.Marshal(map[string]string{
 		"title": "daemon compiled",
 		"body":  proseOpening + "...",
@@ -64,7 +69,14 @@ func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.Pu
 	return n.push(ctx, userID, sub, payload)
 }
 
-func (n *Notifier) push(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, payload []byte) error {
+// push reports whether the subscription turned out to be dead (gone=true,
+// cleaned up, err=nil) as distinct from a real delivery (gone=false, err=nil)
+// -- callers must not treat "no error" alone as "delivered": a caller that
+// counted both the same way (e.g. an aggregate sent/failed tally) would
+// silently report 100% success on a night every subscription went stale,
+// hiding a real delivery outage behind the only observability this Lambda
+// has (found during a full-PR review).
+func (n *Notifier) push(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, payload []byte) (gone bool, err error) {
 	resp, err := webpush.SendNotification(payload, &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{
@@ -77,19 +89,19 @@ func (n *Notifier) push(ctx context.Context, userID uuid.UUID, sub dynamo.PushSu
 		TTL:             60 * 60 * 12, // 12 hours
 	})
 	if err != nil {
-		return fmt.Errorf("vapid push: %w", err)
+		return false, fmt.Errorf("vapid push: %w", err)
 	}
 	defer resp.Body.Close()
 
-	gone, err := classifyPushStatus(resp.StatusCode)
-	if gone {
+	dead, err := classifyPushStatus(resp.StatusCode)
+	if dead {
 		// Permanently expired/unsubscribed: drop it so it isn't retried nightly.
 		if delErr := n.ddb.DeletePushSubscription(ctx, userID.String()); delErr != nil {
-			return fmt.Errorf("delete expired push subscription: %w", delErr)
+			return false, fmt.Errorf("delete expired push subscription: %w", delErr)
 		}
-		return nil
+		return true, nil
 	}
-	return err
+	return false, err
 }
 
 // classifyPushStatus maps a push service HTTP status to an outcome: gone
@@ -125,14 +137,17 @@ const (
 )
 
 // Remind sends the "haven't played today" push to one user. A user with no
-// push subscription is skipped silently — they never opted in.
-func (n *Notifier) Remind(ctx context.Context, userID uuid.UUID) error {
+// push subscription is skipped silently — they never opted in. gone=true
+// means the subscription was found dead and cleaned up, not delivered to --
+// callers doing aggregate sent/failed counting must track this as its own
+// bucket, not fold it into either one (see push's own doc comment).
+func (n *Notifier) Remind(ctx context.Context, userID uuid.UUID) (gone bool, err error) {
 	sub, err := n.ddb.GetPushSubscription(ctx, userID.String())
 	if err != nil {
-		return fmt.Errorf("get push subscription: %w", err)
+		return false, fmt.Errorf("get push subscription: %w", err)
 	}
 	if sub == nil {
-		return nil
+		return false, nil
 	}
 	payload, _ := json.Marshal(map[string]string{
 		"title": reminderTitle,

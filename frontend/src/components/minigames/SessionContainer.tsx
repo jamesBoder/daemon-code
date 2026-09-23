@@ -150,9 +150,12 @@ export function SessionContainer({ fragments, onComplete, returnTo }: Props) {
         </button>
       </div>
 
-      {/* Content — fades between fragments and on mood transition */}
+      {/* Content — fades AND settles between fragments/mood, not a flat
+          opacity swap. A plain fade read as thin once the transition slowed
+          down (pacing pass) -- the tiny scale gives it weight, like the
+          outgoing game exhaling out and the next one settling in. */}
       <motion.div
-        animate={{ opacity: visible ? 1 : 0 }}
+        animate={{ opacity: visible ? 1 : 0, scale: reduced ? 1 : (visible ? 1 : 0.985) }}
         transition={{ duration: reduced ? 0 : transMs / 1000, ease: 'easeInOut' }}
         style={{ position: 'fixed', inset: 0 }}
       >

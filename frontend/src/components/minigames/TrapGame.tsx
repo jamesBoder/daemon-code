@@ -89,7 +89,7 @@ export function TrapGame(props: Props) {
       {/* Silent commit beat — never a verdict. The daemon logs and says nothing. */}
       <div style={{ minHeight: 'var(--space-6)' }} aria-live="polite">
         {committed && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          <motion.div initial={{ opacity: 0, scale: reduced ? 1 : 0.985 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: reduced ? 0 : T.loggedFadeS }}>
             <DecodeText text={copy.trap.logged} style={{
               fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
@@ -149,7 +149,7 @@ function ChoiceTerminals({ kind, stake, sunk, winProb, riskSide, choiceA, choice
                 alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
                 padding: 'var(--space-4)', background: 'transparent', borderRadius: 'var(--radius-lg)',
                 border: `0.5px solid ${isChosen ? T.frame : 'var(--border-active)'}`,
-                boxShadow: isChosen ? `0 0 16px ${T.frame}40` : undefined,
+                boxShadow: isChosen ? `0 0 16px color-mix(in srgb, ${T.frame} 40%, transparent)` : undefined,
                 opacity: isUnchosen ? T.dimAlpha : 1,
                 cursor: committed ? 'default' : 'pointer',
                 transition: `border-color ${T.commitFlashMs}ms ease, box-shadow ${T.commitFlashMs}ms ease, opacity ${T.commitFlashMs}ms ease`,
@@ -247,7 +247,7 @@ function OverconfidenceEstimate({ max, committed, onConfirm }: {
             dragElastic={TR.dragElastic}
             onDrag={sync}
             onDragEnd={sync}
-            whileDrag={committed ? undefined : { scale: TR.handleScale }}
+            whileDrag={committed ? undefined : { scale: TR.handleScale, boxShadow: `0 0 16px color-mix(in srgb, ${T.frame} 40%, transparent), 0 0 6px color-mix(in srgb, ${T.frame} 60%, transparent)` }}
             role="slider"
             tabIndex={committed ? -1 : 0}
             aria-label={copy.trap.estimateAria}

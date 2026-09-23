@@ -74,7 +74,7 @@ export function SpeedRound({ prompts, onComplete }: Props) {
       padding: isDesktop ? MG.space.desktopPad : MG.space.mobilePad,
     }}>
       <motion.div
-        animate={{ opacity: visible ? 1 : 0 }}
+        animate={{ opacity: visible ? 1 : 0, scale: reduced ? 1 : (visible ? 1 : 0.985) }}
         transition={{ duration: reduced ? 0 : fadeDuration, ease: 'easeInOut' }}
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',

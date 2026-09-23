@@ -96,8 +96,8 @@ export function PredictionDuel({ pattern: _pattern, prediction, record, onComple
       {/* Reveal text — fades in after the pause */}
       {phase === 'reveal' && (
         <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, scale: reduced ? 1 : 0.985 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: reduced ? 0 : D.revealFadeS }}
           style={{
             fontFamily:    'var(--font-mono)',
@@ -117,9 +117,9 @@ export function PredictionDuel({ pattern: _pattern, prediction, record, onComple
         {phase !== 'reveal' && (
           <motion.div
             key="options"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, scale: reduced ? 1 : 0.985 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: reduced ? 1 : 0.985 }}
             transition={{ duration: reduced ? 0 : D.revealFadeS }}
             style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', width: '100%', maxWidth: 360 }}
           >
@@ -143,7 +143,7 @@ export function PredictionDuel({ pattern: _pattern, prediction, record, onComple
                     background:   'transparent',
                     borderRadius: 'var(--radius-lg)',
                     border:       isChosen ? `0.5px solid ${accentColor}` : '0.5px solid var(--border-glass)',
-                    boxShadow:    isChosen ? `0 0 16px ${accentColor}30` : undefined,
+                    boxShadow:    isChosen ? `0 0 16px color-mix(in srgb, ${accentColor} 30%, transparent)` : undefined,
                     transition:   D.cardTransition,
                   }}
                 >

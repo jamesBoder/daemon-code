@@ -142,9 +142,10 @@ export function WeightedScale({ pairs, onComplete }: Props) {
     </motion.button>
   )
 
-  // Pair content fades between each pair
+  // Pair content fades AND settles between each pair -- matches
+  // SessionContainer's own fragment transition (pacing pass).
   const pairFade = {
-    animate: { opacity: pairVisible ? 1 : 0 },
+    animate: { opacity: pairVisible ? 1 : 0, scale: reduced ? 1 : (pairVisible ? 1 : 0.985) },
     transition: { duration: reduced ? 0 : transMs / 1000, ease: 'easeInOut' as const },
   }
 

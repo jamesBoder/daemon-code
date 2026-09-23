@@ -8,7 +8,7 @@ import { apiFetchJson } from '../../lib/api'
 import { playSound } from '../../lib/sound'
 import { CONSOLE } from '../../lib/console'
 import { generateAndShareCard } from '../../lib/shareCard'
-import { DAY_QUERY_STALE_MS, TOAST_DISMISS_MS } from '../../lib/constants'
+import { DAY_QUERY_STALE_MS, SESSION_NOT_READY_POLL_MS, TOAST_DISMISS_MS } from '../../lib/constants'
 import type { HomeData, SessionTodayResponse } from '../../types'
 
 // PLAY's idle state — the "console readout" (docs/simplify-pass.md), absorbing
@@ -36,6 +36,10 @@ export function Play() {
     queryKey: ['session-today'],
     queryFn: () => apiFetchJson<SessionTodayResponse>('/session/today'),
     staleTime: query => (query.state.data?.ready ? DAY_QUERY_STALE_MS : 0),
+    // On-demand deck generation (a missed-day user with no deck for today)
+    // now runs asynchronously -- poll while not ready so the freshly
+    // generated deck shows up without a manual reload; stop once it does.
+    refetchInterval: query => (query.state.data?.ready ? false : SESSION_NOT_READY_POLL_MS),
   })
 
   const isLoading = homeLoading || sessionLoading

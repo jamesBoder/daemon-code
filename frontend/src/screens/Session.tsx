@@ -4,7 +4,7 @@ import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson, postSessionComplete } from '../lib/api'
-import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID } from '../lib/constants'
+import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID, SESSION_NOT_READY_POLL_MS } from '../lib/constants'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
@@ -24,6 +24,10 @@ export function Session() {
     // re-asks the server once the overnight deck lands instead of caching
     // this morning's miss for 23 hours.
     staleTime: query => (query.state.data?.ready ? DAY_QUERY_STALE_MS : 0),
+    // On-demand generation now runs asynchronously (see Play.tsx) -- poll
+    // while not ready so this fallback screen picks up the deck once it
+    // lands, instead of requiring a manual reload.
+    refetchInterval: query => (query.state.data?.ready ? false : SESSION_NOT_READY_POLL_MS),
   })
 
   async function handleComplete(fragmentCount: number) {

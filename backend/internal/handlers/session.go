@@ -77,13 +77,33 @@ func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	// there's no session to complete without a deck to play. Only for users
 	// with an existing profile (CompileCount >= 1) — a genuine Day 0 user
 	// has nothing yet to build a deck from, and that's not this gap.
-	// Best-effort: a failure here just falls through to the existing
-	// not-ready response, same as today.
+	//
+	// Fire-and-forget via SQS, same pattern as PostSessionComplete's Analyst
+	// trigger — NOT a synchronous h.deckGen.GenerateForUser call in-request.
+	// That used to run here directly, but GenerateForUser can invoke a live
+	// Anthropic call (buildPulse) with its own 60s client timeout, and this
+	// Lambda's own timeout is 30s: AWS kills the request before the Anthropic
+	// call would ever time out on its own, 504ing the user and dropping the
+	// deck write entirely (a real, confirmed failure mode, not hypothetical —
+	// found during a full-PR review). The actual generation now runs in
+	// backend/cmd/deckgenondemand, sized like the nightly deckgen Lambda
+	// (60s). The queue is FIFO with content-based dedup keyed per user, so
+	// repeated polls while a generation is already in flight don't each
+	// enqueue (and potentially each trigger) another Anthropic call.
+	// Frontend picks up the resulting deck via its own poll once ready.
 	if todaysDeck == nil {
 		if profile, perr := h.q.GetShadowProfile(r.Context(), userID); perr == nil && profile.CompileCount >= 1 {
-			today := time.Now().UTC().Format("2006-01-02") // NOT dynamo.ServiceDate — that rolls to tomorrow past noon UTC, which GetDailyDeck's same-day lookup would never find
-			if gerr := h.deckGen.GenerateForUser(r.Context(), userID, today); gerr == nil {
-				todaysDeck, _ = h.ddb.GetDailyDeck(r.Context(), userID.String())
+			if h.sqsClient != nil && h.cfg.SQSDeckgenQueueURL != "" {
+				body, _ := json.Marshal(map[string]string{"user_id": userID.String()})
+				groupID := userID.String()
+				if _, serr := h.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+					QueueUrl:               aws.String(h.cfg.SQSDeckgenQueueURL),
+					MessageBody:            aws.String(string(body)),
+					MessageGroupId:         aws.String(groupID),
+					MessageDeduplicationId: aws.String(groupID),
+				}); serr != nil {
+					log.Printf("session today: trigger on-demand deckgen for user %s: %v", userID, serr)
+				}
 			}
 		}
 	}

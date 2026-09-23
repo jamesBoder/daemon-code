@@ -12,7 +12,6 @@ import (
 	"github.com/jamesboder/daemon-code/internal/dynamo"
 	"github.com/jamesboder/daemon-code/internal/middleware"
 	"github.com/jamesboder/daemon-code/internal/services"
-	"github.com/jamesboder/daemon-code/internal/services/deck"
 )
 
 func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handler {
@@ -31,7 +30,6 @@ func NewRouter(cfg *config.Config, q *db.Queries, ddb *dynamo.Client) http.Handl
 		tokens:    tokens,
 		s3presign: s3.NewPresignClient(s3.NewFromConfig(awsCfg)),
 		sqsClient: sqs.NewFromConfig(awsCfg),
-		deckGen:   deck.NewGenerator(cfg, ddb, q),
 	}
 
 	// Public auth routes
@@ -72,5 +70,4 @@ type handler struct {
 	tokens    *services.TokenService
 	s3presign *s3.PresignClient
 	sqsClient *sqs.Client
-	deckGen   *deck.Generator
 }

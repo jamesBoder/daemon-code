@@ -27,6 +27,13 @@ export const PROSE_MAX_WIDTH   = 320   // px — max width for daemon prose text
 // showing "still processing" long after the overnight pipeline has delivered.
 export const DAY_QUERY_STALE_MS = 23 * 60 * 60 * 1000
 
+// How often PLAY re-polls /session/today while a deck isn't ready yet. Needed
+// now that on-demand generation (a missed-day user opening PLAY with no deck
+// for today) runs asynchronously via SQS/Lambda instead of inline in the same
+// request -- without a poll, the client would only ever see the freshly
+// generated deck after a manual reload.
+export const SESSION_NOT_READY_POLL_MS = 4000
+
 // Token refresh
 export const TOKEN_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000  // refresh if expiry < 24h away
 

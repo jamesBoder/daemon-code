@@ -145,11 +145,19 @@ func (g *Generator) GenerateForUser(ctx context.Context, userID uuid.UUID, date 
 		return fmt.Errorf("get pattern library: %w", err)
 	}
 
-	// The deck read here is the one that served the day now ending (GetDailyDeck
-	// keys on the current UTC date; the nightly run stamps tomorrow's). Used to
+	// The deck read here is the one that served the day now ending. Used to
 	// keep tonight's content from repeating yesterday's. Best-effort: a missing
 	// or unreadable previous deck just means no exclusions.
-	prevDeck, err := g.ddb.GetDailyDeck(ctx, userID.String())
+	//
+	// GetMostRecentDailyDeck, not GetDailyDeck -- GetDailyDeck only ever looks
+	// up the literal current UTC date, which is correct for the nightly flow
+	// (it runs before tomorrow's deck is written, so "today" IS the deck just
+	// played) but silently became a no-op when this same function started
+	// being called from the on-demand regeneration path too: that path fires
+	// specifically because *today's* deck is missing, so the exclusion lookup
+	// always found nothing, regardless of whether the user played a deck a
+	// few days ago (real bug, found during a full-PR review).
+	prevDeck, err := g.ddb.GetMostRecentDailyDeck(ctx, userID.String())
 	if err != nil {
 		prevDeck = nil
 	}

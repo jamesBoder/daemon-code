@@ -49,7 +49,7 @@ export const MG = {
 
   // ── SpeedRound specific ────────────────────────────────────────────────────
   speed: {
-    crossfadeMs: 150,  // opacity crossfade between prompts (was 80 — pacing pass, barely a fade at that speed)
+    crossfadeMs: 150,  // opacity crossfade between prompts (was 80 — pacing pass, barely a fade at that speed). The only value driving this — do not add a parallel constant elsewhere.
     mobileMaxW:  380,  // px — container max-width on mobile viewport
   },
 
@@ -71,7 +71,9 @@ export const MG = {
   transition: {
     fragmentMs: 380,  // fade between session fragments (was 220)
     pairMs:     260,  // fade between scale pairs (was 150)
-    promptMs:   150,  // speed round prompt crossfade, matches speed.crossfadeMs (was 80)
+    // SpeedRound's own crossfade lives at speed.crossfadeMs, not here — a
+    // duplicate promptMs constant used to sit in this block unreferenced
+    // anywhere, silently drifting from the value that actually drove it.
     stepMs:     400,  // onboarding step transitions (was 250)
     revealS:    0.35, // generic reveal fade (confirm buttons, etc.) (was 0.25)
   },

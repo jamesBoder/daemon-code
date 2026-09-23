@@ -112,11 +112,21 @@ export function SpeedRound({ prompts, onComplete }: Props) {
               onClick={() => handleChoice(option)}
               whileTap={{ scale: 0.97 }}
               animate={{
+                // Both states keep the same two-layer shape (same color
+                // tokens, only the blur radii change) so Framer Motion can
+                // actually interpolate between them -- a structural mismatch
+                // here (e.g. collapsing to a single 'transparent' layer) makes
+                // it snap instead of animate, since it can't tween across
+                // differently-shaped box-shadow values.
                 boxShadow: chosenOption === option
                   ? '0 0 20px var(--accent-glow), 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent)'
-                  : '0 0 0px transparent',
+                  : '0 0 0px var(--accent-glow), 0 0 0px color-mix(in srgb, var(--accent) 40%, transparent)',
               }}
-              transition={{ duration: reduced ? 0 : fadeDuration }}
+              // Scoped to boxShadow only -- a top-level `transition` becomes
+              // the default for whileTap too, replacing its snappy spring
+              // with this slower tween (verified: mid-press scale was stuck
+              // near 1 instead of springing toward 0.97).
+              transition={{ boxShadow: { duration: reduced ? 0 : fadeDuration } }}
               className="glass-card"
               style={{
                 width:       '100%',

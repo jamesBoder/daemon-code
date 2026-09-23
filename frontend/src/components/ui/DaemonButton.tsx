@@ -13,6 +13,10 @@ interface DaemonButtonProps {
   // index.css) for the one actionable CTA on a screen -- deliberately NOT the
   // default, since this button is reused everywhere (auth, settings, confirm
   // modals) and most of those are plain forms, not a single highlighted action.
+  // Primary only: .daemon-btn-glow's keyframes redeclare primary's resting
+  // shadow stack, which would visually clash with secondary's flat/borderless
+  // style, so it's silently ignored on variant="secondary" rather than left
+  // as a caller footgun.
   glow?: boolean
 }
 
@@ -32,7 +36,7 @@ export function DaemonButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`daemon-btn daemon-btn-${variant}${glow && !disabled ? ' daemon-btn-glow' : ''}`}
+      className={`daemon-btn daemon-btn-${variant}${glow && !disabled && variant === 'primary' ? ' daemon-btn-glow' : ''}`}
       whileTap={reduced ? {} : { scale: 0.98 }}
       style={style}
     >

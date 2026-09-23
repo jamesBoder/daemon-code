@@ -311,7 +311,15 @@ export const copy = {
     split:           'divide it. one offer — they can refuse.',
     cut:             'keep what you can. press and hold to cut the rest.',
     pulse:           'connect what belongs together. up to three wires.',
+    odd_one_out:     'five of your own. one doesn\'t fit. find it.',
   } as Record<string, string>,
+
+  // ── The Odd One Out ──────────────────────────────────────────────────────
+  oddOneOut: {
+    intro:      'the daemon pulled these from what you\'ve actually said.',
+    correct:    'found it.',
+    incorrect:  'noted — that one\'s consistent with the rest.',
+  },
 
   // ── The Split ─────────────────────────────────────────────────────────────
   // The negotiation table. Oblique — never "generous"/"fair"/"selfish" (naming

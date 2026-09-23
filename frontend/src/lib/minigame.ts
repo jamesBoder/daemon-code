@@ -461,6 +461,22 @@ export const MG = {
     closeMs:        700,
   },
 
+  // ── The Odd One Out (features-horizon.md §5, resumed 2026-09-23) ──────────
+  // Five of the user's own past Weighted Scale answers — four leaning one way
+  // on a real dimension, one leaning the other. Pick the one that doesn't
+  // belong. Medium liberty per the original design: an evidence-board / case
+  // file feel — quotes read like pinned exhibits, not a normal choice list.
+  oddOneOut: {
+    maxW:         420,   // px — card stack max width
+    cardMinH:     64,    // px
+    cardGap:      'var(--space-3)',
+    tapScale:     0.97,
+    commitFlashMs: 150,  // chosen-card border flash before the reveal beat
+    revealDelayMs: 500,  // pause after commit before correct/incorrect shows — a beat to sit with the pick
+    revealHoldMs:  1800, // how long the reveal holds before onComplete fires
+    revealFadeS:   0.4,
+  },
+
   // ── Onboarding compile animation ──────────────────────────────────────────
   compile: {
     lineDelays: [400, 1200, 2000] as readonly number[], // ms — when each line appears

@@ -13,6 +13,8 @@ import { Split } from './Split'
 import { Cut } from './Cut'
 import { PulseMap } from './PulseMap'
 import type { PulseNode } from './PulseMap'
+import { OddOneOut } from './OddOneOut'
+import type { OddOneOutQuote } from './OddOneOut'
 import type { Fragment } from '../../types'
 
 export interface FragmentRendererArgs {
@@ -104,6 +106,16 @@ export const fragmentRegistry: Record<string, (args: FragmentRendererArgs) => Re
       observation={raw.daemon_observation as string}
       prediction={raw.daemon_prediction as string}
       nodes={(raw.nodes as PulseNode[] | undefined) ?? []}
+      onComplete={onComplete}
+    />
+  ),
+  odd_one_out: ({ raw, onComplete }) => (
+    // buildOddOneOut stamps 5 quotes pulled from the user's own past
+    // Weighted Scale responses (which dimension they cluster on stays
+    // server-only — outlier_id is the only thing this component needs).
+    <OddOneOut
+      quotes={(raw.quotes as OddOneOutQuote[] | undefined) ?? []}
+      outlierId={raw.outlier_id as string}
       onComplete={onComplete}
     />
   ),

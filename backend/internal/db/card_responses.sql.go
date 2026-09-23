@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getRecentResponsesByType = `-- name: GetRecentResponsesByType :many
+SELECT id, user_id, fragment_id, fragment_type, response_data, session_date, responded_at FROM card_responses
+WHERE user_id = $1 AND fragment_type = $2
+ORDER BY responded_at DESC
+LIMIT $3
+`
+
+type GetRecentResponsesByTypeParams struct {
+	UserID       uuid.UUID `json:"user_id"`
+	FragmentType string    `json:"fragment_type"`
+	Limit        int32     `json:"limit"`
+}
+
+// Most-recent-first, capped -- used by The Odd One Out to sample real past
+// responses as quote candidates. Bounded to a reasonably recent window so
+// quotes stay relevant to who the user is now, not a memory from a year ago.
+func (q *Queries) GetRecentResponsesByType(ctx context.Context, arg GetRecentResponsesByTypeParams) ([]CardResponse, error) {
+	rows, err := q.db.Query(ctx, getRecentResponsesByType, arg.UserID, arg.FragmentType, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CardResponse
+	for rows.Next() {
+		var i CardResponse
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FragmentID,
+			&i.FragmentType,
+			&i.ResponseData,
+			&i.SessionDate,
+			&i.RespondedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getResponsesForDate = `-- name: GetResponsesForDate :many
 SELECT id, user_id, fragment_id, fragment_type, response_data, session_date, responded_at FROM card_responses
 WHERE user_id = $1 AND session_date = $2

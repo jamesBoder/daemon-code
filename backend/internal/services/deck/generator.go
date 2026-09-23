@@ -91,15 +91,25 @@ type Generator struct {
 	// panicking, so none of those tests need updating to exercise a network call
 	// they were never meant to make. NewGenerator always sets it.
 	pulseGen pulseTextGenerator
+
+	// oddOneOutHistory is nil on a zero-value Generator, same reasoning as
+	// pulseGen — buildOddOneOut treats nil as "beat unavailable." A small
+	// interface (not g.q directly) so tests can inject a fake response
+	// history instead of only ever exercising the "unavailable" path; g.q
+	// itself is used far too pervasively elsewhere in this file to turn into
+	// an interface just for this one beat. NewGenerator wires it to the real
+	// *db.Queries, which already satisfies this method set as-is.
+	oddOneOutHistory recentResponseFetcher
 }
 
 func NewGenerator(cfg *appconfig.Config, ddb *dynamo.Client, q *db.Queries) *Generator {
 	httpCl := &http.Client{Timeout: 60 * time.Second}
 	return &Generator{
-		cfg:      cfg,
-		ddb:      ddb,
-		q:        q,
-		pulseGen: &anthropicPulseGenerator{apiKey: cfg.AnthropicAPIKey, httpCl: httpCl},
+		cfg:              cfg,
+		ddb:              ddb,
+		q:                q,
+		pulseGen:         &anthropicPulseGenerator{apiKey: cfg.AnthropicAPIKey, httpCl: httpCl},
+		oddOneOutHistory: q,
 	}
 }
 
@@ -279,6 +289,22 @@ func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, pat
 		}
 	}
 
+	// The Odd One Out — the sixth and last special middle beat: mutually
+	// exclusive with a trap, hold, split, cut, and Pulse (one special beat
+	// per session). Needs the user's own Weighted Scale response history to
+	// exist and actually cluster on some dimension, so it can come back
+	// ineligible some nights even past its unlock -- treated the same as
+	// Pulse's own Anthropic-call failure: a missed beat, not an error.
+	var oddOneOut *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && split == nil && cut == nil && pulse == nil && int(profile.CompileCount) >= oddOneOutMinCompiles && rand.Intn(oddOneOutOdds) == 0 { // #nosec G404 — non-crypto game selection
+		if of, ok := g.buildOddOneOut(ctx, profile.UserID); ok {
+			oddOneOut = &of
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -297,6 +323,9 @@ func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, pat
 	}
 	if pulse != nil {
 		middle = append(middle, *pulse)
+	}
+	if oddOneOut != nil {
+		middle = append(middle, *oddOneOut)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 

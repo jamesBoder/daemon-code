@@ -78,6 +78,7 @@ type exclusions struct {
 	trapIDs          map[string]bool
 	cutItemIDs       map[string]bool
 	pulseScenarioIDs map[string]bool
+	splitFramings    map[string]bool
 }
 
 type Generator struct {
@@ -241,7 +242,7 @@ func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, pat
 	// session), occasional past its unlock, replacing one scale so length holds.
 	var split *dynamo.Fragment
 	if trap == nil && overconf == nil && hold == nil && int(profile.CompileCount) >= splitMinCompiles && rand.Intn(splitOdds) == 0 { // #nosec G404 — non-crypto game selection
-		sf := buildSplit(profile)
+		sf := buildSplit(exclude.splitFramings)
 		split = &sf
 		if nScales > 1 {
 			nScales--
@@ -408,6 +409,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		trapIDs:          make(map[string]bool),
 		cutItemIDs:       make(map[string]bool),
 		pulseScenarioIDs: make(map[string]bool),
+		splitFramings:    make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -463,6 +465,13 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 			}
 			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.ScenarioID != "" {
 				ex.pulseScenarioIDs[p.ScenarioID] = true
+			}
+		case "split":
+			var p struct {
+				Framing string `json:"framing"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.Framing != "" {
+				ex.splitFramings[p.Framing] = true
 			}
 		}
 	}
@@ -627,10 +636,29 @@ var splitFramings = []string{
 // client-side and never surfaced; the seed lives in the stored deck, so a Phase 2
 // computeSplitSignals can recompute it to read overreach. response_data v:2
 // { you_keep, they_get, accepted, settle_ms, handle_moves } is captured now.
-// Nothing here reads the model at build time.
-func buildSplit(profile db.ShadowProfile) dynamo.Fragment {
-	_ = profile                                             // reserved for Phase 2 personalization; the framing is model-agnostic today
-	framing := splitFramings[rand.Intn(len(splitFramings))] // #nosec G404 — non-crypto content pick
+// Nothing here reads the model at build time. No profile parameter — unlike
+// buildHold/buildCut/buildPulse there's no current personalization signal to
+// read; add one back at the call site when Phase 2 actually needs it, rather
+// than carrying an unused param on the promise of a future that may not land
+// in this shape (found during a full-PR review).
+//
+// exclude holds framings served in the previous deck (usedContentIDs), same
+// pattern as buildCut/buildPulse — was missing here even though the file's
+// own doc comment promises "never the same table twice" for every fragment
+// type. Falls back to the full pool if every framing was somehow excluded
+// (never happens with 5 framings and one exclusion, but avoids a
+// theoretical empty-candidate panic).
+func buildSplit(exclude map[string]bool) dynamo.Fragment {
+	candidates := make([]string, 0, len(splitFramings))
+	for _, fr := range splitFramings {
+		if !exclude[fr] {
+			candidates = append(candidates, fr)
+		}
+	}
+	if len(candidates) == 0 {
+		candidates = splitFramings
+	}
+	framing := candidates[rand.Intn(len(candidates))] // #nosec G404 — non-crypto content pick
 	payload, _ := json.Marshal(map[string]interface{}{
 		"type":    "split",
 		"seed":    rand.Int63(), // #nosec G404 — non-crypto visual seed

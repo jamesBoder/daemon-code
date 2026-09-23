@@ -11,6 +11,7 @@ import { haptic } from '../lib/haptics'
 import { playSound } from '../lib/sound'
 import { pulseGrain } from '../lib/grain'
 import { LETTER_SPACING_PROCESS, LETTER_SPACING_TIGHT, LETTER_SPACING_WIDE, MODAL_MAX_WIDTH } from '../lib/constants'
+import { useReturnTo } from '../hooks/useReturnTo'
 import type { ShadowProfile, OrbState, ProcessDiff, RecentDiffResponse } from '../types'
 
 // named first (most dramatic), then new processes, then strength changes
@@ -26,14 +27,15 @@ export function SessionComplete() {
   const queryClient   = useQueryClient()
   const location      = useLocation()
 
-  const state         = location.state as { fragmentCount?: number; daemonLine?: string; returnTo?: string } | null
+  const state         = location.state as { fragmentCount?: number; daemonLine?: string } | null
   const fragmentCount = state?.fragmentCount ?? 0
   const daemonLine    = state?.daemonLine
   // Set when the session was started from the new PLAY console
   // (docs/simplify-pass.md) — absent for the old BottomNav entry point,
   // whose "Done" behavior (→ /home) is unchanged.
-  const returnTo      = state?.returnTo ?? '/home'
-  const fromConsole    = !!state?.returnTo
+  const returnToRaw    = useReturnTo()
+  const returnTo      = returnToRaw ?? '/home'
+  const fromConsole    = !!returnToRaw
 
   const [ceremonyDone, setCeremonyDone] = useState(false)
 

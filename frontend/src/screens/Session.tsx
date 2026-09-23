@@ -1,21 +1,21 @@
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson, postSessionComplete } from '../lib/api'
 import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID, SESSION_NOT_READY_POLL_MS } from '../lib/constants'
+import { useReturnTo } from '../hooks/useReturnTo'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
   const navigate     = useNavigate()
   const queryClient  = useQueryClient()
-  const location      = useLocation()
   // Set when entered from the new PLAY console (docs/simplify-pass.md) so
   // completion returns there instead of the old /home default. Absent for
   // every existing entry point (BottomNav's Session tab) — behavior for
   // that path is unchanged.
-  const returnTo      = (location.state as { returnTo?: string } | null)?.returnTo
+  const returnTo      = useReturnTo()
 
   const { data, isLoading } = useQuery({
     queryKey: ['session-today'],

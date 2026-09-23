@@ -60,6 +60,7 @@ type homeResponse struct {
 	Stats             []compileStat `json:"stats"`
 	DaemonProse       string        `json:"daemonProse"`
 	ShadowPrompt      string        `json:"shadowPrompt,omitempty"`
+	Takeaway          string        `json:"takeaway,omitempty"`
 	DailySignalQuote  string        `json:"dailySignalQuote"`
 	DailySignalAuthor string        `json:"dailySignalAuthor"`
 	OrbState          string        `json:"orbState"`
@@ -180,6 +181,7 @@ func buildHomeResponse(profile db.ShadowProfile, state *dynamo.ShadowState, patt
 	if state != nil {
 		resp.DaemonProse = state.DaemonProse
 		resp.ShadowPrompt = state.ShadowPrompt
+		resp.Takeaway = state.Takeaway
 		resp.DaemonAudioURL = audioURL
 		resp.AnalystTime = relativeDate(state.Date, today)
 		if state.CompileLogLines != "" {

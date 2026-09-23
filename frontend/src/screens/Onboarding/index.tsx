@@ -17,6 +17,12 @@ const COMPILE_LINES = [
   '> building initial hypothesis...',
 ]
 
+// A brand-new user's very first interaction with the app -- was 200ms
+// (ReactionTest's own component default is 800ms), barely enough to
+// register a word exists, let alone whether it resonates (pacing pass,
+// 2026-09-22).
+const REACTION_WORD_MS = 400
+
 // ── Card layout used for context, transition, and first-look steps ────────────
 function StepCard({ children }: { children: React.ReactNode }) {
   return (
@@ -116,7 +122,7 @@ export function Onboarding() {
 
   function enterDaemon() {
     setAuth(token!, true)
-    navigate('/home', { replace: true })
+    navigate('/play', { replace: true })
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -143,7 +149,7 @@ export function Onboarding() {
         return (
           <ReactionTest
             words={copy.onboarding.reactionWords}
-            durationMs={200}
+            durationMs={REACTION_WORD_MS}
             onComplete={(r) => { reactionRef.current = r; setStep(2) }}
           />
         )
@@ -239,7 +245,10 @@ export function Onboarding() {
               The analyst processes tonight.<br />
               The model surfaces tomorrow.
             </p>
-            <button className="daemon-btn daemon-btn-primary" style={{ maxWidth: 240 }} onClick={enterDaemon}>
+            {/* The one-time threshold into the whole app -- glowed like the
+                named-diff card and MoodCheck's confirm, not the routine
+                step-advance buttons elsewhere in this flow. */}
+            <button className="daemon-btn daemon-btn-primary daemon-btn-glow" style={{ maxWidth: 240 }} onClick={enterDaemon}>
               Enter the daemon →
             </button>
           </StepCard>

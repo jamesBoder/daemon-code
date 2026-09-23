@@ -116,7 +116,7 @@ export function WeightedScale({ pairs, onComplete }: Props) {
         dragConstraints={{ left: -dragMax, right: dragMax }}
         dragElastic={T.dragElastic}
         onDragEnd={reveal}
-        whileDrag={{ scale: T.handleScale }}
+        whileDrag={{ scale: T.handleScale, boxShadow: '0 0 16px var(--accent-glow), 0 0 6px color-mix(in srgb, var(--accent) 40%, transparent)' }}
         style={{
           x: dragX,
           position: 'absolute', top: '50%', left: `calc(50% - ${T.handleSize / 2}px)`, marginTop: -(T.handleSize / 2),
@@ -142,9 +142,10 @@ export function WeightedScale({ pairs, onComplete }: Props) {
     </motion.button>
   )
 
-  // Pair content fades between each pair
+  // Pair content fades AND settles between each pair -- matches
+  // SessionContainer's own fragment transition (pacing pass).
   const pairFade = {
-    animate: { opacity: pairVisible ? 1 : 0 },
+    animate: { opacity: pairVisible ? 1 : 0, scale: reduced ? 1 : (pairVisible ? 1 : 0.985) },
     transition: { duration: reduced ? 0 : transMs / 1000, ease: 'easeInOut' as const },
   }
 

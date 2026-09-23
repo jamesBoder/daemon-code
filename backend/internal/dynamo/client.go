@@ -41,6 +41,7 @@ type ShadowState struct {
 	OrbState        string `dynamodbav:"orb_state"`  // profile.Stage at time of compile; used by Chronicle
 	DaemonProse     string `dynamodbav:"daemon_prose"`
 	ShadowPrompt    string `dynamodbav:"shadow_prompt"` // Mirror Method question; written by Narrator
+	Takeaway        string `dynamodbav:"takeaway"`      // short quotable line distilling the prose; feeds Self + the share card (see docs/simplify-pass.md)
 	AudioURL        string `dynamodbav:"audio_url"`
 	CompileStats    string `dynamodbav:"compile_stats"`     // JSON []CompileStat
 	RecentDiff      string `dynamodbav:"recent_diff"`       // JSON []processDiff; Analyst-computed, written by Narrator
@@ -178,6 +179,48 @@ func (c *Client) GetDailyDeck(ctx context.Context, userID string) (*DailyDeck, e
 	return &d, nil
 }
 
+// GetMostRecentDailyDeck returns the user's most recently written deck,
+// whatever date it's stamped with -- unlike GetDailyDeck, which only ever
+// looks up the literal current UTC date. Used for content-repeat exclusion
+// (GenerateForUser), where GetDailyDeck silently became a no-op when called
+// from the on-demand regeneration path: that path fires specifically
+// because *today's* deck is missing, so GetDailyDeck's own lookup for
+// "today" always returned nil there, regardless of whether the user had
+// actually played a deck a few days ago. In the nightly flow (which runs
+// before tomorrow's deck is written) the most recent deck IS today's, so
+// this returns the same result GetDailyDeck did there -- strictly more
+// robust, not a behavior change for that caller.
+//
+// begins_with(#d, "20") excludes non-date sort keys sharing this table's
+// user_id partition (e.g. the standalone Pulse subsystem's fixed "pulse"
+// sort key) -- without it, "pulse" sorts after any date string
+// lexicographically and would always win a plain descending query.
+func (c *Client) GetMostRecentDailyDeck(ctx context.Context, userID string) (*DailyDeck, error) {
+	limit := int32(1)
+	out, err := c.ddb.Query(ctx, &dynamodb.QueryInput{
+		TableName:                aws.String(c.tableDecks),
+		KeyConditionExpression:   aws.String("user_id = :uid AND begins_with(#d, :prefix)"),
+		ExpressionAttributeNames: map[string]string{"#d": "date"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid":    &types.AttributeValueMemberS{Value: userID},
+			":prefix": &types.AttributeValueMemberS{Value: "20"},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            &limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("most recent daily deck query: %w", err)
+	}
+	if len(out.Items) == 0 {
+		return nil, nil
+	}
+	var d DailyDeck
+	if err := attributevalue.UnmarshalMap(out.Items[0], &d); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	return &d, nil
+}
+
 func (c *Client) PutDailyDeck(ctx context.Context, deck DailyDeck) error {
 	item, err := attributevalue.MarshalMap(deck)
 	if err != nil {
@@ -219,6 +262,19 @@ func (c *Client) GetPushSubscription(ctx context.Context, userID string) (*PushS
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 	return &sub, nil
+}
+
+// DeletePushSubscription removes a user's stored subscription — used when the
+// push service reports it permanently gone, so it isn't retried every night.
+func (c *Client) DeletePushSubscription(ctx context.Context, userID string) error {
+	_, err := c.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(c.tableState),
+		Key: map[string]types.AttributeValue{
+			"user_id": &types.AttributeValueMemberS{Value: userID},
+			"date":    &types.AttributeValueMemberS{Value: "push_subscription"},
+		},
+	})
+	return err
 }
 
 func (c *Client) PutPushSubscription(ctx context.Context, userID string, sub PushSubscription) error {

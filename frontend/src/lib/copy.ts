@@ -158,6 +158,10 @@ export const copy = {
     emptyBody:    'Play a few sessions. A shape will surface here as the read deepens.',
     // The archetype, surfaced richly (today it only drives an accent + voice).
     archetypeIntro: 'the daemon reads you as',
+    // OLD, single fixed clinical-sounding name — kept as-is, unchanged, only
+    // because the old (still-live) Self.tsx reads it and that screen stays
+    // untouched until cutover (docs/simplify-pass.md). The new SelfTab uses
+    // archetypeNamePairs below instead — don't add new callers of this one.
     archetypeNames: {
       abandoned_child: 'The Abandoned Child',
       unworthy_self:   'The Unworthy Self',
@@ -165,6 +169,21 @@ export const copy = {
       grief_carrier:   'The Grief Carrier',
       default:         'Still Resolving',
     } as Record<string, string>,
+    // Rotating pairs, not fixed labels (docs/simplify-pass.md — "Frontend
+    // spec: archetype label copy") — softened off the real psychological
+    // grounding in analyst.go (reaches for connection despite withdrawal /
+    // believes inadequate, compensates / suppressed anger, controlled
+    // surface / carries unresolved loss), never a clinical-sounding name
+    // pinned on you. Which of the pair shows rotates deterministically by
+    // compileCount (see pickArchetypeLabel in Self tab), same principle as
+    // the Narrator's lens rotation — never random-per-render.
+    archetypeNamePairs: {
+      abandoned_child: ['The Steady Reach', 'The Open Hand'],
+      unworthy_self:   ['The Prover', 'The Long Climb'],
+      caged_rage:      ['The Banked Fire', 'The Held Flame'],
+      grief_carrier:   ['The Keeper', 'The Old Weight'],
+      default:         ['Still Resolving'],
+    } as Record<string, string[]>,
     // One line per stage — the relationship made legible (§4.3).
     stageLines: {
       cold:    'A first impression, barely. The form is still mostly noise.',
@@ -182,6 +201,9 @@ export const copy = {
       weakening: 'losing its grip',
     } as Record<string, string>,
     patternsForming: 'Something else is still forming. The daemon is watching it.',
+    // Recent read — folded-in Chronicle (docs/simplify-pass.md), short
+    // one-line takeaways only, capped, never the full nightly log.
+    takeawaysTitle: 'recent',
   },
   onboarding: {
     // 60 words — broad coverage across all four archetypes + neutral
@@ -288,7 +310,16 @@ export const copy = {
     hold:            'nothing is asked here. stay, or release when you choose.',
     split:           'divide it. one offer — they can refuse.',
     cut:             'keep what you can. press and hold to cut the rest.',
+    pulse:           'connect what belongs together. up to three wires.',
+    odd_one_out:     'five of your own. one doesn\'t fit. find it.',
   } as Record<string, string>,
+
+  // ── The Odd One Out ──────────────────────────────────────────────────────
+  oddOneOut: {
+    intro:      'the daemon pulled these from what you\'ve actually said.',
+    correct:    'found it.',
+    incorrect:  'noted — that one\'s consistent with the rest.',
+  },
 
   // ── The Split ─────────────────────────────────────────────────────────────
   // The negotiation table. Oblique — never "generous"/"fair"/"selfish" (naming

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -71,21 +72,45 @@ const (
 // exclusions holds content IDs served by the previous deck, kept out of
 // tonight's sampling so consecutive sessions don't repeat.
 type exclusions struct {
-	pairIDs        map[string]bool
-	speedPromptIDs map[string]bool
-	reactionWords  map[string]bool
-	trapIDs        map[string]bool
-	cutItemIDs     map[string]bool
+	pairIDs          map[string]bool
+	speedPromptIDs   map[string]bool
+	reactionWords    map[string]bool
+	trapIDs          map[string]bool
+	cutItemIDs       map[string]bool
+	pulseScenarioIDs map[string]bool
+	splitFramings    map[string]bool
 }
 
 type Generator struct {
 	cfg *appconfig.Config
 	ddb *dynamo.Client
 	q   *db.Queries
+
+	// pulseGen is nil on a zero-value Generator (every existing test constructs
+	// one this way) — buildPulse treats that as "beat unavailable" rather than
+	// panicking, so none of those tests need updating to exercise a network call
+	// they were never meant to make. NewGenerator always sets it.
+	pulseGen pulseTextGenerator
+
+	// oddOneOutHistory is nil on a zero-value Generator, same reasoning as
+	// pulseGen — buildOddOneOut treats nil as "beat unavailable." A small
+	// interface (not g.q directly) so tests can inject a fake response
+	// history instead of only ever exercising the "unavailable" path; g.q
+	// itself is used far too pervasively elsewhere in this file to turn into
+	// an interface just for this one beat. NewGenerator wires it to the real
+	// *db.Queries, which already satisfies this method set as-is.
+	oddOneOutHistory recentResponseFetcher
 }
 
 func NewGenerator(cfg *appconfig.Config, ddb *dynamo.Client, q *db.Queries) *Generator {
-	return &Generator{cfg: cfg, ddb: ddb, q: q}
+	httpCl := &http.Client{Timeout: 60 * time.Second}
+	return &Generator{
+		cfg:              cfg,
+		ddb:              ddb,
+		q:                q,
+		pulseGen:         &anthropicPulseGenerator{apiKey: cfg.AnthropicAPIKey, httpCl: httpCl},
+		oddOneOutHistory: q,
+	}
 }
 
 func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) error {
@@ -101,6 +126,26 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		return fmt.Errorf("parse user_id: %w", err)
 	}
 
+	// The nightly/session-triggered chain always builds the NEXT deck — the
+	// user just finished today's (or it's the 23:00 nightly slot) — so it
+	// stamps with ServiceDate's "roll to tomorrow past noon UTC" policy.
+	return g.GenerateForUser(ctx, userID, dynamo.ServiceDate(time.Now()))
+}
+
+// GenerateForUser builds and stores a deck for one user, stamped with the
+// given date — the same logic Run uses via the nightly/session-triggered
+// chain, extracted so it's callable directly without an EventBridge event
+// and with an explicit date rather than Run's hardcoded "always the next
+// day" policy. Used by GetSessionToday for on-demand regeneration:
+// session-completion-triggered compiles (see docs/simplify-pass.md) fixed
+// the "daemon compiles forever with no activity" problem, but left a gap —
+// nothing re-triggers deck generation for a user who simply missed a day,
+// since there's no session to complete without a deck to play.
+// GetSessionToday calls this with TODAY's actual date (not ServiceDate,
+// which would roll to tomorrow past noon UTC and silently fail to produce
+// a deck GetDailyDeck's same-day query would ever find) when it finds none
+// for today, closing that gap.
+func (g *Generator) GenerateForUser(ctx context.Context, userID uuid.UUID, date string) error {
 	profile, err := g.q.GetShadowProfile(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("get shadow profile: %w", err)
@@ -111,11 +156,19 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		return fmt.Errorf("get pattern library: %w", err)
 	}
 
-	// The deck read here is the one that served the day now ending (GetDailyDeck
-	// keys on the current UTC date; the nightly run stamps tomorrow's). Used to
+	// The deck read here is the one that served the day now ending. Used to
 	// keep tonight's content from repeating yesterday's. Best-effort: a missing
 	// or unreadable previous deck just means no exclusions.
-	prevDeck, err := g.ddb.GetDailyDeck(ctx, userID.String())
+	//
+	// GetMostRecentDailyDeck, not GetDailyDeck -- GetDailyDeck only ever looks
+	// up the literal current UTC date, which is correct for the nightly flow
+	// (it runs before tomorrow's deck is written, so "today" IS the deck just
+	// played) but silently became a no-op when this same function started
+	// being called from the on-demand regeneration path too: that path fires
+	// specifically because *today's* deck is missing, so the exclusion lookup
+	// always found nothing, regardless of whether the user played a deck a
+	// few days ago (real bug, found during a full-PR review).
+	prevDeck, err := g.ddb.GetMostRecentDailyDeck(ctx, userID.String())
 	if err != nil {
 		prevDeck = nil
 	}
@@ -127,10 +180,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 		pred = db.TomorrowPrediction{}
 	}
 
-	fragments := g.buildDeck(profile, patterns, usedContentIDs(prevDeck), pred)
-	// Stamp with the date this deck serves (the following UTC day for the
-	// 23:00 UTC nightly run) so GetDailyDeck finds it throughout that day.
-	date := dynamo.ServiceDate(time.Now())
+	fragments := g.buildDeck(ctx, profile, patterns, usedContentIDs(prevDeck), pred)
 
 	if err := g.ddb.PutDailyDeck(ctx, dynamo.DailyDeck{
 		UserID:    userID.String(),
@@ -159,7 +209,7 @@ func (g *Generator) Run(ctx context.Context, event events.EventBridgeEvent) erro
 // assembly below, register its renderer in the frontend fragment registry, and
 // teach computeDimensionSignals (internal/services/ai/context.go) its
 // response_data shape.
-func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions, pred db.TomorrowPrediction) []dynamo.Fragment {
+func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, patterns []db.PatternLibrary, exclude exclusions, pred db.TomorrowPrediction) []dynamo.Fragment {
 	fast := g.pickFastGames(profile, exclude)
 	opener, second := fast[0], fast[1]
 
@@ -202,7 +252,7 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	// session), occasional past its unlock, replacing one scale so length holds.
 	var split *dynamo.Fragment
 	if trap == nil && overconf == nil && hold == nil && int(profile.CompileCount) >= splitMinCompiles && rand.Intn(splitOdds) == 0 { // #nosec G404 — non-crypto game selection
-		sf := buildSplit(profile)
+		sf := buildSplit(exclude.splitFramings)
 		split = &sf
 		if nScales > 1 {
 			nScales--
@@ -222,6 +272,39 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 		}
 	}
 
+	// The Map — the fifth and last special middle beat: mutually exclusive with
+	// a trap, hold, split, and cut (one special beat per session). Unlike its
+	// siblings this one calls out to Anthropic to generate its daemon text;
+	// buildPulse handles a failed call with hedged fallback text rather than
+	// dropping the beat, and g.pulseGen is nil on a zero-value Generator (every
+	// existing test), so this never fires unexpectedly in tests that don't ask
+	// for it. Replaces one scale so length holds, same as the rest of the chain.
+	var pulse *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && split == nil && cut == nil && int(profile.CompileCount) >= pulseMinCompiles && rand.Intn(pulseOdds) == 0 { // #nosec G404 — non-crypto game selection
+		if pf, ok := buildPulse(ctx, g.pulseGen, profile, exclude.pulseScenarioIDs); ok {
+			pulse = &pf
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
+	// The Odd One Out — the sixth and last special middle beat: mutually
+	// exclusive with a trap, hold, split, cut, and Pulse (one special beat
+	// per session). Needs the user's own Weighted Scale response history to
+	// exist and actually cluster on some dimension, so it can come back
+	// ineligible some nights even past its unlock -- treated the same as
+	// Pulse's own Anthropic-call failure: a missed beat, not an error.
+	var oddOneOut *dynamo.Fragment
+	if trap == nil && overconf == nil && hold == nil && split == nil && cut == nil && pulse == nil && int(profile.CompileCount) >= oddOneOutMinCompiles && rand.Intn(oddOneOutOdds) == 0 { // #nosec G404 — non-crypto game selection
+		if of, ok := g.buildOddOneOut(ctx, profile.UserID); ok {
+			oddOneOut = &of
+			if nScales > 1 {
+				nScales--
+			}
+		}
+	}
+
 	middle := []dynamo.Fragment{second}
 	for _, pair := range pickScalePairs(nScales, profile.CompileCount, exclude.pairIDs) {
 		middle = append(middle, buildWeightedScaleFragment(pair))
@@ -237,6 +320,12 @@ func (g *Generator) buildDeck(profile db.ShadowProfile, patterns []db.PatternLib
 	}
 	if cut != nil {
 		middle = append(middle, *cut)
+	}
+	if pulse != nil {
+		middle = append(middle, *pulse)
+	}
+	if oddOneOut != nil {
+		middle = append(middle, *oddOneOut)
 	}
 	middle = arrangeNoAdjacent(middle, opener.Type)
 
@@ -343,11 +432,13 @@ func adjacencyViolations(fragments []dynamo.Fragment, prevType string) int {
 // contribute nothing.
 func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 	ex := exclusions{
-		pairIDs:        make(map[string]bool),
-		speedPromptIDs: make(map[string]bool),
-		reactionWords:  make(map[string]bool),
-		trapIDs:        make(map[string]bool),
-		cutItemIDs:     make(map[string]bool),
+		pairIDs:          make(map[string]bool),
+		speedPromptIDs:   make(map[string]bool),
+		reactionWords:    make(map[string]bool),
+		trapIDs:          make(map[string]bool),
+		cutItemIDs:       make(map[string]bool),
+		pulseScenarioIDs: make(map[string]bool),
+		splitFramings:    make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -396,6 +487,20 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 				for _, it := range p.Items {
 					ex.cutItemIDs[it.ID] = true
 				}
+			}
+		case "pulse":
+			var p struct {
+				ScenarioID string `json:"scenario_id"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.ScenarioID != "" {
+				ex.pulseScenarioIDs[p.ScenarioID] = true
+			}
+		case "split":
+			var p struct {
+				Framing string `json:"framing"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.Framing != "" {
+				ex.splitFramings[p.Framing] = true
 			}
 		}
 	}
@@ -560,10 +665,29 @@ var splitFramings = []string{
 // client-side and never surfaced; the seed lives in the stored deck, so a Phase 2
 // computeSplitSignals can recompute it to read overreach. response_data v:2
 // { you_keep, they_get, accepted, settle_ms, handle_moves } is captured now.
-// Nothing here reads the model at build time.
-func buildSplit(profile db.ShadowProfile) dynamo.Fragment {
-	_ = profile                                             // reserved for Phase 2 personalization; the framing is model-agnostic today
-	framing := splitFramings[rand.Intn(len(splitFramings))] // #nosec G404 — non-crypto content pick
+// Nothing here reads the model at build time. No profile parameter — unlike
+// buildHold/buildCut/buildPulse there's no current personalization signal to
+// read; add one back at the call site when Phase 2 actually needs it, rather
+// than carrying an unused param on the promise of a future that may not land
+// in this shape (found during a full-PR review).
+//
+// exclude holds framings served in the previous deck (usedContentIDs), same
+// pattern as buildCut/buildPulse — was missing here even though the file's
+// own doc comment promises "never the same table twice" for every fragment
+// type. Falls back to the full pool if every framing was somehow excluded
+// (never happens with 5 framings and one exclusion, but avoids a
+// theoretical empty-candidate panic).
+func buildSplit(exclude map[string]bool) dynamo.Fragment {
+	candidates := make([]string, 0, len(splitFramings))
+	for _, fr := range splitFramings {
+		if !exclude[fr] {
+			candidates = append(candidates, fr)
+		}
+	}
+	if len(candidates) == 0 {
+		candidates = splitFramings
+	}
+	framing := candidates[rand.Intn(len(candidates))] // #nosec G404 — non-crypto content pick
 	payload, _ := json.Marshal(map[string]interface{}{
 		"type":    "split",
 		"seed":    rand.Int63(), // #nosec G404 — non-crypto visual seed

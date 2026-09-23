@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -139,7 +140,7 @@ func TestOverconfidenceLeadsDeckAndIsExclusive(t *testing.T) {
 
 	sawOverconf := false
 	for i := 0; i < 400; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		if len(deck) < 5 || len(deck) > 7 {
 			t.Fatalf("deck length %d out of [5,7]", len(deck))
 		}
@@ -209,7 +210,7 @@ func TestTrapGatedByCompileCount(t *testing.T) {
 	// Below the unlock: a trap must never appear, no matter the coin flips.
 	young := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: trapMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(young, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), young, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "trap" {
 				t.Fatal("trap appeared before the compile-count unlock")
 			}
@@ -223,7 +224,7 @@ func TestTrapGatedByCompileCount(t *testing.T) {
 	patterns := []db.PatternLibrary{namedPattern("the_approval_loop.process", 40)}
 	sawTrap := false
 	for i := 0; i < 300; i++ {
-		deck := g.buildDeck(old, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), old, patterns, exclusions{}, db.TomorrowPrediction{})
 		if len(deck) < 5 || len(deck) > 6 {
 			t.Fatalf("deck length %d out of [5,6]", len(deck))
 		}

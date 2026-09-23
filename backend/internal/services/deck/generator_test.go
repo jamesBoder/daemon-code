@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -29,7 +30,7 @@ func TestBuildDeckArc(t *testing.T) {
 
 	sawSpeedRound := false
 	for i := 0; i < 200; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 
 		if len(deck) < 5 || len(deck) > 6 {
 			t.Fatalf("deck length %d, want 5-6", len(deck))
@@ -76,7 +77,7 @@ func TestBuildDeckBeforeSpeedRoundEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: 0}
 	for i := 0; i < 50; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "speed_round" {
 				t.Fatal("speed round appeared before eligibility")
 			}
@@ -128,7 +129,7 @@ func TestBuildSpeedRoundExcludesServed(t *testing.T) {
 
 func TestBuildDeckNoPatternsHasNoDuel(t *testing.T) {
 	g := &Generator{}
-	deck := g.buildDeck(db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{}, db.TomorrowPrediction{})
+	deck := g.buildDeck(context.Background(), db.ShadowProfile{PrimaryArchetype: "default"}, nil, exclusions{}, db.TomorrowPrediction{})
 	for _, f := range deck {
 		if f.Type == "prediction_duel" {
 			t.Fatal("duel present without patterns")
@@ -198,7 +199,7 @@ func TestReactionTestSampling(t *testing.T) {
 		Words []string `json:"words"`
 	}
 	for i := 0; i < 100; i++ {
-		deck := g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{})
 		seen := map[string]bool{}
 		for _, f := range deck {
 			if f.Type != "reaction_test" {
@@ -410,7 +411,7 @@ func TestBuildDeckHoldSelection(t *testing.T) {
 
 	sawHold := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		holds, traps := 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -441,7 +442,7 @@ func TestBuildDeckHoldBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: holdMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "hold" {
 				t.Fatal("hold appeared before eligibility")
 			}
@@ -450,7 +451,7 @@ func TestBuildDeckHoldBeforeEligibility(t *testing.T) {
 }
 
 func TestBuildSplit(t *testing.T) {
-	f := buildSplit(db.ShadowProfile{CompileCount: 10})
+	f := buildSplit(nil)
 	if f.Type != "split" {
 		t.Fatalf("type %q, want split", f.Type)
 	}
@@ -487,8 +488,8 @@ func TestBuildSplit(t *testing.T) {
 func TestBuildSplitVariesPerNight(t *testing.T) {
 	// Per-night uniqueness: two builds get different seeds (the table is never
 	// identical), so the frontend's counterpart presence varies.
-	a := buildSplit(db.ShadowProfile{CompileCount: 10})
-	b := buildSplit(db.ShadowProfile{CompileCount: 10})
+	a := buildSplit(nil)
+	b := buildSplit(nil)
 	var pa, pb map[string]any
 	if err := json.Unmarshal([]byte(a.Payload), &pa); err != nil {
 		t.Fatalf("payload a not valid JSON: %v", err)
@@ -498,6 +499,60 @@ func TestBuildSplitVariesPerNight(t *testing.T) {
 	}
 	if pa["seed"] == pb["seed"] {
 		t.Fatal("two splits shared a seed — the table should vary per night")
+	}
+}
+
+func TestBuildSplitExcludesServed(t *testing.T) {
+	// Exclude all but one framing — buildSplit must still return only that
+	// one, not fall back to the full pool while a real choice remains.
+	exclude := map[string]bool{}
+	for _, fr := range splitFramings[1:] {
+		exclude[fr] = true
+	}
+	for i := 0; i < 10; i++ {
+		f := buildSplit(exclude)
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+			t.Fatalf("payload not valid JSON: %v", err)
+		}
+		if payload["framing"] != splitFramings[0] {
+			t.Fatalf("framing %v, want the sole non-excluded framing %q", payload["framing"], splitFramings[0])
+		}
+	}
+
+	// Excluding every framing falls back to the full pool rather than panicking.
+	allExcluded := map[string]bool{}
+	for _, fr := range splitFramings {
+		allExcluded[fr] = true
+	}
+	f := buildSplit(allExcluded)
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(f.Payload), &payload); err != nil {
+		t.Fatalf("payload not valid JSON: %v", err)
+	}
+	found := false
+	for _, fr := range splitFramings {
+		if payload["framing"] == fr {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("framing %v not in splitFramings even with the full-pool fallback", payload["framing"])
+	}
+}
+
+func TestUsedContentIDsCollectsSplit(t *testing.T) {
+	frag := buildSplit(nil)
+	var p struct {
+		Framing string `json:"framing"`
+	}
+	if err := json.Unmarshal([]byte(frag.Payload), &p); err != nil {
+		t.Fatalf("payload: %v", err)
+	}
+
+	ex := usedContentIDs(&dynamo.DailyDeck{Fragments: []dynamo.Fragment{frag}})
+	if !ex.splitFramings[p.Framing] {
+		t.Fatalf("framing %q not collected into exclusions: %v", p.Framing, ex.splitFramings)
 	}
 }
 
@@ -511,7 +566,7 @@ func TestBuildDeckSplitSelection(t *testing.T) {
 
 	sawSplit := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		splits, traps, holds := 0, 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -544,7 +599,7 @@ func TestBuildDeckSplitBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: splitMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "split" {
 				t.Fatal("split appeared before eligibility")
 			}
@@ -659,7 +714,7 @@ func TestBuildDeckCutSelection(t *testing.T) {
 
 	sawCut := false
 	for i := 0; i < 500; i++ {
-		deck := g.buildDeck(profile, patterns, exclusions{}, db.TomorrowPrediction{})
+		deck := g.buildDeck(context.Background(), profile, patterns, exclusions{}, db.TomorrowPrediction{})
 		cuts, traps, holds, splits := 0, 0, 0, 0
 		for _, f := range deck {
 			switch f.Type {
@@ -694,7 +749,7 @@ func TestBuildDeckCutBeforeEligibility(t *testing.T) {
 	g := &Generator{}
 	profile := db.ShadowProfile{PrimaryArchetype: "default", CompileCount: cutMinCompiles - 1}
 	for i := 0; i < 200; i++ {
-		for _, f := range g.buildDeck(profile, nil, exclusions{}, db.TomorrowPrediction{}) {
+		for _, f := range g.buildDeck(context.Background(), profile, nil, exclusions{}, db.TomorrowPrediction{}) {
 			if f.Type == "cut" {
 				t.Fatal("cut appeared before eligibility")
 			}

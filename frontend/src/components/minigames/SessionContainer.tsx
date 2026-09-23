@@ -16,13 +16,16 @@ import type { Fragment } from '../../types'
 interface Props {
   fragments: Fragment[]
   onComplete: (count: number) => void
+  // Set when entered from the new PLAY console — quitting mid-session should
+  // return there instead of the old /home default. See Session.tsx.
+  returnTo?: string
 }
 
 type Phase = 'game' | 'mood'
 
 const transMs = MG.transition.fragmentMs
 
-export function SessionContainer({ fragments, onComplete }: Props) {
+export function SessionContainer({ fragments, onComplete, returnTo }: Props) {
   const navigate  = useNavigate()
   const reduced   = useReducedMotion()
   const transTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -105,7 +108,18 @@ export function SessionContainer({ fragments, onComplete }: Props) {
     setVisible(true)
   }
 
+  // Guards against a fragment's own onComplete firing more than once for the
+  // same fragment (e.g. a tap-driven reveal-then-continue UI, PulseMap's own
+  // shape) -- without this, a repeat call double-posts to /session/response
+  // and schedules a second, uncoordinated advance() timer. Keyed by fragment
+  // id rather than a plain boolean: SessionContainer itself doesn't remount
+  // per fragment (only the Renderer does via key={fragment.id}), so the ref
+  // has to naturally "reset" by comparing against the current fragment.
+  const completingIdRef = useRef<string | null>(null)
+
   function handleFragmentComplete(responseData: unknown) {
+    if (completingIdRef.current === fragment.id) return
+    completingIdRef.current = fragment.id
     postResponse(fragment, responseData)
     if (reduced) {
       advance(idx)
@@ -147,9 +161,12 @@ export function SessionContainer({ fragments, onComplete }: Props) {
         </button>
       </div>
 
-      {/* Content — fades between fragments and on mood transition */}
+      {/* Content — fades AND settles between fragments/mood, not a flat
+          opacity swap. A plain fade read as thin once the transition slowed
+          down (pacing pass) -- the tiny scale gives it weight, like the
+          outgoing game exhaling out and the next one settling in. */}
       <motion.div
-        animate={{ opacity: visible ? 1 : 0 }}
+        animate={{ opacity: visible ? 1 : 0, scale: reduced ? 1 : (visible ? 1 : 0.985) }}
         transition={{ duration: reduced ? 0 : transMs / 1000, ease: 'easeInOut' }}
         style={{ position: 'fixed', inset: 0 }}
       >
@@ -210,7 +227,7 @@ export function SessionContainer({ fragments, onComplete }: Props) {
           confirmLabel={copy.session.exitConfirm}
           dangerous
           onCancel={() => setShowExitModal(false)}
-          onConfirm={() => navigate('/home', { replace: true })}
+          onConfirm={() => navigate(returnTo ?? '/home', { replace: true })}
         />
       )}
     </>

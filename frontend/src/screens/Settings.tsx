@@ -9,8 +9,8 @@ import { BottomNav } from '../components/ui/BottomNav'
 import { ScreenHeader } from '../components/ui/ScreenHeader'
 import { apiFetchJson, patchProfile, getVoiceSampleUrl } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, SOUND_KEY, SOUND_EVENT } from '../lib/constants'
-import { stopAmbient, playSound } from '../lib/sound'
+import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_SCALE, BUTTON_TAP_OPACITY, HAIRLINE, HAPTICS_KEY, LETTER_SPACING_WIDE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, ROUTE_TRANSITION_MS, SCREEN_HEADER_HEIGHT, SOUND_KEY } from '../lib/constants'
+import { playSound } from '../lib/sound'
 import type { ShadowProfile } from '../types'
 
 const TOGGLE = {
@@ -118,9 +118,7 @@ export function Settings() {
     const next = !soundEnabled
     localStorage.setItem(SOUND_KEY, String(next))
     setSoundEnabled(next)
-    window.dispatchEvent(new Event(SOUND_EVENT))
     if (next) playSound('click')    // confirm it works + unlock the context within this gesture
-    else stopAmbient()              // silence the bed immediately on opt-out
   }
 
   function handleSignOut() {
@@ -164,7 +162,11 @@ export function Settings() {
 
   return (
     <>
-      <ScreenHeader title="settings" />
+      {/* onBack always shown now, not just when reached from the console shell
+          (docs/simplify-pass.md) — the bezel Settings icon has no other way
+          back, and adding it here doesn't remove BottomNav for the old
+          entry path, so nothing regresses there. */}
+      <ScreenHeader title="settings" onBack={() => navigate(-1)} />
       <div className="screen" style={{ overflowY: 'auto', paddingTop: `calc(${SCREEN_HEADER_HEIGHT}px + env(safe-area-inset-top))`, paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` }}>
         <div style={{ padding: 'var(--space-6) var(--space-5) var(--space-8)', maxWidth: MAX_CONTENT_WIDTH, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 

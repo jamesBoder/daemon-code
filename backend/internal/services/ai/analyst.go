@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -293,10 +294,15 @@ type Analyst struct {
 func NewAnalyst(cfg *appconfig.Config, q *db.Queries) *Analyst {
 	awsCfg, _ := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWSRegion))
 	return &Analyst{
-		cfg:    cfg,
-		q:      q,
-		eb:     eventbridge.NewFromConfig(awsCfg),
-		httpCl: &http.Client{Timeout: 60 * time.Second},
+		cfg: cfg,
+		q:   q,
+		eb:  eventbridge.NewFromConfig(awsCfg),
+		// Raised from 60s (2026-09-18): analystMaxTokens went from 2048 to
+		// 8192 in the same fix, and generating that many tokens can take
+		// longer than 60s — confirmed by "context deadline exceeded" on
+		// every attempt right after that change. The Lambda's own timeout
+		// (terraform, 300s) has plenty of room above this.
+		httpCl: &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
@@ -336,8 +342,19 @@ const snapshotInterval = 30
 const recentSessionWindow = 7
 
 // analystMaxTokens caps the Anthropic response for the Analyst Lambda.
-// Narrator uses narratorMaxTokens (768); Analyst needs more room for dimension JSON + patterns.
-const analystMaxTokens = 2048
+// Narrator uses narratorMaxTokens (768); Analyst needs more room for dimension
+// JSON + patterns. Raised from 2048 (2026-09-18): for at least one data-rich
+// account (64 compiles of accumulated history), Claude wrote pages of visible
+// step-by-step reasoning ("I'll work through this systematically... STEP 1:
+// Decode card_responses...") before ever reaching the JSON, exhausting the
+// budget and losing the entire compile — the prompt's explicit "never
+// produce prose" instruction didn't reliably prevent this, and this model
+// rejects the assistant-message-prefill technique outright ("This model
+// does not support assistant message prefill"). Raising the ceiling doesn't
+// cost more unless the model actually uses it — it's a safety margin against
+// a failure mode that silently drops a whole day's compile, which is a much
+// worse outcome than a slightly higher token ceiling.
+const analystMaxTokens = 8192
 
 type analystOutput struct {
 	PrimaryArchetype      string              `json:"primary_archetype"`
@@ -466,6 +483,16 @@ func (a *Analyst) RunForUserOnDate(ctx context.Context, userID uuid.UUID, date s
 	}
 
 	output, err := a.callAnthropic(ctx, ac)
+	// One retry, specifically for a bad response (not a network/API-level
+	// failure, which would just fail identically again) — a single instance
+	// of the model writing prose instead of JSON shouldn't waste the whole
+	// compile with nothing written (found 2026-09-18: it did, for a
+	// data-rich account, even with the "{" prefill; a second attempt is
+	// cheap insurance against a failure mode that isn't fully eliminated).
+	if err != nil && errors.Is(err, errUnparseableOutput) {
+		log.Printf("analyst: retrying after unparseable output for user %s", userID)
+		output, err = a.callAnthropic(ctx, ac)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("anthropic call: %w", err)
 	}
@@ -794,7 +821,24 @@ func (a *Analyst) callAnthropic(ctx context.Context, ac analystContext) (*analys
 	text := extractJSON(stripMarkdownFence(apiResp.Content[0].Text))
 	var output analystOutput
 	if err := json.Unmarshal([]byte(text), &output); err != nil {
-		return nil, fmt.Errorf("parse analyst output JSON: %w", err)
+		// Log the raw text on parse failure — the error alone doesn't say
+		// what Claude actually returned, which made a real occurrence of
+		// this (2026-09-18: Claude returned no JSON at all, pure prose)
+		// impossible to diagnose after the fact.
+		snippet := apiResp.Content[0].Text
+		if len(snippet) > 500 {
+			snippet = snippet[:500]
+		}
+		log.Printf("analyst: unparseable output, raw text: %q", snippet)
+		return nil, fmt.Errorf("%w: %w", errUnparseableOutput, err)
 	}
 	return &output, nil
 }
+
+// errUnparseableOutput marks a failure specific to Claude's response, not the
+// network/API call — callAnthropic's caller retries once on this specific
+// error (a single bad response, e.g. the model writing prose instead of
+// JSON despite the "{" prefill, shouldn't waste the whole compile — see
+// docs/simplify-pass.md), but not on a persistent failure like an API outage
+// or exhausted credits, which would just fail identically again.
+var errUnparseableOutput = errors.New("analyst: unparseable model output")

@@ -696,11 +696,22 @@ function RevealOverlay({
   const [showPrediction, setShowPrediction] = useState(reduced)
 
   // Typewriter — visual only; the aria-live region exposes the full text immediately.
+  // One interval for the whole animation, self-clearing on completion --
+  // charIdx was previously a dependency of this same effect, so every tick
+  // tore down and recreated a new setInterval instead of letting one run.
   useEffect(() => {
-    if (reduced || charIdx >= observation.length) return
-    const t = setInterval(() => setCharIdx((i) => Math.min(i + 1, observation.length)), MAP.typeCharMs)
+    if (reduced) return
+    const t = setInterval(() => {
+      setCharIdx((i) => {
+        if (i >= observation.length) {
+          clearInterval(t)
+          return i
+        }
+        return i + 1
+      })
+    }, MAP.typeCharMs)
     return () => clearInterval(t)
-  }, [reduced, charIdx, observation.length])
+  }, [reduced, observation.length])
 
   // Observation hold, then prediction.
   useEffect(() => {

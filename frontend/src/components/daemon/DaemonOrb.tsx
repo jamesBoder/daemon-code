@@ -116,7 +116,11 @@ export function DaemonOrb({
             ? { duration: 1.8, ease: 'easeInOut', repeat: Infinity, repeatDelay: 0.3 }
             : compilePulseActive && !reduced
               ? { duration: COMPILE_PULSE_S, ease: 'easeOut' }
-              : { duration: REDUCED_MOTION_DURATION }
+              // Idle/settle case: matches the ring and core layers below
+              // (reduced ? flat duration : springs.smooth) -- this layer had
+              // been left on a flat tween unconditionally, so it settled
+              // differently from its two siblings for motion-enabled users.
+              : reduced ? { duration: REDUCED_MOTION_DURATION } : springs.smooth
         }
         style={{
           position: 'absolute',

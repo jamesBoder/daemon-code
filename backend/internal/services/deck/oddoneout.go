@@ -127,10 +127,21 @@ func (g *Generator) buildOddOneOut(ctx context.Context, userID uuid.UUID, exclud
 	for dim, sides := range byDim {
 		high := mapKeys(sides[true])
 		low := mapKeys(sides[false])
+		highQualifies := len(high) >= oddOneOutMajorityNeeded && len(low) >= oddOneOutMinorityNeeded
+		lowQualifies := len(low) >= oddOneOutMajorityNeeded && len(high) >= oddOneOutMinorityNeeded
 		switch {
-		case len(high) >= oddOneOutMajorityNeeded && len(low) >= oddOneOutMinorityNeeded:
+		case highQualifies && lowQualifies:
+			// Both sides independently clear the majority bar -- coin-flip which
+			// one frames as the majority instead of always favoring "high", so a
+			// strongly-split dimension isn't always shown the same way around.
+			if rand.Intn(2) == 0 { // #nosec G404 — non-crypto content pick
+				eligible = append(eligible, eligibleDim{dim, high, true, low})
+			} else {
+				eligible = append(eligible, eligibleDim{dim, low, false, high})
+			}
+		case highQualifies:
 			eligible = append(eligible, eligibleDim{dim, high, true, low})
-		case len(low) >= oddOneOutMajorityNeeded && len(high) >= oddOneOutMinorityNeeded:
+		case lowQualifies:
 			eligible = append(eligible, eligibleDim{dim, low, false, high})
 		}
 	}

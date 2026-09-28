@@ -80,9 +80,10 @@ export function OddOneOut({ quotes, outlierId, onComplete }: Props) {
 
       <div style={{ width: '100%', maxWidth: O.maxW, display: 'flex', flexDirection: 'column', gap: O.cardGap }}>
         {quotes.map((q, i) => {
-          const isChosen    = chosenId === q.id
-          const isOutlier   = phase === 'reveal' && q.id === outlierId
-          const isDimmed    = phase === 'reveal' && !isChosen && !isOutlier
+          const isChosen  = chosenId === q.id
+          const isPending = phase === 'pick' && isChosen
+          const isOutlier = phase === 'reveal' && q.id === outlierId
+          const isDimmed  = phase === 'reveal' && !isChosen && !isOutlier
           // A faint fixed per-card tilt — pinned-to-a-corkboard, not a grid.
           const tilt = [-1.2, 0.8, -0.5, 1.4, -0.9][i % 5]
           return (
@@ -98,12 +99,16 @@ export function OddOneOut({ quotes, outlierId, onComplete }: Props) {
                   ? 'var(--compile-green)'
                   : (isChosen && phase === 'reveal' && !correct)
                     ? 'var(--warning)'
-                    : 'var(--border-glass)',
+                    : isPending
+                      ? 'var(--accent)'
+                      : 'var(--border-glass)',
                 boxShadow: isOutlier
                   ? '0 0 20px color-mix(in srgb, var(--compile-green) 35%, transparent)'
                   : (isChosen && phase === 'reveal' && !correct)
                     ? '0 0 20px color-mix(in srgb, var(--warning) 35%, transparent)'
-                    : '0 0 0px transparent',
+                    : isPending
+                      ? '0 0 16px var(--accent-glow)'
+                      : '0 0 0px transparent',
               }}
               transition={{
                 opacity: { duration: reduced ? 0 : O.revealFadeS },

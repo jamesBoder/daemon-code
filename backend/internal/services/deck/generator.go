@@ -79,6 +79,7 @@ type exclusions struct {
 	cutItemIDs       map[string]bool
 	pulseScenarioIDs map[string]bool
 	splitFramings    map[string]bool
+	oddOneOutQuotes  map[string]bool
 }
 
 type Generator struct {
@@ -297,7 +298,7 @@ func (g *Generator) buildDeck(ctx context.Context, profile db.ShadowProfile, pat
 	// Pulse's own Anthropic-call failure: a missed beat, not an error.
 	var oddOneOut *dynamo.Fragment
 	if trap == nil && overconf == nil && hold == nil && split == nil && cut == nil && pulse == nil && int(profile.CompileCount) >= oddOneOutMinCompiles && rand.Intn(oddOneOutOdds) == 0 { // #nosec G404 — non-crypto game selection
-		if of, ok := g.buildOddOneOut(ctx, profile.UserID); ok {
+		if of, ok := g.buildOddOneOut(ctx, profile.UserID, exclude.oddOneOutQuotes); ok {
 			oddOneOut = &of
 			if nScales > 1 {
 				nScales--
@@ -439,6 +440,7 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 		cutItemIDs:       make(map[string]bool),
 		pulseScenarioIDs: make(map[string]bool),
 		splitFramings:    make(map[string]bool),
+		oddOneOutQuotes:  make(map[string]bool),
 	}
 	if prev == nil {
 		return ex
@@ -501,6 +503,17 @@ func usedContentIDs(prev *dynamo.DailyDeck) exclusions {
 			}
 			if json.Unmarshal([]byte(f.Payload), &p) == nil && p.Framing != "" {
 				ex.splitFramings[p.Framing] = true
+			}
+		case "odd_one_out":
+			var p struct {
+				Quotes []struct {
+					Text string `json:"text"`
+				} `json:"quotes"`
+			}
+			if json.Unmarshal([]byte(f.Payload), &p) == nil {
+				for _, q := range p.Quotes {
+					ex.oddOneOutQuotes[q.Text] = true
+				}
 			}
 		}
 	}

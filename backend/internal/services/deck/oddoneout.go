@@ -64,7 +64,7 @@ type recentResponseFetcher interface {
 	GetRecentResponsesByType(ctx context.Context, arg db.GetRecentResponsesByTypeParams) ([]db.CardResponse, error)
 }
 
-func (g *Generator) buildOddOneOut(ctx context.Context, userID uuid.UUID) (dynamo.Fragment, bool) {
+func (g *Generator) buildOddOneOut(ctx context.Context, userID uuid.UUID, exclude map[string]bool) (dynamo.Fragment, bool) {
 	if g.oddOneOutHistory == nil {
 		return dynamo.Fragment{}, false
 	}
@@ -99,6 +99,9 @@ func (g *Generator) buildOddOneOut(ctx context.Context, userID uuid.UUID) (dynam
 			quote := res.Left
 			if leanedRight {
 				quote = res.Right
+			}
+			if exclude[quote] {
+				continue // shown as a quote last night -- don't repeat the exact same case file
 			}
 			for dim, ds := range pair.DimensionSignals {
 				high := leanedRight != ds.LeftHigh // leaned-right AND right-is-high, or leaned-left AND left-is-high

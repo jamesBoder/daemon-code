@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jamesboder/daemon-code/internal/db"
+	"github.com/jamesboder/daemon-code/internal/dynamo"
 	"github.com/jamesboder/daemon-code/internal/signal"
 )
 
@@ -61,14 +62,14 @@ func pairsForDimension(t *testing.T, dim string, n int) []signal.Pair {
 
 func TestBuildOddOneOutNoHistory(t *testing.T) {
 	g := &Generator{oddOneOutHistory: &fakeRecentResponseFetcher{}}
-	if _, ok := g.buildOddOneOut(context.Background(), uuid.New()); ok {
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), nil); ok {
 		t.Fatal("buildOddOneOut should be unavailable with zero response history")
 	}
 }
 
 func TestBuildOddOneOutUnavailableWhenNil(t *testing.T) {
 	g := &Generator{} // zero-value, oddOneOutHistory nil -- mirrors every other special beat's test pattern
-	if _, ok := g.buildOddOneOut(context.Background(), uuid.New()); ok {
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), nil); ok {
 		t.Fatal("buildOddOneOut should be unavailable when oddOneOutHistory is nil")
 	}
 }
@@ -80,7 +81,7 @@ func TestBuildOddOneOutInsufficientCluster(t *testing.T) {
 		weightedScaleResponseRow(t, pairs[0], "conscientiousness", true),
 		weightedScaleResponseRow(t, pairs[1], "conscientiousness", false),
 	}}}
-	if _, ok := g.buildOddOneOut(context.Background(), uuid.New()); ok {
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), nil); ok {
 		t.Fatal("buildOddOneOut should be unavailable without enough responses to cluster")
 	}
 }
@@ -98,7 +99,7 @@ func TestBuildOddOneOutSelectsOutlier(t *testing.T) {
 	responses = append(responses, minorityRow)
 
 	g := &Generator{oddOneOutHistory: &fakeRecentResponseFetcher{responses: responses}}
-	frag, ok := g.buildOddOneOut(context.Background(), uuid.New())
+	frag, ok := g.buildOddOneOut(context.Background(), uuid.New(), nil)
 	if !ok {
 		t.Fatal("buildOddOneOut !ok with a clean 4-vs-1 cluster on a real dimension")
 	}
@@ -158,8 +159,63 @@ func TestBuildOddOneOutSkipsUnknownPairText(t *testing.T) {
 	g := &Generator{oddOneOutHistory: &fakeRecentResponseFetcher{responses: []db.CardResponse{
 		{ResponseData: body},
 	}}}
-	if _, ok := g.buildOddOneOut(context.Background(), uuid.New()); ok {
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), nil); ok {
 		t.Fatal("buildOddOneOut should skip unmatched pair text, not fabricate a dimension")
+	}
+}
+
+func TestBuildOddOneOutExcludesServedQuotes(t *testing.T) {
+	// Same clean 4-vs-1 cluster as TestBuildOddOneOutSelectsOutlier, exactly at
+	// the eligibility bar -- excluding one quote from either side should drop
+	// that side below its threshold and make the beat unavailable, proving the
+	// exclude map is actually threaded through the bucketing, not ignored.
+	const dim = "conscientiousness"
+	highPairs := pairsForDimension(t, dim, 4)
+	lowPair := pairsForDimension(t, dim, 5)[4]
+
+	highQuoteText := func(p signal.Pair) string {
+		ds := p.DimensionSignals[dim]
+		if ds.LeftHigh {
+			return p.Left
+		}
+		return p.Right
+	}
+	lowQuoteText := func(p signal.Pair) string {
+		ds := p.DimensionSignals[dim]
+		if ds.LeftHigh {
+			return p.Right
+		}
+		return p.Left
+	}
+
+	buildResponses := func() []db.CardResponse {
+		var responses []db.CardResponse
+		for _, p := range highPairs {
+			responses = append(responses, weightedScaleResponseRow(t, p, dim, true))
+		}
+		responses = append(responses, weightedScaleResponseRow(t, lowPair, dim, false))
+		return responses
+	}
+
+	g := &Generator{oddOneOutHistory: &fakeRecentResponseFetcher{responses: buildResponses()}}
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), map[string]bool{highQuoteText(highPairs[0]): true}); ok {
+		t.Fatal("excluding one of the 4 majority quotes should drop below the majority bar")
+	}
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), map[string]bool{lowQuoteText(lowPair): true}); ok {
+		t.Fatal("excluding the sole minority quote should drop below the minority bar")
+	}
+	// A no-op exclusion (some unrelated quote) leaves the cluster intact.
+	if _, ok := g.buildOddOneOut(context.Background(), uuid.New(), map[string]bool{"not a served quote": true}); !ok {
+		t.Fatal("an exclusion that matches nothing should not affect eligibility")
+	}
+}
+
+func TestUsedContentIDsCollectsOddOneOut(t *testing.T) {
+	frag := dynamo.Fragment{Type: "odd_one_out", Payload: `{"quotes":[{"id":"a","text":"the risk you haven't taken"},{"id":"b","text":"the exit you kept open"}],"outlier_id":"b"}`}
+
+	ex := usedContentIDs(&dynamo.DailyDeck{Fragments: []dynamo.Fragment{frag}})
+	if !ex.oddOneOutQuotes["the risk you haven't taken"] || !ex.oddOneOutQuotes["the exit you kept open"] {
+		t.Fatalf("oddOneOutQuotes %v missing quotes from the served fragment", ex.oddOneOutQuotes)
 	}
 }
 

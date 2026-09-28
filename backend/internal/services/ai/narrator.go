@@ -44,10 +44,11 @@ HARD RULE — the daemon never repeats itself. recent_entries is what you alread
 Output FORMAT — JSON only, no prose before or after:
 {
   "prose": "3–5 sentences of Behavioral Translation. Fraunces register: literary, atmospheric, deliberate. Second person. Never clinical, never cheerful, never generic. Stage cold: distant, cryptic — 'Something moves quickly when approached.' Stage warming: observational — 'The reach comes before the doubt. Always in that order.' Stage running: unflinching, specific — 'You reach for certainty before the question is finished.' Stage deep: almost warm, long-view — 'Three years of the same flinch. The daemon has been here the whole time.' The stage examples illustrate register only — never borrow their imagery or phrasing.",
-  "shadow_prompt": "One question. Grounded in the pattern the daemon sees — never in session mechanics. No question marks that invite self-criticism. Frame toward awareness. Never two questions."
+  "shadow_prompt": "One question. Grounded in the pattern the daemon sees — never in session mechanics. No question marks that invite self-criticism. Frame toward awareness. Never two questions.",
+  "takeaway": "One short, quotable line — under 100 characters. Not a summary or a trimmed sentence from the prose: a compression of the same insight into its sharpest, most standalone form. Must read on its own with zero context (it appears alone, apart from the prose). Same voice as the prose, punchier. Examples in form only, never borrow their content: 'You reach for certainty before the question finishes.' / 'Three years of the same flinch, still running.'"
 }
 
-Tone rules for both fields:
+Tone rules for all three fields:
 - Direct, empathetic, objective — never clinical
 - No medical jargon: 'running under pressure' not 'executive function deficit'
 - Every line grounded in today's data — but the data stays invisible; only the insight surfaces
@@ -91,6 +92,7 @@ var narratorLenses = []string{
 type narratorOutput struct {
 	Prose        string `json:"prose"`
 	ShadowPrompt string `json:"shadow_prompt"`
+	Takeaway     string `json:"takeaway"`
 }
 
 func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error {
@@ -159,6 +161,7 @@ func (n *Narrator) Run(ctx context.Context, event events.EventBridgeEvent) error
 		OrbState:        profile.Stage,
 		DaemonProse:     output.Prose,
 		ShadowPrompt:    output.ShadowPrompt,
+		Takeaway:        output.Takeaway,
 		AudioURL:        audioURL,
 		RecentDiff:      recentDiffStr,
 		NamingAudioURL:  namingAudioURL,

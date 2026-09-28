@@ -11,7 +11,7 @@ import { AUTH_FORM_MAX_WIDTH, HAIRLINE, INPUT_FONT_SIZE } from '../../lib/consta
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: 'var(--space-3) var(--space-4)',
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--surface-input)',
   border: `${HAIRLINE} solid var(--border)`,
   borderRadius: 'var(--radius-md)',
   color: 'var(--text-primary)',
@@ -55,7 +55,7 @@ export function Login() {
 
       const data = await r.json() as AuthResponse
       setAuth(data.token, data.onboarding_complete)
-      navigate(data.onboarding_complete ? '/home' : '/onboarding')
+      navigate(data.onboarding_complete ? '/play' : '/onboarding')
     } catch {
       setError('Something went wrong. Try again.')
     } finally {

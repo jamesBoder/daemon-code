@@ -18,6 +18,7 @@ type chronicleEntry struct {
 	OrbState     string `json:"orbState,omitempty"`
 	Prose        string `json:"prose"`
 	ShadowPrompt string `json:"shadowPrompt,omitempty"`
+	Takeaway     string `json:"takeaway,omitempty"`
 	SignalQuote  string `json:"signalQuote,omitempty"`
 	SignalAuthor string `json:"signalAuthor,omitempty"`
 	AudioURL     string `json:"audioUrl,omitempty"`
@@ -55,6 +56,7 @@ func (h *handler) GetChronicle(w http.ResponseWriter, r *http.Request) {
 			OrbState:     s.OrbState,
 			Prose:        s.DaemonProse,
 			ShadowPrompt: s.ShadowPrompt,
+			Takeaway:     s.Takeaway,
 			SignalQuote:  s.SignalQuote,
 			SignalAuthor: s.SignalAuthor,
 			AudioURL:     audioURL,

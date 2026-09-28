@@ -66,7 +66,7 @@ resource "aws_iam_role_policy" "lambda_exec" {
         Sid    = "SQSSend"
         Effect = "Allow"
         Action = ["sqs:SendMessage"]
-        Resource = [aws_sqs_queue.analyst.arn]
+        Resource = [aws_sqs_queue.analyst.arn, aws_sqs_queue.deckgen_ondemand.arn]
       },
       {
         Sid    = "SQSConsume"
@@ -74,7 +74,10 @@ resource "aws_iam_role_policy" "lambda_exec" {
         Action = [
           "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"
         ]
-        Resource = [aws_sqs_queue.analyst.arn, aws_sqs_queue.analyst_dlq.arn]
+        Resource = [
+          aws_sqs_queue.analyst.arn, aws_sqs_queue.analyst_dlq.arn,
+          aws_sqs_queue.deckgen_ondemand.arn, aws_sqs_queue.deckgen_ondemand_dlq.arn
+        ]
       },
       {
         Sid      = "EventBridge"
@@ -135,6 +138,35 @@ resource "aws_sqs_queue" "analyst" {
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.analyst_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = var.tags
+}
+
+# ── SQS — on-demand single-user deck regen (GetSessionToday) ─────────────────
+# FIFO with content-based dedup, MessageGroupId/DeduplicationId = user ID:
+# the API handler enqueues on every poll while today's deck is still missing,
+# so without dedup a user hammering refresh (or two tabs) could enqueue --
+# and each trigger a live Anthropic call inside buildPulse -- multiple times
+# for the same generation. FIFO's dedup window coalesces repeats for free,
+# no application-level locking needed.
+resource "aws_sqs_queue" "deckgen_ondemand_dlq" {
+  name                      = "${var.app_name}-deckgen-ondemand-dlq.fifo"
+  fifo_queue                = true
+  message_retention_seconds = 1209600
+  tags                      = var.tags
+}
+
+resource "aws_sqs_queue" "deckgen_ondemand" {
+  name                        = "${var.app_name}-deckgen-ondemand.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  visibility_timeout_seconds  = 90   # must be >= deckgenondemand Lambda timeout
+  message_retention_seconds   = 3600 # a stale on-demand request isn't worth honoring hours later
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.deckgen_ondemand_dlq.arn
     maxReceiveCount     = 3
   })
 
@@ -255,6 +287,7 @@ locals {
     AUDIO_BUCKET               = var.audio_bucket_name
     STATIC_DOMAIN              = var.static_domain
     SQS_ANALYST_QUEUE_URL      = aws_sqs_queue.analyst.url
+    SQS_DECKGEN_ONDEMAND_QUEUE_URL = aws_sqs_queue.deckgen_ondemand.url
     DYNAMO_TABLE_DECKS         = var.dynamo_table_decks
     DYNAMO_TABLE_STATE         = var.dynamo_table_state
     EVENT_BUS_NAME             = aws_cloudwatch_event_bus.main.name
@@ -293,7 +326,11 @@ resource "aws_apigatewayv2_api" "api" {
   tags          = var.tags
 
   cors_configuration {
-    allow_origins = ["https://${var.static_domain}"]
+    # feat-console-redesign.daemon-code.pages.dev — Cloudflare Pages branch-
+    # preview URL for the console-redesign work (docs/simplify-pass.md),
+    # temporary while that branch is unmerged. Remove once it's merged or the
+    # branch is deleted.
+    allow_origins = ["https://${var.static_domain}", "https://feat-console-redesign.daemon-code.pages.dev"]
     allow_methods = ["GET", "POST", "DELETE", "PUT", "PATCH"]
     allow_headers = ["Content-Type", "Authorization"]
     max_age       = 86400
@@ -414,6 +451,41 @@ resource "aws_lambda_function" "deckgen" {
   tags = var.tags
 }
 
+# On-demand single-user deck regen, triggered by SQS from GetSessionToday
+# (backend/internal/handlers/session.go) rather than the nightly EventBridge
+# fan-out -- split out from the API Lambda specifically because it can invoke
+# a live Anthropic call (buildPulse), which the API Lambda's 30s timeout
+# could never survive. Sized like the nightly deckgen Lambda (60s).
+resource "aws_lambda_function" "deckgen_ondemand" {
+  # No hyphen between "deckgen" and "ondemand" -- must exactly match the Go
+  # cmd folder name (backend/cmd/deckgenondemand), since cd-backend.yml's
+  # deploy loop derives the Lambda function name directly from the cmd
+  # folder name (daemon-code-${cmd}), with no per-Lambda name mapping.
+  function_name = "${var.app_name}-deckgenondemand"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "bootstrap"
+  runtime       = "provided.al2023"
+  architectures = ["arm64"]
+  timeout       = 60
+  memory_size   = 128
+
+  filename         = data.archive_file.placeholder.output_path
+  source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  environment { variables = local.lambda_env }
+  tracing_config { mode = "Active" }
+
+  lifecycle { ignore_changes = [filename, source_code_hash] }
+
+  tags = var.tags
+}
+
+resource "aws_lambda_event_source_mapping" "deckgen_ondemand_sqs" {
+  event_source_arn = aws_sqs_queue.deckgen_ondemand.arn
+  function_name    = aws_lambda_function.deckgen_ondemand.arn
+  batch_size       = 1
+}
+
 resource "aws_lambda_function" "notifier" {
   function_name = "${var.app_name}-notifier"
   role          = aws_iam_role.lambda_exec.arn
@@ -494,6 +566,7 @@ output "orchestrator_lambda_arn" { value = aws_lambda_function.orchestrator.arn 
 output "analyst_lambda_arn"      { value = aws_lambda_function.analyst.arn }
 output "narrator_lambda_arn"     { value = aws_lambda_function.narrator.arn }
 output "deckgen_lambda_arn"      { value = aws_lambda_function.deckgen.arn }
+output "deckgen_ondemand_lambda_arn" { value = aws_lambda_function.deckgen_ondemand.arn }
 output "notifier_lambda_arn"      { value = aws_lambda_function.notifier.arn }
 output "pulsegenerator_lambda_arn" { value = aws_lambda_function.pulsegenerator.arn }
 output "sqs_analyst_queue_url"   { value = aws_sqs_queue.analyst.url }

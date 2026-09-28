@@ -142,6 +142,7 @@ export function ReactionTest({ words, durationMs = 800, onComplete }: Props) {
               width: rippleCfg.size, height: rippleCfg.size,
               borderRadius: '50%',
               background: 'var(--accent)',
+              filter: `blur(${rippleCfg.blurPx}px)`,
               pointerEvents: 'none',
             }}
           />

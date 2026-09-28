@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jamesboder/daemon-code/internal/db"
 	"github.com/jamesboder/daemon-code/internal/middleware"
@@ -63,13 +65,50 @@ func (h *handler) GetSessionRecentDiff(w http.ResponseWriter, r *http.Request) {
 func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
-	deck, err := h.ddb.GetDailyDeck(r.Context(), userID.String())
+	todaysDeck, err := h.ddb.GetDailyDeck(r.Context(), userID.String())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not load session")
 		return
 	}
 
-	if deck == nil {
+	// On-demand regeneration: session-completion-triggered compiles fixed
+	// the daemon running forever with no activity, but left a gap — nothing
+	// re-triggers deck generation for a user who simply missed a day, since
+	// there's no session to complete without a deck to play. Only for users
+	// with an existing profile (CompileCount >= 1) — a genuine Day 0 user
+	// has nothing yet to build a deck from, and that's not this gap.
+	//
+	// Fire-and-forget via SQS, same pattern as PostSessionComplete's Analyst
+	// trigger — NOT a synchronous h.deckGen.GenerateForUser call in-request.
+	// That used to run here directly, but GenerateForUser can invoke a live
+	// Anthropic call (buildPulse) with its own 60s client timeout, and this
+	// Lambda's own timeout is 30s: AWS kills the request before the Anthropic
+	// call would ever time out on its own, 504ing the user and dropping the
+	// deck write entirely (a real, confirmed failure mode, not hypothetical —
+	// found during a full-PR review). The actual generation now runs in
+	// backend/cmd/deckgenondemand, sized like the nightly deckgen Lambda
+	// (60s). The queue is FIFO with content-based dedup keyed per user, so
+	// repeated polls while a generation is already in flight don't each
+	// enqueue (and potentially each trigger) another Anthropic call.
+	// Frontend picks up the resulting deck via its own poll once ready.
+	if todaysDeck == nil {
+		if profile, perr := h.q.GetShadowProfile(r.Context(), userID); perr == nil && profile.CompileCount >= 1 {
+			if h.sqsClient != nil && h.cfg.SQSDeckgenQueueURL != "" {
+				body, _ := json.Marshal(map[string]string{"user_id": userID.String()})
+				groupID := userID.String()
+				if _, serr := h.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+					QueueUrl:               aws.String(h.cfg.SQSDeckgenQueueURL),
+					MessageBody:            aws.String(string(body)),
+					MessageGroupId:         aws.String(groupID),
+					MessageDeduplicationId: aws.String(groupID),
+				}); serr != nil {
+					log.Printf("session today: trigger on-demand deckgen for user %s: %v", userID, serr)
+				}
+			}
+		}
+	}
+
+	if todaysDeck == nil {
 		respondWithJSON(w, http.StatusOK, map[string]interface{}{
 			"fragments": []interface{}{},
 			"ready":     false,
@@ -78,7 +117,7 @@ func (h *handler) GetSessionToday(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"fragments": deck.Fragments,
+		"fragments": todaysDeck.Fragments,
 		"ready":     true,
 	})
 }
@@ -128,6 +167,10 @@ type sessionCompleteResponse struct {
 // PostSessionComplete runs the cheap deterministic scorer when a session's deck
 // finishes: it moves the bars of reinforced processes, may seed one "still
 // forming" process, and returns a varied daemon line. Free and instant.
+//
+// This is also where the heavier Analyst pipeline gets triggered — the daemon
+// only compiles on days a session actually completed, not on a nightly sweep
+// of every user regardless of activity (see docs/simplify-pass.md).
 func (h *handler) PostSessionComplete(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserIDFromContext(r.Context())
 
@@ -135,6 +178,17 @@ func (h *handler) PostSessionComplete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not finalize session")
 		return
+	}
+
+	// Trigger Analyst immediately — fire-and-forget, do not block the response.
+	if h.sqsClient != nil && h.cfg.SQSQueueURL != "" {
+		body, _ := json.Marshal(map[string]string{"user_id": userID.String()})
+		if _, err := h.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+			QueueUrl:    aws.String(h.cfg.SQSQueueURL),
+			MessageBody: aws.String(string(body)),
+		}); err != nil {
+			log.Printf("session complete: trigger analyst for user %s: %v", userID, err)
+		}
 	}
 
 	respondWithJSON(w, http.StatusOK, sessionCompleteResponse{Diff: result.Diff, DaemonLine: result.DaemonLine})

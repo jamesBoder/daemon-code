@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
@@ -51,16 +53,30 @@ func (n *Notifier) Run(ctx context.Context, event events.EventBridgeEvent) error
 	}
 
 	opening := firstSentence(state.DaemonProse)
-	return n.sendPush(ctx, *sub, opening)
+	gone, err := n.sendPush(ctx, userID, *sub, opening)
+	if gone {
+		log.Printf("notifier: push subscription for user %s was dead, cleaned up (not delivered)", userID)
+	}
+	return err
 }
 
-func (n *Notifier) sendPush(_ context.Context, sub dynamo.PushSubscription, proseOpening string) error {
+func (n *Notifier) sendPush(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, proseOpening string) (gone bool, err error) {
 	payload, _ := json.Marshal(map[string]string{
-		"title":  "daemon compiled",
-		"body":   proseOpening + "...",
-		"screen": "home",
+		"title": "daemon compiled",
+		"body":  proseOpening + "...",
+		"url":   "/play", // the service worker reads url; the old "screen" key was ignored
 	})
+	return n.push(ctx, userID, sub, payload)
+}
 
+// push reports whether the subscription turned out to be dead (gone=true,
+// cleaned up, err=nil) as distinct from a real delivery (gone=false, err=nil)
+// -- callers must not treat "no error" alone as "delivered": a caller that
+// counted both the same way (e.g. an aggregate sent/failed tally) would
+// silently report 100% success on a night every subscription went stale,
+// hiding a real delivery outage behind the only observability this Lambda
+// has (found during a full-PR review).
+func (n *Notifier) push(ctx context.Context, userID uuid.UUID, sub dynamo.PushSubscription, payload []byte) (gone bool, err error) {
 	resp, err := webpush.SendNotification(payload, &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{
@@ -73,10 +89,33 @@ func (n *Notifier) sendPush(_ context.Context, sub dynamo.PushSubscription, pros
 		TTL:             60 * 60 * 12, // 12 hours
 	})
 	if err != nil {
-		return fmt.Errorf("vapid push: %w", err)
+		return false, fmt.Errorf("vapid push: %w", err)
 	}
 	defer resp.Body.Close()
-	return nil
+
+	dead, err := classifyPushStatus(resp.StatusCode)
+	if dead {
+		// Permanently expired/unsubscribed: drop it so it isn't retried nightly.
+		if delErr := n.ddb.DeletePushSubscription(ctx, userID.String()); delErr != nil {
+			return false, fmt.Errorf("delete expired push subscription: %w", delErr)
+		}
+		return true, nil
+	}
+	return false, err
+}
+
+// classifyPushStatus maps a push service HTTP status to an outcome: gone
+// (404/410 — the subscription is permanently dead) or an error for any other
+// non-2xx (transient, worth surfacing in the logs).
+func classifyPushStatus(status int) (gone bool, err error) {
+	switch {
+	case status >= 200 && status < 300:
+		return false, nil
+	case status == http.StatusNotFound || status == http.StatusGone:
+		return true, nil
+	default:
+		return false, fmt.Errorf("push service returned status %d", status)
+	}
 }
 
 func firstSentence(prose string) string {
@@ -87,4 +126,33 @@ func firstSentence(prose string) string {
 		return prose[:120]
 	}
 	return prose
+}
+
+// Reminder copy — a plain system nudge, deliberately not the daemon's voice
+// (the daemon never comments on engagement; see docs/simplify-pass.md).
+const (
+	reminderTitle = "daemon code"
+	reminderBody  = "Today's session is ready."
+	reminderURL   = "/play"
+)
+
+// Remind sends the "haven't played today" push to one user. A user with no
+// push subscription is skipped silently — they never opted in. gone=true
+// means the subscription was found dead and cleaned up, not delivered to --
+// callers doing aggregate sent/failed counting must track this as its own
+// bucket, not fold it into either one (see push's own doc comment).
+func (n *Notifier) Remind(ctx context.Context, userID uuid.UUID) (gone bool, err error) {
+	sub, err := n.ddb.GetPushSubscription(ctx, userID.String())
+	if err != nil {
+		return false, fmt.Errorf("get push subscription: %w", err)
+	}
+	if sub == nil {
+		return false, nil
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"title": reminderTitle,
+		"body":  reminderBody,
+		"url":   reminderURL,
+	})
+	return n.push(ctx, userID, *sub, payload)
 }

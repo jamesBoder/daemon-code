@@ -4,6 +4,7 @@ import type { StroopItem, StroopCue } from '../components/minigames/Stroop'
 import { Hold } from '../components/minigames/Hold'
 import { Split } from '../components/minigames/Split'
 import { Cut } from '../components/minigames/Cut'
+import { PulseMap } from '../components/minigames/PulseMap'
 import { copy } from '../lib/copy'
 import { MG } from '../lib/minigame'
 import { FRAGMENT_CONTEXT_MS, LETTER_SPACING_COMPILE } from '../lib/constants'
@@ -171,13 +172,24 @@ function randomCutParams() {
   }
 }
 
-type GameKey = 'stroop' | 'hold' | 'split' | 'cut'
+// A fixed sample scenario for playtesting The Map — the real one is stamped by
+// buildPulse (scenario, daemon lines, six nodes).
+const PULSE_SAMPLE = {
+  scenarioId: 'dev_pulse',
+  text: 'A door stands open in an empty house.',
+  observation: 'You went toward the door before the room.',
+  prediction: 'Next time you will hesitate.',
+  nodes: ['leave', 'stay', 'listen', 'name it', 'wait', 'close it'].map((text, i) => ({ id: `dev_${i + 1}`, text })),
+}
+
+type GameKey = 'stroop' | 'hold' | 'split' | 'cut' | 'pulse'
 
 const GAMES: { key: GameKey; label: string }[] = [
   { key: 'stroop', label: 'The Stroop Variant' },
   { key: 'hold',   label: 'The Hold' },
   { key: 'split',  label: 'The Split' },
   { key: 'cut',    label: 'The Cut' },
+  { key: 'pulse',  label: 'The Map' },
 ]
 
 type Phase = 'menu' | 'context' | 'game'
@@ -264,6 +276,8 @@ export function DevGames() {
         <Hold key={runId} params={holdParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
       ) : active === 'split' ? (
         <Split key={runId} params={splitParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
+      ) : active === 'pulse' ? (
+        <PulseMap key={runId} {...PULSE_SAMPLE} onComplete={handleComplete} />
       ) : (
         <Cut key={runId} params={cutParams ?? undefined} onComplete={handleComplete} forceMotion={forceMotion} />
       )

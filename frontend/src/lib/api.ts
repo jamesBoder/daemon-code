@@ -114,6 +114,7 @@ export function homeToCompileData(home: HomeData): CompileData {
     stats: home.stats.map(s => ({ label: s.label, text: s.value })),
     daemonProse: home.daemonProse || 'Signal collected. The daemon compiles overnight.',
     shadowPrompt: home.shadowPrompt,
+    takeaway: home.takeaway,
     dailySignalQuote: home.dailySignalQuote,
     dailySignalAuthor: home.dailySignalAuthor,
     orbState: VALID_ORB_STATES.includes(home.orbState as OrbState)

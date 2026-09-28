@@ -4,12 +4,18 @@ import { SessionContainer } from '../components/minigames/SessionContainer'
 import { DaemonOrb } from '../components/daemon/DaemonOrb'
 import { DaemonButton } from '../components/ui/DaemonButton'
 import { apiFetchJson, postSessionComplete } from '../lib/api'
-import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID } from '../lib/constants'
+import { DAY_QUERY_STALE_MS, ORB_LAYOUT_ID, SESSION_NOT_READY_POLL_MS } from '../lib/constants'
+import { useReturnTo } from '../hooks/useReturnTo'
 import type { SessionTodayResponse } from '../types'
 
 export function Session() {
   const navigate     = useNavigate()
   const queryClient  = useQueryClient()
+  // Set when entered from the new PLAY console (docs/simplify-pass.md) so
+  // completion returns there instead of the old /home default. Absent for
+  // every existing entry point (BottomNav's Session tab) — behavior for
+  // that path is unchanged.
+  const returnTo      = useReturnTo()
 
   const { data, isLoading } = useQuery({
     queryKey: ['session-today'],
@@ -18,6 +24,10 @@ export function Session() {
     // re-asks the server once the overnight deck lands instead of caching
     // this morning's miss for 23 hours.
     staleTime: query => (query.state.data?.ready ? DAY_QUERY_STALE_MS : 0),
+    // On-demand generation now runs asynchronously (see Play.tsx) -- poll
+    // while not ready so this fallback screen picks up the deck once it
+    // lands, instead of requiring a manual reload.
+    refetchInterval: query => (query.state.data?.ready ? false : SESSION_NOT_READY_POLL_MS),
   })
 
   async function handleComplete(fragmentCount: number) {
@@ -36,7 +46,7 @@ export function Session() {
       // Live scoring is non-essential; ignore and continue.
     }
 
-    navigate('/session/complete', { state: { fragmentCount, daemonLine } })
+    navigate('/session/complete', { state: { fragmentCount, daemonLine, returnTo } })
   }
 
   if (isLoading) {
@@ -55,10 +65,10 @@ export function Session() {
           The daemon is still processing.<br />
           Today&rsquo;s session isn&rsquo;t ready yet.
         </p>
-        <DaemonButton onClick={() => navigate('/home')}>Return home →</DaemonButton>
+        <DaemonButton onClick={() => navigate(returnTo ?? '/home')}>Return home →</DaemonButton>
       </div>
     )
   }
 
-  return <SessionContainer fragments={data.fragments} onComplete={handleComplete} />
+  return <SessionContainer fragments={data.fragments} onComplete={handleComplete} returnTo={returnTo} />
 }

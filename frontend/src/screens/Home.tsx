@@ -17,7 +17,6 @@ import { BOTTOM_NAV_HEIGHT, BUTTON_TAP_OPACITY, BUTTON_TAP_SCALE, COMPILE_PLAYED
 import { copy } from '../lib/copy'
 import { generateAndShareCard } from '../lib/shareCard'
 import { usePushPrompt } from '../hooks/usePushPrompt'
-import { useAmbient } from '../hooks/useAmbient'
 import type { HomeData, ShadowProfile, Archetype } from '../types'
 
 
@@ -59,9 +58,6 @@ export function Home() {
 
   const isLoading = homeLoading || profileLoading
   const isError   = homeError
-
-  // Ambient bed cutoff opens as the daemon's model deepens (kernelAccess 0–100 → 0–1).
-  useAmbient((home?.kernelAccess ?? 0) / 100)
 
   const { show: showPushPrompt, dismiss: dismissPush, enable: enablePush } = usePushPrompt(home?.day ?? 0)
 

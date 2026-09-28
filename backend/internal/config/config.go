@@ -12,23 +12,24 @@ import (
 )
 
 type Config struct {
-	AWSRegion        string
-	DBHost           string
-	DBPort           string
-	DBName           string
-	DBUser           string
-	DBPassword       string
-	JWTSecret        string
-	AnthropicAPIKey  string
-	AudioBucket      string
-	SQSQueueURL      string // orchestrator → per-user Analyst fan-out
-	DynamoTableDecks string
-	DynamoTableState string
-	VAPIDPublicKey   string
-	VAPIDPrivateKey  string
-	EventBusName     string // custom EventBridge bus name for inter-Lambda events
-	Environment      string
-	AllowedOrigin    string // CORS allowed origin; empty = "*" (local dev)
+	AWSRegion          string
+	DBHost             string
+	DBPort             string
+	DBName             string
+	DBUser             string
+	DBPassword         string
+	JWTSecret          string
+	AnthropicAPIKey    string
+	AudioBucket        string
+	SQSQueueURL        string // orchestrator → per-user Analyst fan-out
+	SQSDeckgenQueueURL string // GetSessionToday → on-demand single-user deck regen (backend/cmd/deckgenondemand)
+	DynamoTableDecks   string
+	DynamoTableState   string
+	VAPIDPublicKey     string
+	VAPIDPrivateKey    string
+	EventBusName       string // custom EventBridge bus name for inter-Lambda events
+	Environment        string
+	AllowedOrigin      string // CORS allowed origin; empty = "*" (local dev)
 }
 
 type dbSecret struct {
@@ -51,14 +52,15 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		AWSRegion:        region,
-		AudioBucket:      os.Getenv("AUDIO_BUCKET"),
-		SQSQueueURL:      os.Getenv("SQS_ANALYST_QUEUE_URL"),
-		DynamoTableDecks: os.Getenv("DYNAMO_TABLE_DECKS"),
-		DynamoTableState: os.Getenv("DYNAMO_TABLE_STATE"),
-		EventBusName:     os.Getenv("EVENT_BUS_NAME"),
-		Environment:      os.Getenv("ENVIRONMENT"),
-		AllowedOrigin:    os.Getenv("ALLOWED_ORIGIN"),
+		AWSRegion:          region,
+		AudioBucket:        os.Getenv("AUDIO_BUCKET"),
+		SQSQueueURL:        os.Getenv("SQS_ANALYST_QUEUE_URL"),
+		SQSDeckgenQueueURL: os.Getenv("SQS_DECKGEN_ONDEMAND_QUEUE_URL"),
+		DynamoTableDecks:   os.Getenv("DYNAMO_TABLE_DECKS"),
+		DynamoTableState:   os.Getenv("DYNAMO_TABLE_STATE"),
+		EventBusName:       os.Getenv("EVENT_BUS_NAME"),
+		Environment:        os.Getenv("ENVIRONMENT"),
+		AllowedOrigin:      os.Getenv("ALLOWED_ORIGIN"),
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(region))

@@ -27,6 +27,13 @@ export const PROSE_MAX_WIDTH   = 320   // px — max width for daemon prose text
 // showing "still processing" long after the overnight pipeline has delivered.
 export const DAY_QUERY_STALE_MS = 23 * 60 * 60 * 1000
 
+// How often PLAY re-polls /session/today while a deck isn't ready yet. Needed
+// now that on-demand generation (a missed-day user opening PLAY with no deck
+// for today) runs asynchronously via SQS/Lambda instead of inline in the same
+// request -- without a poll, the client would only ever see the freshly
+// generated deck after a manual reload.
+export const SESSION_NOT_READY_POLL_MS = 4000
+
 // Token refresh
 export const TOKEN_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000  // refresh if expiry < 24h away
 
@@ -47,6 +54,9 @@ export const SESSION_PROGRESS_Z_INDEX = 10   // session progress bar — above b
 export const HEADER_Z_INDEX           = 50   // fixed screen header — above session, below modals
 export const TOAST_Z_INDEX            = 20   // above scrollable content, below modals (MODAL_Z_INDEX)
 export const MODAL_Z_INDEX            = 100  // above all position:fixed session content
+export const CONSOLE_OVERLAY_Z_INDEX  = 40   // console scanline/vignette texture — below the content it textures, below the tab strip
+export const CONSOLE_CONTENT_Z_INDEX  = 45   // console PLAY/SELF content — above the texture overlay so real UI (buttons etc.) never gets washed out, below the tab strip
+export const CONSOLE_FLICKER_Z_INDEX  = 9998 // console tab-switch dip — above everything except the grain overlay (9999)
 export const MODAL_MAX_WIDTH   = 320   // px — confirm modal max width
 
 // Session
@@ -59,9 +69,8 @@ export const HAPTICS_KEY   = 'haptics_enabled'    // localStorage boolean; defau
 export const DAEMON_VOICE_KEY   = 'daemon_voice_enabled' // localStorage boolean; default true (opt-out)
 export const DAEMON_VOICE_EVENT = 'daemon-voice-change'  // window event: same-tab notify when the toggle flips
 
-// Web Audio atmosphere (§7) — procedural UI sounds + signal-reactive ambient drone
-export const SOUND_KEY   = 'sound_enabled'       // localStorage boolean; default false (opt-in — never plays unenabled)
-export const SOUND_EVENT = 'daemon-sound-change' // window event: same-tab notify when the toggle flips
+// Web Audio (§7) — procedural UI sounds (event sounds only; no ambient bed)
+export const SOUND_KEY = 'sound_enabled' // localStorage boolean; default false (opt-in — never plays unenabled)
 
 // localStorage keys
 export const COMPILE_PLAYED_KEY = 'compile_played_day'  // sessionStorage — prevents re-playing compile animation same day

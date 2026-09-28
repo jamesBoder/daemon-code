@@ -109,7 +109,7 @@ export function MoodCheck({ onSelect }: Props) {
                 dragElastic={T.dragElastic}
                 onDrag={syncScore}
                 onDragEnd={syncScore}
-                whileDrag={{ scale: T.handleScale }}
+                whileDrag={{ scale: T.handleScale, boxShadow: '0 0 16px var(--accent-glow), 0 0 6px color-mix(in srgb, var(--accent) 40%, transparent)' }}
                 style={{
                   x: dragX,
                   position: 'absolute', top: '50%', left: `calc(50% - ${T.handleSize / 2}px)`, marginTop: -(T.handleSize / 2),
@@ -131,7 +131,7 @@ export function MoodCheck({ onSelect }: Props) {
 
           <button
             onClick={handleConfirm}
-            className="daemon-btn daemon-btn-primary"
+            className="daemon-btn daemon-btn-primary daemon-btn-glow"
             style={{ width: '100%', maxWidth: T.confirmMaxW }}
           >
             {copy.mood.confirm}

@@ -61,6 +61,7 @@ export interface CompileData {
   stats: CompileStat[]
   daemonProse: string
   shadowPrompt?: string
+  takeaway?: string  // short quotable line distilling daemonProse; feeds Self + the share card
   dailySignalQuote: string
   dailySignalAuthor: string
   orbState: OrbState
@@ -108,6 +109,7 @@ export interface HomeData {
   stats: { label: string; value: string }[]
   daemonProse: string
   shadowPrompt?: string
+  takeaway?: string  // short quotable line distilling daemonProse; feeds Self + the share card
   dailySignalQuote: string
   dailySignalAuthor: string
   orbState: OrbState
@@ -163,6 +165,7 @@ export interface ChronicleEntry {
   orbState?: OrbState
   prose: string
   shadowPrompt?: string
+  takeaway?: string  // short quotable line distilling prose; feeds Self + the share card
   signalQuote?: string
   signalAuthor?: string
   audioUrl?: string
